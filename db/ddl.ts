@@ -27,6 +27,24 @@ export const MIGRATION_DDL = `
 
   CREATE INDEX IF NOT EXISTS idx_recipes_cookbook_id ON recipes(cookbook_id);
 
+  CREATE TABLE IF NOT EXISTS shopping_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS shopping_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    quantity TEXT,
+    checked INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_shopping_items_list_id ON shopping_items(list_id);
+
   -- Tags were removed from the MVP (SPEC.md §7/§8); drop legacy tables.
   -- Junction table first because of the FK reference into tags.
   DROP TABLE IF EXISTS recipe_tags;

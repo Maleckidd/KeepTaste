@@ -1,13 +1,15 @@
 # KeepTaste — Technical Specification (SDD)
 
 > Living document. Update it with every significant design decision.
-> Version: 1.3 | Date: 2026-06
+> Version: 1.4 | Date: 2026-06
 
 ---
 
 ## 1. Product goal
 
 A private, local mobile app for storing and managing cooking recipes. Works fully offline — data is stored exclusively on the user's device. No accounts, no cloud sync, no ads. With export capability.
+
+A second product area — simple shopping lists (§5.10) — shares the same philosophy and lives behind a bottom tab bar (§5.9): Recipes and Shopping are sibling areas of one local-first app.
 
 Philosophy: **your data, your device**. Markdown export guarantees the user is never locked in by the app — their recipes are always readable outside of it.
 
@@ -45,7 +47,10 @@ Philosophy: **your data, your device**. Markdown export guarantees the user is n
 ```
 app/
   _layout.tsx            ← root layout: DB initialization, Stack configuration
-  index.tsx              ← home screen: cookbook grid + settings entry
+  (tabs)/
+    _layout.tsx          ← bottom tab bar: Recipes + Shopping (§5.9)
+    index.tsx            ← Recipes tab: cookbook grid + settings entry
+    shopping.tsx         ← Shopping tab root (§5.10)
   settings.tsx           ← app info, no-backup notice, import, delete all data
   cookbook/
     [id].tsx             ← recipe list; id="all" → all recipes (+ title search)
@@ -333,11 +338,11 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 **Content:**
 - **App info** — the app name ("KeepTaste") and version, read from `Constants.expoConfig?.version` (fallback `1.0.0`).
 - **Data / no-backup notice** — explains that recipes are stored only on this device, that there are no accounts and no cloud sync, that uninstalling the app deletes all recipes, and that exporting a cookbook to Markdown (§5.6) is the only backup mechanism.
-- **Delete all data** — a destructive button that wipes every cookbook and recipe.
+- **Delete all data** — a destructive button that wipes every cookbook, recipe and shopping list.
 
 **Delete all data flow:**
 - Double confirmation: first an `Alert` ("Delete all data?") explaining what will be removed, then on confirm a second `Alert` warning the action cannot be undone. Both use destructive button styles.
-- On final confirm: `deleteAllData()` (in `db/recipes.ts`) deletes all recipes then all cookbooks (in that order) and returns the stored image paths; the screen then deletes those image files via `deleteStoredImage` and navigates back home (which reloads via `useFocusEffect`).
+- On final confirm: `deleteAllData()` (in `db/recipes.ts`) deletes all recipes, then all cookbooks, then all shopping items and lists (in that order) and returns the stored image paths; the screen then deletes those image files via `deleteStoredImage` and navigates back home (which reloads via `useFocusEffect`).
 
 ### 5.8 Import from Markdown
 
@@ -358,7 +363,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 ---
 
-### 5.9 Bottom tab navigation *(planned — not yet implemented)*
+### 5.9 Bottom tab navigation
 
 A persistent bottom tab bar with two tabs, introducing the second product area (Shopping, §5.10):
 
@@ -381,11 +386,11 @@ app/
 **Rules:**
 - The tab bar is visible on the two tab roots; modal forms (recipe/cookbook/list forms) and detail screens open **over** it via the root Stack, consistent with the current modal pattern.
 - Tab bar colors come from the theme palettes (`surface` background, `primary` active tint, `textMuted` inactive tint, `border` top hairline) via `useTheme()` — works in both light and dark mode.
-- The settings gear stays in the Recipes tab header (§5.1) — Shopping has its own header with its own "+" action.
+- The settings gear stays in the Recipes tab header (§5.1) — Shopping has its own header. The Shopping "+" action arrives with §5.10; until then the Shopping tab shows only a header and an empty state.
 
 ---
 
-### 5.10 Shopping lists *(planned — not yet implemented)*
+### 5.10 Shopping lists
 
 A second product area: simple, offline shopping lists. Same philosophy as recipes — local-only, no accounts, no magic.
 
@@ -516,6 +521,8 @@ Values to be verified on a device for contrast (target: WCAG AA for text). Photo
 ## 8. TODO — open items
 
 ### High priority
+- [x] **Bottom tab navigation** — restructure `app/` into a `(tabs)` group with a two-tab bottom bar: Recipes (existing home) and Shopping (§5.9); modals and detail screens keep opening over the bar via the root Stack
+- [x] **Shopping lists** — the Shopping tab per §5.10: `shopping_lists`/`shopping_items` tables (DDL + schema), list-of-lists view, "New shopping list" modal, list detail with inline product adding and the checked/"In cart" flow. Depends on the tab bar landing first
 - [x] **Remove tags from the existing code** — drop the `tags`/`recipe_tags` tables (DDL + `DROP TABLE IF EXISTS` for existing dev installs), fields in `schema.ts`, the tags field in `RecipeForm`, chips in the recipe view, and the section in export
 - [x] **Cookbook create/edit modal** — form with a name field and an image picker for the cover (replacing the `Alert` placeholder in `index.tsx`); editing available via long-press on a tile; long-press also gains an "Edit" option and a second delete confirmation with a message about recipes surviving (§5.1, §5.2)
 - [x] **Copying photos to `documentDirectory`** — critical data-loss risk: the image picker URI points to the system cache. Done in `utils/imageStorage.ts`: (1) on recipe/cookbook save the picked file is copied to `FileSystem.documentDirectory`, (2) the stored copy is deleted when the record is deleted or the photo is replaced/removed, (3) covers both recipe `image_path` and cookbook `cover_image_path`; graceful no-op on web (`documentDirectory` is null there)

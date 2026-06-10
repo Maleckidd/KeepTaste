@@ -9,7 +9,7 @@
 // Both select and delete return a thenable so they can be `await`ed directly,
 // matching how unfiltered Drizzle queries behave at runtime.
 
-import { recipes, cookbooks } from '../db/schema';
+import { recipes, cookbooks, shoppingItems, shoppingLists } from '../db/schema';
 
 // Per-test queues of rows the next two `.from(...)` calls should resolve to.
 // The implementation selects recipe rows first, then cookbook rows.
@@ -54,14 +54,14 @@ describe('db/recipes — deleteAllData', () => {
     );
   });
 
-  it('deletes recipes before cookbooks (both tables, unfiltered)', async () => {
+  it('deletes recipes, cookbooks, then shopping items and lists (all unfiltered)', async () => {
     // recipe rows, then cookbook rows
     selectResults = [[], []];
 
     await (recipesModule as any).deleteAllData();
 
-    expect(db.delete).toHaveBeenCalledTimes(2);
-    expect(deleteCalls).toEqual([recipes, cookbooks]);
+    expect(db.delete).toHaveBeenCalledTimes(4);
+    expect(deleteCalls).toEqual([recipes, cookbooks, shoppingItems, shoppingLists]);
   });
 
   it('returns combined non-null image paths from recipes and cookbooks', async () => {

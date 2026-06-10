@@ -24,8 +24,30 @@ export const recipes = sqliteTable('recipes', {
   updatedAt: text('updated_at').notNull().default(new Date().toISOString()),
 });
 
+export const shoppingLists = sqliteTable('shopping_lists', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  createdAt: text('created_at').notNull().default(new Date().toISOString()),
+  updatedAt: text('updated_at').notNull().default(new Date().toISOString()),
+});
+
+export const shoppingItems = sqliteTable('shopping_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  listId: integer('list_id')
+    .notNull()
+    .references(() => shoppingLists.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  quantity: text('quantity'),
+  checked: integer('checked').notNull().default(0),
+  createdAt: text('created_at').notNull().default(new Date().toISOString()),
+});
+
 // TypeScript types derived from the schema
 export type Cookbook = typeof cookbooks.$inferSelect;
 export type NewCookbook = typeof cookbooks.$inferInsert;
 export type Recipe = typeof recipes.$inferSelect;
 export type NewRecipe = typeof recipes.$inferInsert;
+export type ShoppingList = typeof shoppingLists.$inferSelect;
+export type NewShoppingList = typeof shoppingLists.$inferInsert;
+export type ShoppingItem = typeof shoppingItems.$inferSelect;
+export type NewShoppingItem = typeof shoppingItems.$inferInsert;

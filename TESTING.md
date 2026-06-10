@@ -291,6 +291,46 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 1. After MI-01, open imported R1.
 - Expected: gray placeholder instead of a photo (export does not carry images — known format property, not a bug); everything else intact.
 
+### SL — Shopping lists (SPEC §5.10)
+
+**SL-01 · P0 · Create a shopping list**
+1. Shopping tab → tap "+" → the "New shopping list" modal opens with the name field focused.
+2. Leave the name empty → tap "Create list".
+- Expected: blocked with a "Missing name" alert; no list is created.
+3. Type a name, then tap the "✕" close button.
+- Expected: "Discard changes?" alert (dirty-check); "Discard" closes without creating, "Keep editing" stays.
+4. Type a name → tap "Create list".
+- Expected: navigates straight into the new list's detail (empty state); tapping back returns to the Shopping tab with the new list visible.
+
+**SL-02 · P0 · Add products**
+1. In a list detail, reveal the add row (empty list: "Add product" button; non-empty: "+" in the header).
+2. Confirm with an empty name.
+- Expected: no-op (nothing added).
+3. Add a product with a name only, then one with a quantity (e.g. "1 kg").
+- Expected: each appears in the active section; quantity shown muted next to the name when present; after each add the inputs clear and the add row stays open with focus back on the name field.
+
+**SL-03 · P0 · Check / uncheck flow**
+1. Tap a product (or its checkbox).
+- Expected: it grays out (line-through, muted checkmark-circle) and moves under the uppercase "In cart" section header.
+2. Observe the header.
+- Expected: "In cart" header appears only when at least one item is checked.
+3. Uncheck the item.
+- Expected: it returns to the active section; header disappears when nothing is checked.
+
+**SL-04 · P1 · Progress label + list reordering**
+1. From the Shopping tab, observe a list with items.
+- Expected: card shows "{checked}/{total} in cart" (hidden when the list is empty).
+2. Check or add an item in another list, then return to the tab.
+- Expected: the changed list floats to the top (sorted by `updated_at`).
+
+**SL-05 · P1 · Delete a list removes its items (CASCADE — verify in Expo Go)**
+1. Long-press a list card → Alert → "Delete".
+- Expected: the list disappears; its `shopping_items` rows are removed via `ON DELETE CASCADE` (verify no orphaned items remain).
+
+**SL-06 · P2 · Delete a product via long-press**
+1. Long-press a product row → Alert → "Delete".
+- Expected: the product is removed; the parent list's `updated_at` is touched.
+
 ### DC — Discard-changes dialogs (SPEC §5.2, §5.5)
 
 **DC-01 · P0 · Dirty recipe form warns on Cancel**

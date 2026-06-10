@@ -35,7 +35,7 @@ export default function RootLayout() {
           },
         }}
       >
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="cookbook/[id]"
           options={{ title: 'Cookbook' }}
@@ -59,6 +59,17 @@ export default function RootLayout() {
           name="recipe/edit"
           options={{
             title: 'Edit recipe',
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="shopping/[id]"
+          options={{ title: 'Shopping list', presentation: 'card' }}
+        />
+        <Stack.Screen
+          name="shopping/new"
+          options={{
+            title: 'New shopping list',
             presentation: 'modal',
           }}
         />

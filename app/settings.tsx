@@ -113,7 +113,7 @@ export default function SettingsScreen() {
   const handleDeleteAll = () => {
     Alert.alert(
       'Delete all data?',
-      'This will remove every cookbook and recipe stored on this device, along with their images.',
+      'This will remove every cookbook, recipe and shopping list stored on this device, along with their images.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -209,7 +209,7 @@ export default function SettingsScreen() {
           <Text style={styles.deleteButtonText}>Delete all data</Text>
         </TouchableOpacity>
         <Text style={styles.deleteHint}>
-          Permanently erases every cookbook and recipe on this device.
+          Permanently erases every cookbook, recipe and shopping list on this device.
         </Text>
       </ScrollView>
     </View>

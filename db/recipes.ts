@@ -1,6 +1,13 @@
 import { eq, isNull, desc } from 'drizzle-orm';
 import { db } from './client';
-import { recipes, cookbooks, type Recipe, type NewRecipe } from './schema';
+import {
+  recipes,
+  cookbooks,
+  shoppingItems,
+  shoppingLists,
+  type Recipe,
+  type NewRecipe,
+} from './schema';
 import { filterRecipesByTitle } from '../utils/search';
 
 // --- Recipes ---
@@ -70,6 +77,10 @@ export async function deleteAllData(): Promise<string[]> {
 
   await db.delete(recipes);
   await db.delete(cookbooks);
+  // Shopping data goes too — "delete all data" means the whole app. Items
+  // before lists so the FK never dangles even without CASCADE support.
+  await db.delete(shoppingItems);
+  await db.delete(shoppingLists);
 
   const paths = [
     ...recipeRows.map((r) => r.imagePath),
