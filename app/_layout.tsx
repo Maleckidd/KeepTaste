@@ -74,6 +74,13 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="shopping/edit"
+          options={{
+            title: 'Rename list',
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
           name="cookbook/new"
           options={{
             title: 'New cookbook',

@@ -41,17 +41,29 @@ export default function ShoppingScreen() {
     }, [loadData])
   );
 
-  const handleDelete = (list: ShoppingListWithCounts) => {
-    Alert.alert(list.name, 'Delete this shopping list?', [
-      { text: 'Cancel', style: 'cancel' },
+  const handleLongPress = (list: ShoppingListWithCounts) => {
+    Alert.alert(list.name, 'What would you like to do?', [
+      {
+        text: 'Rename',
+        onPress: () => router.push(`/shopping/edit?id=${list.id}`),
+      },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
-          await deleteShoppingList(list.id);
-          loadData();
-        },
+        onPress: () =>
+          Alert.alert(list.name, 'Delete this shopping list?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                await deleteShoppingList(list.id);
+                loadData();
+              },
+            },
+          ]),
       },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
@@ -89,7 +101,7 @@ export default function ShoppingScreen() {
               <TouchableOpacity
                 style={styles.card}
                 onPress={() => router.push(`/shopping/${item.id}`)}
-                onLongPress={() => handleDelete(item)}
+                onLongPress={() => handleLongPress(item)}
                 activeOpacity={0.8}
               >
                 <View style={styles.cardBody}>

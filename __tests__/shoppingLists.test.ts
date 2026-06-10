@@ -186,6 +186,20 @@ describe('db/shoppingLists — deleteShoppingList', () => {
   });
 });
 
+describe('db/shoppingLists — updateShoppingListName', () => {
+  it('updates the name and refreshes updatedAt', async () => {
+    await (listsModule as any).updateShoppingListName(5, 'Weekend BBQ');
+
+    expect(db.update).toHaveBeenCalledWith(shoppingLists);
+    const call = updateCalls.find((c) => c.table === shoppingLists);
+    expect(call).toBeDefined();
+    const set = call!.set as { name?: string; updatedAt?: string };
+    expect(set.name).toBe('Weekend BBQ');
+    expect(typeof set.updatedAt).toBe('string');
+    expect(set.updatedAt!.length).toBeGreaterThan(0);
+  });
+});
+
 describe('db/shoppingLists — getShoppingLists', () => {
   it('annotates each list with totalCount and checkedCount, preserving list order', async () => {
     // Select ordering assumed: (1) lists, then (2) items across all lists.

@@ -47,6 +47,16 @@ export async function createShoppingList(name: string): Promise<number> {
   return result[0].id;
 }
 
+export async function updateShoppingListName(
+  id: number,
+  name: string
+): Promise<void> {
+  await db
+    .update(shoppingLists)
+    .set({ name, updatedAt: new Date().toISOString() })
+    .where(eq(shoppingLists.id, id));
+}
+
 export async function deleteShoppingList(id: number): Promise<void> {
   await db.delete(shoppingLists).where(eq(shoppingLists.id, id));
 }

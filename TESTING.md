@@ -327,6 +327,11 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 1. Long-press a list card → Alert → "Delete".
 - Expected: the list disappears; its `shopping_items` rows are removed via `ON DELETE CASCADE` (verify no orphaned items remain).
 
+**SL-07 · P1 · Rename a list**
+1. Long-press a list card → **Rename** → modal opens pre-filled with the current name.
+2. Change the name, Save; also try: clearing the name (blocked with an Alert) and closing via ✕ after editing (dirty-check Alert).
+- Expected: card shows the new name; the renamed list floats to the top of the Shopping tab (`updated_at` refreshed); items untouched.
+
 **SL-06 · P2 · Delete a product via long-press**
 1. Long-press a product row → Alert → "Delete".
 - Expected: the product is removed; the parent list's `updated_at` is touched.

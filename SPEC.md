@@ -399,7 +399,7 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 - Lists sorted descending by `updated_at`
 - "+" button in the header → "New shopping list" form
 - Tap a card → opens the list detail view
-- Long-press a card → Alert: **Delete / Cancel**, with a destructive confirmation (deleting a list deletes its items — unlike cookbooks there is no orphan pool)
+- Long-press a card → Alert: **Rename / Delete / Cancel**. Rename opens a "Rename list" modal (same single-field form as creation, pre-filled, "Save" button, ✕ with dirty-check); renaming refreshes the list's `updated_at`. Delete asks for a second, destructive confirmation (deleting a list deletes its items — unlike cookbooks there is no orphan pool)
 - Empty state: icon + a message encouraging creating the first list
 
 **"New shopping list" form (modal):**
