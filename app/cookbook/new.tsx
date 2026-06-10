@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import CookbookForm from '@/components/cookbook/CookbookForm';
 import { createCookbook } from '@/db/cookbooks';
-import { Colors } from '@/constants/theme';
+import { useTheme, ThemePalette } from '@/constants/theme';
 import { type CookbookFormData, normalizeCookbookInput } from '@/utils/cookbookForm';
 import { persistImage } from '@/utils/imageStorage';
 
 export default function NewCookbookScreen() {
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = async (data: CookbookFormData) => {
@@ -34,9 +36,9 @@ export default function NewCookbookScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
 });

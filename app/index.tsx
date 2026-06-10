@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,15 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCookbooks, deleteCookbook } from '@/db/cookbooks';
 import { deleteStoredImage } from '@/utils/imageStorage';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import {
+  useTheme,
+  ThemePalette,
+  Typography,
+  Spacing,
+  Radius,
+  Shadow,
+} from '@/constants/theme';
 import type { Cookbook } from '@/db/schema';
-
-const TILE_COLORS = Colors.cookbookColors;
 
 function CookbookTile({
   item,
@@ -29,7 +34,10 @@ function CookbookTile({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const tileColor = TILE_COLORS[index % TILE_COLORS.length];
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const tileColors = c.cookbookColors;
+  const tileColor = tileColors[index % tileColors.length];
 
   return (
     <TouchableOpacity
@@ -59,6 +67,8 @@ function CookbookTile({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [cookbooks, setCookbooks] = useState<Cookbook[]>([]);
 
   const loadCookbooks = useCallback(async () => {
@@ -141,25 +151,25 @@ export default function HomeScreen() {
             style={styles.addButton}
             onPress={() => router.push('/settings')}
           >
-            <Ionicons name="settings-outline" size={22} color={Colors.primary} />
+            <Ionicons name="settings-outline" size={22} color={c.primary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={handleAddCookbook}>
-            <Ionicons name="add" size={26} color={Colors.primary} />
+            <Ionicons name="add" size={26} color={c.primary} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* "All recipes" tile */}
       <TouchableOpacity style={styles.allRecipesTile} onPress={handleOpenAllRecipes}>
-        <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
+        <Ionicons name="search-outline" size={18} color={c.textSecondary} />
         <Text style={styles.allRecipesText}>All recipes</Text>
-        <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
       </TouchableOpacity>
 
       {/* Cookbook grid */}
       {cookbooks.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="book-outline" size={56} color={Colors.border} />
+          <Ionicons name="book-outline" size={56} color={c.border} />
           <Text style={styles.emptyTitle}>No cookbooks</Text>
           <Text style={styles.emptyText}>
             Tap + to create your first cookbook
@@ -182,10 +192,10 @@ export default function HomeScreen() {
 
 const TILE_SIZE = 160;
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
   header: {
     flexDirection: 'row',
@@ -197,7 +207,7 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontSize: Typography.size.sm,
-    color: Colors.textMuted,
+    color: c.textMuted,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 2,
@@ -205,7 +215,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.size.xxl,
     fontWeight: Typography.weight.bold,
-    color: Colors.text,
+    color: c.text,
     letterSpacing: -0.5,
   },
   headerActions: {
@@ -217,7 +227,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadow.sm,
@@ -230,15 +240,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: c.border,
   },
   allRecipesText: {
     flex: 1,
     fontSize: Typography.size.base,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
   },
   grid: {
     paddingHorizontal: Spacing.base,
@@ -280,11 +290,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: Typography.size.lg,
     fontWeight: Typography.weight.semibold,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
   },
   emptyText: {
     fontSize: Typography.size.base,
-    color: Colors.textMuted,
+    color: c.textMuted,
     textAlign: 'center',
     lineHeight: Typography.size.base * 1.5,
   },

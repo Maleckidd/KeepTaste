@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RecipeForm from '@/components/recipe/RecipeForm';
 import { type RecipeFormData } from '@/utils/recipeForm';
 import { createRecipe } from '@/db/recipes';
-import { Colors } from '@/constants/theme';
+import { useTheme, ThemePalette } from '@/constants/theme';
 import { parsePositiveInt } from '@/utils/numeric';
 import { persistImage } from '@/utils/imageStorage';
 
 export default function NewRecipeScreen() {
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { cookbookId } = useLocalSearchParams<{ cookbookId?: string }>();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,9 +48,9 @@ export default function NewRecipeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
 });

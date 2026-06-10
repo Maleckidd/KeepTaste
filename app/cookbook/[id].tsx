@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { getCookbookById } from '@/db/cookbooks';
 import { getRecipesByCookbook, getAllRecipes, searchRecipes } from '@/db/recipes';
 import { exportCookbookToMarkdown } from '@/utils/markdown';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import {
+  useTheme,
+  ThemePalette,
+  Typography,
+  Spacing,
+  Radius,
+  Shadow,
+} from '@/constants/theme';
 import type { Recipe, Cookbook } from '@/db/schema';
 
 function RecipeCard({
@@ -24,6 +31,8 @@ function RecipeCard({
   recipe: Recipe;
   onPress: () => void;
 }) {
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       {recipe.imagePath ? (
@@ -34,7 +43,7 @@ function RecipeCard({
         />
       ) : (
         <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-          <Ionicons name="restaurant-outline" size={28} color={Colors.border} />
+          <Ionicons name="restaurant-outline" size={28} color={c.border} />
         </View>
       )}
       <View style={styles.cardBody}>
@@ -44,7 +53,7 @@ function RecipeCard({
         <View style={styles.cardMeta}>
           {recipe.prepTime || recipe.cookTime ? (
             <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+              <Ionicons name="time-outline" size={13} color={c.textMuted} />
               <Text style={styles.metaText}>
                 {(recipe.prepTime || 0) + (recipe.cookTime || 0)} min
               </Text>
@@ -52,13 +61,13 @@ function RecipeCard({
           ) : null}
           {recipe.servings ? (
             <View style={styles.metaItem}>
-              <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
+              <Ionicons name="people-outline" size={13} color={c.textMuted} />
               <Text style={styles.metaText}>{recipe.servings} servings</Text>
             </View>
           ) : null}
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+      <Ionicons name="chevron-forward" size={16} color={c.border} />
     </TouchableOpacity>
   );
 }
@@ -66,6 +75,8 @@ function RecipeCard({
 export default function CookbookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const isAll = id === 'all';
 
   const [cookbook, setCookbook] = useState<Cookbook | null>(null);
@@ -111,7 +122,7 @@ export default function CookbookScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
           {headerTitle}
@@ -119,7 +130,7 @@ export default function CookbookScreen() {
         <View style={styles.headerActions}>
           {!isAll && cookbook && (
             <TouchableOpacity onPress={handleExport} style={styles.iconButton}>
-              <Ionicons name="share-outline" size={22} color={Colors.text} />
+              <Ionicons name="share-outline" size={22} color={c.text} />
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -131,29 +142,32 @@ export default function CookbookScreen() {
             }
             style={styles.iconButton}
           >
-            <Ionicons name="add" size={26} color={Colors.primary} />
+            <Ionicons name="add" size={26} color={c.primary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search bar */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search recipes..."
-          placeholderTextColor={Colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
-      </View>
+      {/* Search bar — title search works across all cookbooks (SPEC §5.3),
+          so it only appears in the "All recipes" view */}
+      {isAll ? (
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={16} color={c.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search recipes..."
+            placeholderTextColor={c.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+      ) : null}
 
       {/* Recipe list */}
       {recipes.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="restaurant-outline" size={48} color={Colors.border} />
+          <Ionicons name="restaurant-outline" size={48} color={c.border} />
           <Text style={styles.emptyText}>
             {searchQuery
               ? 'No results'
@@ -178,10 +192,10 @@ export default function CookbookScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
   header: {
     flexDirection: 'row',
@@ -198,7 +212,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: Typography.size.xl,
     fontWeight: Typography.weight.bold,
-    color: Colors.text,
+    color: c.text,
     letterSpacing: -0.3,
   },
   headerActions: {
@@ -220,15 +234,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: c.border,
   },
   searchInput: {
     flex: 1,
     fontSize: Typography.size.base,
-    color: Colors.text,
+    color: c.text,
     paddingVertical: 0,
   },
   list: {
@@ -239,7 +253,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     borderRadius: Radius.md,
     overflow: 'hidden',
     gap: Spacing.md,
@@ -251,7 +265,7 @@ const styles = StyleSheet.create({
     height: 80,
   },
   cardImagePlaceholder: {
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -263,7 +277,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: Typography.size.base,
     fontWeight: Typography.weight.semibold,
-    color: Colors.text,
+    color: c.text,
     lineHeight: Typography.size.base * 1.3,
   },
   cardMeta: {
@@ -277,7 +291,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: Typography.size.xs,
-    color: Colors.textMuted,
+    color: c.textMuted,
   },
   emptyState: {
     flex: 1,
@@ -288,7 +302,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: Typography.size.base,
-    color: Colors.textMuted,
+    color: c.textMuted,
     textAlign: 'center',
     lineHeight: Typography.size.base * 1.5,
   },

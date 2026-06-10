@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import {
+  useTheme,
+  ThemePalette,
+  Typography,
+  Spacing,
+  Radius,
+  Shadow,
+} from '@/constants/theme';
 import {
   type CookbookFormData,
   emptyCookbookFormData,
@@ -34,6 +41,8 @@ function Field({
   label: string;
   children: React.ReactNode;
 }) {
+  const c = useTheme();
+  const fieldStyles = useMemo(() => makeFieldStyles(c), [c]);
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}</Text>
@@ -42,12 +51,12 @@ function Field({
   );
 }
 
-const fieldStyles = StyleSheet.create({
+const makeFieldStyles = (c: ThemePalette) => StyleSheet.create({
   container: { gap: Spacing.xs },
   label: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -59,6 +68,8 @@ export default function CookbookForm({
   onCancel,
   isLoading,
 }: Props) {
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const initial = initialData ?? emptyCookbookFormData();
   const [form, setForm] = useState<CookbookFormData>(initial);
 
@@ -97,6 +108,19 @@ export default function CookbookForm({
       set('coverImagePath', result.assets[0].uri);
     }
   };
+
+  const handlePhotoPress = () =>
+    Alert.alert('Cover photo', 'Where would you like to add a photo from?', [
+      { text: 'Gallery', onPress: handlePickImage },
+      { text: 'Camera', onPress: handleTakePhoto },
+      form.coverImagePath
+        ? {
+            text: 'Remove photo',
+            style: 'destructive',
+            onPress: () => set('coverImagePath', ''),
+          }
+        : { text: 'Cancel', style: 'cancel' },
+    ]);
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -140,54 +164,38 @@ export default function CookbookForm({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Cover */}
-        <TouchableOpacity
-          style={styles.imageArea}
-          onPress={() =>
-            Alert.alert('Cover photo', 'Where would you like to add a photo from?', [
-              { text: 'Gallery', onPress: handlePickImage },
-              { text: 'Camera', onPress: handleTakePhoto },
-              form.coverImagePath
-                ? {
-                    text: 'Remove photo',
-                    style: 'destructive',
-                    onPress: () => set('coverImagePath', ''),
-                  }
-                : { text: 'Cancel', style: 'cancel' },
-            ])
-          }
-        >
-          {form.coverImagePath ? (
-            <Image
-              source={{ uri: form.coverImagePath }}
-              style={styles.imagePreview}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Ionicons name="camera-outline" size={28} color={Colors.textMuted} />
-              <Text style={styles.imagePlaceholderText}>Add cover photo</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Name */}
-        <Field label="Cookbook name">
-          <TextInput
-            style={[styles.input, styles.inputLarge]}
-            placeholder="e.g. Desserts..."
-            placeholderTextColor={Colors.textMuted}
-            value={form.name}
-            onChangeText={(v) => set('name', v)}
-            returnKeyType="done"
-          />
-        </Field>
+        {/* Name + cover */}
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1 }}>
+            <Field label="Cookbook name">
+              <TextInput
+                style={[styles.input, styles.inputLarge]}
+                placeholder="e.g. Desserts..."
+                placeholderTextColor={c.textMuted}
+                value={form.name}
+                onChangeText={(v) => set('name', v)}
+                returnKeyType="done"
+              />
+            </Field>
+          </View>
+          <TouchableOpacity style={styles.photoButton} onPress={handlePhotoPress}>
+            {form.coverImagePath ? (
+              <Image
+                source={{ uri: form.coverImagePath }}
+                style={styles.photoThumb}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="camera-outline" size={22} color={c.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -195,15 +203,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: c.border,
   },
   cancelButton: { padding: Spacing.xs },
   cancelText: {
     fontSize: Typography.size.base,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
   },
   saveButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: c.primary,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.full,
@@ -221,39 +229,36 @@ const styles = StyleSheet.create({
     gap: Spacing.base,
     paddingBottom: Spacing.xxxl,
   },
-  imageArea: {
-    borderRadius: Radius.lg,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.md,
+  },
+  photoButton: {
+    width: 52,
+    height: 52,
+    borderRadius: Radius.md,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
     ...Shadow.sm,
   },
-  imagePreview: {
+  photoThumb: {
     width: '100%',
-    height: 180,
-  },
-  imagePlaceholder: {
-    height: 120,
-    backgroundColor: Colors.surfaceAlt,
-    borderRadius: Radius.lg,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-  },
-  imagePlaceholderText: {
-    fontSize: Typography.size.sm,
-    color: Colors.textMuted,
+    height: '100%',
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: c.border,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: Typography.size.base,
-    color: Colors.text,
+    color: c.text,
   },
   inputLarge: {
     fontSize: Typography.size.lg,

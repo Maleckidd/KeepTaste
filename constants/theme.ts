@@ -1,8 +1,17 @@
-export const Colors = {
-  // Main palette — warm and appetizing
+import { useColorScheme } from 'react-native';
+
+// Cookbook tile colors (rotating) — shared across both palettes.
+const cookbookColors = [
+  '#C84B31', // brick
+  '#4A7C59', // forest green
+  '#2C5F8A', // steel blue
+  '#8A6C2C', // golden
+  '#6B3F7A', // plum
+  '#3D7A7A', // teal
+];
+
+export const lightColors = {
   primary: '#C84B31',       // deep red / brick
-  primaryLight: '#E8705A',
-  primaryDark: '#9E3520',
 
   background: '#FAFAF7',    // warm white
   surface: '#FFFFFF',
@@ -13,21 +22,35 @@ export const Colors = {
   textMuted: '#A09890',
 
   border: '#E8E4DE',
-  borderStrong: '#C8C0B8',
 
-  success: '#4A7C59',
   error: '#C84B31',
 
-  // Cookbook tile colors (rotating)
-  cookbookColors: [
-    '#C84B31', // brick
-    '#4A7C59', // forest green
-    '#2C5F8A', // steel blue
-    '#8A6C2C', // golden
-    '#6B3F7A', // plum
-    '#3D7A7A', // teal
-  ],
+  cookbookColors,
 };
+
+export const darkColors = {
+  primary: '#E06A4F',
+
+  background: '#1C1814',
+  surface: '#262019',
+  surfaceAlt: '#2F2820',
+
+  text: '#F0EBE4',
+  textSecondary: '#A89F95',
+  textMuted: '#7A716A',
+
+  border: '#3A322A',
+
+  error: '#E06A4F',
+
+  cookbookColors,
+};
+
+export type ThemePalette = typeof lightColors;
+
+export function useTheme(): ThemePalette {
+  return useColorScheme() === 'dark' ? darkColors : lightColors;
+}
 
 export const Typography = {
   fontFamily: {

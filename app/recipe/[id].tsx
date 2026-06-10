@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
 import { getRecipeById, deleteRecipe } from '@/db/recipes';
 import { deleteStoredImage } from '@/utils/imageStorage';
-import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
+import {
+  useTheme,
+  ThemePalette,
+  Typography,
+  Spacing,
+  Radius,
+} from '@/constants/theme';
 import type { Recipe } from '@/db/schema';
 
 function formatTime(minutes: number | null | undefined): string {
@@ -27,6 +33,9 @@ function formatTime(minutes: number | null | undefined): string {
 export default function RecipeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const markdownStyles = useMemo(() => makeMarkdownStyles(c), [c]);
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
 
@@ -69,7 +78,7 @@ export default function RecipeScreen() {
       {/* Nav bar with actions */}
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navButton}>
-          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
         <View style={styles.navActions}>
           <TouchableOpacity
@@ -78,10 +87,10 @@ export default function RecipeScreen() {
             }
             style={styles.navButton}
           >
-            <Ionicons name="create-outline" size={22} color={Colors.text} />
+            <Ionicons name="create-outline" size={22} color={c.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDelete} style={styles.navButton}>
-            <Ionicons name="trash-outline" size={22} color={Colors.error} />
+            <Ionicons name="trash-outline" size={22} color={c.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -99,7 +108,7 @@ export default function RecipeScreen() {
           />
         ) : (
           <View style={styles.heroPlaceholder}>
-            <Ionicons name="restaurant" size={48} color={Colors.border} />
+            <Ionicons name="restaurant" size={48} color={c.border} />
           </View>
         )}
 
@@ -111,7 +120,7 @@ export default function RecipeScreen() {
           <View style={styles.metaRow}>
             {recipe.prepTime ? (
               <View style={styles.metaItem}>
-                <Ionicons name="cut-outline" size={15} color={Colors.textMuted} />
+                <Ionicons name="cut-outline" size={15} color={c.textMuted} />
                 <View>
                   <Text style={styles.metaLabel}>Prep</Text>
                   <Text style={styles.metaValue}>{formatTime(recipe.prepTime)}</Text>
@@ -120,7 +129,7 @@ export default function RecipeScreen() {
             ) : null}
             {recipe.cookTime ? (
               <View style={styles.metaItem}>
-                <Ionicons name="flame-outline" size={15} color={Colors.textMuted} />
+                <Ionicons name="flame-outline" size={15} color={c.textMuted} />
                 <View>
                   <Text style={styles.metaLabel}>Cook</Text>
                   <Text style={styles.metaValue}>{formatTime(recipe.cookTime)}</Text>
@@ -129,7 +138,7 @@ export default function RecipeScreen() {
             ) : null}
             {totalTime > 0 ? (
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={15} color={Colors.textMuted} />
+                <Ionicons name="time-outline" size={15} color={c.textMuted} />
                 <View>
                   <Text style={styles.metaLabel}>Total</Text>
                   <Text style={styles.metaValue}>{formatTime(totalTime)}</Text>
@@ -138,7 +147,7 @@ export default function RecipeScreen() {
             ) : null}
             {recipe.servings ? (
               <View style={styles.metaItem}>
-                <Ionicons name="people-outline" size={15} color={Colors.textMuted} />
+                <Ionicons name="people-outline" size={15} color={c.textMuted} />
                 <View>
                   <Text style={styles.metaLabel}>Servings</Text>
                   <Text style={styles.metaValue}>{recipe.servings}</Text>
@@ -167,7 +176,7 @@ export default function RecipeScreen() {
           {recipe.notes ? (
             <View style={styles.notesBox}>
               <View style={styles.notesHeader}>
-                <Ionicons name="document-text-outline" size={15} color={Colors.primary} />
+                <Ionicons name="document-text-outline" size={15} color={c.primary} />
                 <Text style={styles.notesTitle}>Notes</Text>
               </View>
               <Text style={styles.notesText}>{recipe.notes}</Text>
@@ -179,29 +188,29 @@ export default function RecipeScreen() {
   );
 }
 
-const markdownStyles = {
+const makeMarkdownStyles = (c: ThemePalette) => ({
   body: {
-    color: Colors.text,
+    color: c.text,
     fontSize: Typography.size.base,
     lineHeight: Typography.size.base * 1.7,
   },
   heading1: {
     fontSize: Typography.size.lg,
     fontWeight: Typography.weight.bold,
-    color: Colors.text,
+    color: c.text,
     marginTop: Spacing.base,
     marginBottom: Spacing.sm,
   },
   heading2: {
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.semibold,
-    color: Colors.text,
+    color: c.text,
     marginTop: Spacing.base,
     marginBottom: Spacing.xs,
   },
   strong: {
     fontWeight: Typography.weight.semibold,
-    color: Colors.text,
+    color: c.text,
   },
   bullet_list: {
     marginVertical: Spacing.xs,
@@ -209,12 +218,12 @@ const markdownStyles = {
   list_item: {
     marginVertical: 2,
   },
-};
+});
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
   navBar: {
     flexDirection: 'row',
@@ -244,7 +253,7 @@ const styles = StyleSheet.create({
   heroPlaceholder: {
     width: '100%',
     height: 160,
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -255,7 +264,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.size.xxl,
     fontWeight: Typography.weight.bold,
-    color: Colors.text,
+    color: c.text,
     letterSpacing: -0.5,
     lineHeight: Typography.size.xxl * 1.2,
   },
@@ -271,14 +280,14 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: Typography.size.xs,
-    color: Colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   metaValue: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
-    color: Colors.text,
+    color: c.text,
   },
   section: {
     gap: Spacing.xs,
@@ -286,16 +295,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   notesBox: {
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: c.surfaceAlt,
     borderRadius: Radius.md,
     padding: Spacing.base,
     borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
+    borderLeftColor: c.primary,
     gap: Spacing.sm,
   },
   notesHeader: {
@@ -306,13 +315,13 @@ const styles = StyleSheet.create({
   notesTitle: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
-    color: Colors.primary,
+    color: c.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   notesText: {
     fontSize: Typography.size.base,
-    color: Colors.text,
+    color: c.text,
     lineHeight: Typography.size.base * 1.5,
   },
 });

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { SafeAreaView, StyleSheet, ActivityIndicator, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import CookbookForm from '@/components/cookbook/CookbookForm';
 import { getCookbookById, updateCookbook } from '@/db/cookbooks';
-import { Colors } from '@/constants/theme';
+import { useTheme, ThemePalette } from '@/constants/theme';
 import {
   type CookbookFormData,
   cookbookToFormData,
@@ -13,6 +13,8 @@ import { persistImage } from '@/utils/imageStorage';
 
 export default function EditCookbookScreen() {
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [initialData, setInitialData] = useState<CookbookFormData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +51,7 @@ export default function EditCookbookScreen() {
   if (!initialData) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={Colors.primary} />
+        <ActivityIndicator color={c.primary} />
       </View>
     );
   }
@@ -66,15 +68,15 @@ export default function EditCookbookScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
   loading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
 });

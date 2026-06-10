@@ -11,6 +11,7 @@ module.exports = {
     '^expo-file-system$': '<rootDir>/__mocks__/expo-file-system.ts',
     '^expo-sharing$': '<rootDir>/__mocks__/expo-sharing.ts',
     '^expo-sqlite$': '<rootDir>/__mocks__/expo-sqlite.ts',
+    '^react-native$': '<rootDir>/__mocks__/react-native.ts',
   },
   transform: {
     '^.+\\.tsx?$': [

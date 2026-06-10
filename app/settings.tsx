@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,25 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { deleteAllData } from '@/db/recipes';
+import { importCookbook } from '@/db/import';
+import { parseCookbookMarkdown, type ImportedRecipe } from '@/utils/importMarkdown';
 import { deleteStoredImage } from '@/utils/imageStorage';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import {
+  useTheme,
+  ThemePalette,
+  Typography,
+  Spacing,
+  Radius,
+  Shadow,
+} from '@/constants/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   const performDelete = async () => {
@@ -34,6 +47,64 @@ export default function SettingsScreen() {
           text: 'Delete everything',
           style: 'destructive',
           onPress: performDelete,
+        },
+      ]
+    );
+  };
+
+  const runImport = async (cookbookName: string, recipes: ImportedRecipe[]) => {
+    try {
+      const { recipeCount } = await importCookbook({ cookbookName, recipes });
+      Alert.alert(
+        'Import complete',
+        `Imported "${cookbookName}" with ${recipeCount} ${
+          recipeCount === 1 ? 'recipe' : 'recipes'
+        }.`
+      );
+      router.back();
+    } catch {
+      Alert.alert(
+        'Import failed',
+        'Something went wrong while saving. The cookbook may have been imported partially.'
+      );
+    }
+  };
+
+  const handleImport = async () => {
+    const picked = await DocumentPicker.getDocumentAsync({
+      type: ['text/markdown', 'text/plain'],
+      copyToCacheDirectory: true,
+    });
+
+    if (picked.canceled) return;
+    const asset = picked.assets[0];
+    if (!asset) return;
+
+    let content: string;
+    try {
+      content = await FileSystem.readAsStringAsync(asset.uri);
+    } catch {
+      Alert.alert('Import failed', 'Could not read the selected file.');
+      return;
+    }
+
+    const result = parseCookbookMarkdown(content);
+    if (!result.ok) {
+      Alert.alert('Import failed', result.error);
+      return;
+    }
+
+    const count = result.recipes.length;
+    Alert.alert(
+      'Import cookbook?',
+      `Import "${result.cookbookName}" with ${count} ${
+        count === 1 ? 'recipe' : 'recipes'
+      }?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Import',
+          onPress: () => runImport(result.cookbookName, result.recipes),
         },
       ]
     );
@@ -59,7 +130,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
           Settings
@@ -84,7 +155,7 @@ export default function SettingsScreen() {
             <Ionicons
               name="phone-portrait-outline"
               size={18}
-              color={Colors.textSecondary}
+              color={c.textSecondary}
             />
             <Text style={styles.noticeText}>
               Your recipes are stored only on this device. There are no accounts
@@ -95,7 +166,7 @@ export default function SettingsScreen() {
             <Ionicons
               name="trash-outline"
               size={18}
-              color={Colors.textSecondary}
+              color={c.textSecondary}
             />
             <Text style={styles.noticeText}>
               Uninstalling the app deletes all of your recipes.
@@ -105,7 +176,7 @@ export default function SettingsScreen() {
             <Ionicons
               name="document-text-outline"
               size={18}
-              color={Colors.textSecondary}
+              color={c.textSecondary}
             />
             <Text style={styles.noticeText}>
               Exporting a cookbook to Markdown is the only way to back up your
@@ -114,6 +185,19 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Import */}
+        <TouchableOpacity
+          style={styles.importButton}
+          onPress={handleImport}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="download-outline" size={18} color={c.text} />
+          <Text style={styles.importButtonText}>Import from Markdown</Text>
+        </TouchableOpacity>
+        <Text style={styles.importHint}>
+          Adds a new cookbook from a previously exported Markdown file.
+        </Text>
+
         {/* Delete all data */}
         <Text style={styles.sectionLabel}>Danger zone</Text>
         <TouchableOpacity
@@ -121,7 +205,7 @@ export default function SettingsScreen() {
           onPress={handleDeleteAll}
           activeOpacity={0.8}
         >
-          <Ionicons name="trash-outline" size={18} color={Colors.surface} />
+          <Ionicons name="trash-outline" size={18} color={c.surface} />
           <Text style={styles.deleteButtonText}>Delete all data</Text>
         </TouchableOpacity>
         <Text style={styles.deleteHint}>
@@ -132,10 +216,10 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: c.background,
   },
   header: {
     flexDirection: 'row',
@@ -153,7 +237,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: Typography.size.xl,
     fontWeight: Typography.weight.bold,
-    color: Colors.text,
+    color: c.text,
     letterSpacing: -0.3,
   },
   content: {
@@ -162,7 +246,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: Typography.size.sm,
-    color: Colors.textMuted,
+    color: c.textMuted,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginTop: Spacing.lg,
@@ -170,21 +254,21 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: c.border,
     padding: Spacing.base,
     gap: Spacing.md,
   },
   appName: {
     fontSize: Typography.size.lg,
     fontWeight: Typography.weight.bold,
-    color: Colors.text,
+    color: c.text,
   },
   appVersion: {
     fontSize: Typography.size.base,
-    color: Colors.textMuted,
+    color: c.textMuted,
   },
   noticeRow: {
     flexDirection: 'row',
@@ -194,15 +278,39 @@ const styles = StyleSheet.create({
   noticeText: {
     flex: 1,
     fontSize: Typography.size.base,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
     lineHeight: Typography.size.base * 1.5,
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: c.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    paddingVertical: Spacing.base,
+    marginTop: Spacing.md,
+  },
+  importButtonText: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.text,
+  },
+  importHint: {
+    fontSize: Typography.size.sm,
+    color: c.textMuted,
+    textAlign: 'center',
+    marginTop: Spacing.sm,
+    lineHeight: Typography.size.sm * 1.4,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    backgroundColor: Colors.error,
+    backgroundColor: c.error,
     borderRadius: Radius.md,
     paddingVertical: Spacing.base,
     ...Shadow.sm,
@@ -210,11 +318,11 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: Typography.size.base,
     fontWeight: Typography.weight.semibold,
-    color: Colors.surface,
+    color: c.surface,
   },
   deleteHint: {
     fontSize: Typography.size.sm,
-    color: Colors.textMuted,
+    color: c.textMuted,
     textAlign: 'center',
     marginTop: Spacing.sm,
     lineHeight: Typography.size.sm * 1.4,

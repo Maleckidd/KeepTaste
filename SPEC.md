@@ -1,7 +1,7 @@
 # KeepTaste — Technical Specification (SDD)
 
 > Living document. Update it with every significant design decision.
-> Version: 1.2 | Date: 2026-06
+> Version: 1.3 | Date: 2026-06
 
 ---
 
@@ -31,6 +31,7 @@ Philosophy: **your data, your device**. Markdown export guarantees the user is n
 | ORM | Drizzle ORM | Typed query builder, minimal abstraction, great DX |
 | Photos | expo-image-picker | Gallery and camera access, permission handling |
 | File export | expo-file-system + expo-sharing | Write .md to cache, system share sheet |
+| File import | expo-document-picker + expo-file-system | Pick a .md file, read its contents for parsing (§5.8) |
 | Markdown | react-native-markdown-display | Lightweight library, good support for a Markdown subset |
 | Icons | @expo/vector-icons (Ionicons) | Bundled with Expo, zero configuration |
 | Language | TypeScript (strict) | Type safety, better DX |
@@ -44,30 +45,43 @@ Philosophy: **your data, your device**. Markdown export guarantees the user is n
 ```
 app/
   _layout.tsx            ← root layout: DB initialization, Stack configuration
-  index.tsx              ← home screen: list of cookbooks
+  index.tsx              ← home screen: cookbook grid + settings entry
+  settings.tsx           ← app info, no-backup notice, import, delete all data
   cookbook/
-    [id].tsx             ← recipe grid; id="all" → all recipes
+    [id].tsx             ← recipe list; id="all" → all recipes (+ title search)
+    new.tsx              ← modal: new cookbook
+    edit.tsx             ← modal: edit cookbook
   recipe/
     [id].tsx             ← recipe view (read-only with Markdown)
     new.tsx              ← modal: new recipe
     edit.tsx             ← modal: edit recipe
 
 components/
+  cookbook/
+    CookbookForm.tsx     ← shared cookbook form (new + edit)
   recipe/
-    RecipeForm.tsx       ← shared form (new + edit)
+    RecipeForm.tsx       ← shared recipe form (new + edit)
 
 db/
   schema.ts              ← Drizzle table definitions + TypeScript types
-  client.ts              ← SQLite connection, DDL migrations
+  ddl.ts                 ← migration DDL shared by native and web clients
+  client.ts              ← native SQLite connection, runs migrations
+  client.web.ts          ← in-memory sql.js client (web test build only)
   cookbooks.ts           ← queries: cookbook CRUD
-  recipes.ts             ← queries: recipe CRUD, search
+  recipes.ts             ← queries: recipe CRUD, search, delete-all-data
+  import.ts              ← writes a parsed Markdown import (cookbook + recipes)
 
 utils/
   markdown.ts            ← cookbook → .md file export logic
+  importMarkdown.ts      ← parser for previously exported .md files (§5.8)
   imageStorage.ts        ← persisting picked images into documentDirectory + cleanup
+  cookbookForm.ts        ← cookbook form logic (normalize, dirty-check)
+  recipeForm.ts          ← recipe form logic (mapping, dirty-check)
+  numeric.ts             ← numeric field parsing (integer ≥ 1 or null)
+  search.ts              ← diacritics-safe title search
 
 constants/
-  theme.ts               ← design tokens: colors, typography, spacing, shadows
+  theme.ts               ← design tokens: light/dark palettes + useTheme(), typography, spacing, shadows
 ```
 
 ### Data flow
@@ -135,15 +149,14 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 ### 5.1 Home screen — "Recipes"
 
 **Behavior:**
-- Displays a **list** of cookbook tiles, stacked vertically, each tile = one cookbook (full width)
+- Displays a **grid of cookbook tiles, 2 per row**, each tile = one cookbook
 - Tiles have rotating background colors from the palette (`cookbookColors` in theme)
 - If a cookbook has a cover (`cover_image_path`), the photo covers the background color with a slight dark overlay for title readability
-- "+" button in the header, right side → new recipe (with unset `cookbook_id`, since we're not inside any cookbook)
-- A fixed "All recipes" row above the list — the **only entry point** to the `/cookbook/all` view
+- Header (left): "KeepTaste" eyebrow + "Cookbooks" title; header (right): a **settings gear** (→ §5.7) and a **"+" button → new cookbook modal** (§5.2)
+- A fixed "All recipes" row above the grid — the **only entry point** to the `/cookbook/all` view
 - Long-press on a tile → Alert with options: **Edit / Delete / Cancel**
   - **Edit** → opens the cookbook modal (§5.2) pre-filled with the current name and cover
   - **Delete** → second confirmation Alert with the message: *"Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'."* + Delete (destructive) / Cancel buttons
-- The last tile is an empty tile with a plus, "New cookbook" → adds a new cookbook
 
 **Edge cases:**
 - No cookbooks → empty state with an icon and a message encouraging the user to create their first one
@@ -151,24 +164,18 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 
 **Refreshing:** `useFocusEffect` — data is loaded every time the user returns to the screen (e.g. after adding a cookbook).
 
-**Search:**
-- Text field filtering by recipe title, across **all** cookbooks
-- Case-insensitive comparison, **correct for non-ASCII characters (e.g. Polish diacritics)** — filtering happens on the JS side via `title.toLowerCase().includes(query.toLowerCase())`, not via SQL `LIKE` (which is case-insensitive only for ASCII — searching "żurek" would not find "Żurek")
-- Search runs on every text change (no "search" button)
-- Empty field → normal view (cookbook list + "All recipes" row)
-- Non-empty field → the cookbook list disappears, replaced by a **results list: recipe titles only, stacked vertically, no photos**; tapping a title → recipe view
-- No results → grayed-out text *"No results"* (color `textMuted`)
+**Search** lives in the "All recipes" view (see §5.3) — there is no search field on the home screen.
 
 ---
 
 ### 5.2 Creating and editing a cookbook
 
 **Cookbook form (modal) — shared between create and edit:**
-- Field: cookbook name (required)
-- Optional: cover (image picker — gallery or camera)
+- Field: cookbook name (required) — at the very top of the form
+- Optional: cover (image picker — gallery or camera). Entry point is a small icon-only camera button on the same row as the name field (right side); once a cover is picked, the button shows the cover as a thumbnail (tap to change/remove)
 
 **Entry points:**
-- Create: "New cookbook" tile on the home screen → empty form
+- Create: "+" button in the home-screen header → empty form
 - Edit: long-press on a cookbook tile → "Edit" → form pre-filled with the current name and cover
 
 **On save:**
@@ -184,17 +191,22 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 ### 5.3 Recipe list in a cookbook
 
 **Behavior:**
-- **Tile grid, 2 per row**
-- The first tile is a plus tile, "Add recipe"
+- **Vertical list of recipe cards** (one per row): photo thumbnail on the left (or placeholder), title, total time (prep + cook), number of servings. **Missing metadata (time, servings) is hidden** — we don't show "—" or empty labels
 - URL `/cookbook/[id]` — recipes assigned to a specific cookbook
 - URL `/cookbook/all` — all recipes from all cookbooks and unassigned ones
 - Recipes sorted descending by `updated_at` (most recently modified on top)
-- Each tile shows: photo thumbnail (or placeholder), title, total time (prep + cook), number of servings. **Missing metadata (time, servings) is hidden** — we don't show "—" or empty labels
 - "+" button in the header → new recipe (with pre-filled `cookbook_id` when inside a specific cookbook)
-- Three-dot icon in the header → drop-down menu; it contains an "Export" item with an export icon. Available only in a specific cookbook's view, not in "All recipes"
+- **Export (share) icon in the header** → exports the cookbook to Markdown (§5.6). Available only in a specific cookbook's view, not in "All recipes"
+
+**Search (only in the `/cookbook/all` view):**
+- Text field above the list, filtering by recipe title across **all** cookbooks
+- Case-insensitive comparison, **correct for non-ASCII characters (e.g. Polish diacritics)** — filtering happens on the JS side via `title.toLowerCase().includes(query.toLowerCase())`, not via SQL `LIKE` (which is case-insensitive only for ASCII — searching "żurek" would not find "Żurek")
+- Search runs on every text change (no "search" button); tapping a result opens the recipe view
+- No results → grayed-out text *"No results"* (color `textMuted`)
+- The field is **not shown** in a specific cookbook's view — search is global by design
 
 **Edge cases:**
-- Empty cookbook → only the "Add recipe" tile is visible; no extra empty state needed
+- Empty cookbook → empty state with an icon and a "tap + to add" message
 
 ---
 
@@ -246,7 +258,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 - Numeric fields — **unambiguous parsing rule:** the value is parsed to an integer (`parseInt`); it is saved only if the result is an integer ≥ 1. Everything else (empty field, text, zero, negative values, `NaN`) → we save `null`. Implementation note: the pattern `value ? Number(value) : null` is **wrong** — for text it saves `NaN` to the database.
 
 **Photo:**
-- Tap on the photo area → Alert with options: Gallery / Camera / Remove photo (if one exists)
+- The title field sits at the very top of the form with a small icon-only camera button on the same row (right side) as the photo entry point. Once a photo is picked, the button shows it as a thumbnail; tapping it opens an Alert with options: Gallery / Camera / Remove photo (if one exists)
 - Photo processed by ImagePicker with `allowsEditing: true`, aspect ratio 4:3, quality 0.8
 - The photo file is **copied to `FileSystem.documentDirectory`** when the recipe is saved (the picker URI points to the system cache, which may be cleared — see §8, high priority); the same applies to cookbook covers
 - Deleting a recipe/cookbook or replacing a photo → delete the copied file from `documentDirectory` (cleanup so the directory doesn't grow indefinitely)
@@ -261,7 +273,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 ### 5.6 Exporting a cookbook to Markdown
 
-**Trigger:** three-dot icon in the `/cookbook/[id]` screen header → drop-down → "Export" (unavailable in the "All recipes" view).
+**Trigger:** export (share) icon in the `/cookbook/[id]` screen header (unavailable in the "All recipes" view) → system share sheet via `Sharing.shareAsync()` (on iOS this includes "Save to Files"; a dedicated "save to device" option was considered and dropped — the share sheet covers the need).
 
 **Format of the resulting `.md` file:**
 
@@ -327,6 +339,115 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 - Double confirmation: first an `Alert` ("Delete all data?") explaining what will be removed, then on confirm a second `Alert` warning the action cannot be undone. Both use destructive button styles.
 - On final confirm: `deleteAllData()` (in `db/recipes.ts`) deletes all recipes then all cookbooks (in that order) and returns the stored image paths; the screen then deletes those image files via `deleteStoredImage` and navigates back home (which reloads via `useFocusEffect`).
 
+### 5.8 Import from Markdown
+
+**Entry point:** an "Import from Markdown" button in the Settings screen, in the "Your data" section (above the Danger zone).
+
+**Accepted format:** KeepTaste's own Markdown export (§5.6). The parser (`utils/importMarkdown.ts`, pure, no native imports) is the inverse of the export builder:
+- Cookbook name comes from the first `# ` heading; `*Exported:*` / `*Recipes:*` lines are informational and never trusted (the recipe count is derived from the actual `## ` blocks, not the header).
+- Each `## ` block is a recipe, running until the next `## `, a `---` line, or EOF. Trailing `---` / whitespace produce no phantom recipes.
+- The meta line `**Prep:** … | **Cook:** … | **Servings:** …` is parsed token-by-token; each token is independent and absent tokens stay `null`. Prep/Cook strings are inverted via `parseTimeToMinutes` (the lockstep inverse of export's `formatTime` — "45 min", "1 hr 30 min", "2 hr"; the time-string mapping must stay in sync if `formatTime` ever changes). Servings is a plain integer.
+- `### Ingredients` / `### Instructions` bodies default to `''` when the section is absent. `### Notes` is `null` when absent, the body when present, and `''` when the header is present but the body empty.
+- Internal body Markdown is preserved exactly; only `# `, `## `, and `### Ingredients|Instructions|Notes` are structural. Hand-edited files are best-effort — unescaped bodies that contain those structural markers may mis-split (documented limitation).
+
+**Persistence:** `db/import.ts` `importCookbook()` creates the cookbook (`createCookbook`) then each recipe sequentially (`createRecipe`). No transaction (consistent with the rest of `db/`); a failure mid-import may leave a partial cookbook.
+
+**Flow:** pick a file via `DocumentPicker.getDocumentAsync` (canceled → no-op) → read with `FileSystem.readAsStringAsync` → `parseCookbookMarkdown`. Parse failure surfaces via `Alert('Import failed', error)`. On success, a confirm `Alert` (`Import "{name}" with {N} recipes?`) gates the write; on confirm `importCookbook` runs in try/catch, then a success `Alert` with the count and `router.back()` (home reloads via `useFocusEffect`). A thrown error surfaces an Alert noting the import may be partial.
+
+**Semantics:** duplicates are allowed — importing the same file twice creates a second cookbook. A zero-recipe file imports an empty cookbook.
+
+---
+
+### 5.9 Bottom tab navigation *(planned — not yet implemented)*
+
+A persistent bottom tab bar with two tabs, introducing the second product area (Shopping, §5.10):
+
+| Tab | Icon (Ionicons) | Destination |
+|---|---|---|
+| **Recipes** | `book-outline` / `book` (active) | The existing cookbook home (§5.1) and everything reachable from it |
+| **Shopping** | `cart-outline` / `cart` (active) | Shopping lists (§5.10) |
+
+**Mechanism:** Expo Router tab layout — the `app/` tree is restructured into a `(tabs)` group:
+
+```
+app/
+  _layout.tsx            ← root Stack (modals, recipe/cookbook screens) + DB init
+  (tabs)/
+    _layout.tsx          ← Tabs navigator (bottom bar)
+    index.tsx            ← Recipes tab: cookbook home (moved from app/index.tsx)
+    shopping.tsx         ← Shopping tab: list of shopping lists
+```
+
+**Rules:**
+- The tab bar is visible on the two tab roots; modal forms (recipe/cookbook/list forms) and detail screens open **over** it via the root Stack, consistent with the current modal pattern.
+- Tab bar colors come from the theme palettes (`surface` background, `primary` active tint, `textMuted` inactive tint, `border` top hairline) via `useTheme()` — works in both light and dark mode.
+- The settings gear stays in the Recipes tab header (§5.1) — Shopping has its own header with its own "+" action.
+
+---
+
+### 5.10 Shopping lists *(planned — not yet implemented)*
+
+A second product area: simple, offline shopping lists. Same philosophy as recipes — local-only, no accounts, no magic.
+
+**Shopping tab root — list of shopping lists:**
+- Vertical list of cards styled like the recipe list (§5.3) but **without photos**: list name + item progress (e.g. "3/8 in cart"; counts hidden when the list is empty)
+- Lists sorted descending by `updated_at`
+- "+" button in the header → "New shopping list" form
+- Tap a card → opens the list detail view
+- Long-press a card → Alert: **Delete / Cancel**, with a destructive confirmation (deleting a list deletes its items — unlike cookbooks there is no orphan pool)
+- Empty state: icon + a message encouraging creating the first list
+
+**"New shopping list" form (modal):**
+- Title: "New shopping list"
+- Input: "List name" (required; trimmed; empty → Alert, not saved)
+- Button: "Create list"
+- An "✕" close button in the corner dismisses the form (dirty-check Alert like other forms, §5.2/§5.5)
+- On create → navigates straight to the new (empty) list's detail view
+
+**List detail view — empty state:**
+- Title: "Your shopping list is empty"
+- Below it, regular text: "Add products and build your shopping list"
+- Button: "Add product"
+
+**Adding a product:**
+- "Add product" reveals an inline row with two inputs: **product name** (required, trimmed) and **quantity** (optional, free-form text — "2", "1 kg", "3 packs"; stored as TEXT, no numeric parsing so units stay possible)
+- Confirming adds the product to the list and clears the inputs so the next product can be typed immediately; the row stays open until dismissed
+- The "Add product" affordance remains available on a non-empty list (e.g. as the header "+" or a persistent row)
+
+**List items & the "In cart" flow:**
+- Each product renders as a row: name (+ quantity, muted, when present) with a **checkbox on the right**
+- Unchecked items appear at the top, in the order they were added
+- Tapping the checkbox: it becomes checked, the row is **grayed out** (muted text/checkbox) and **moves to the bottom of the list**, under an "In cart" section header (the header appears only when at least one item is checked)
+- Unchecking moves the item back to the unchecked group
+- Item edits update the parent list's `updated_at` (so active lists float to the top of the Shopping tab)
+- Long-press an item → Alert: Delete / Cancel
+
+**Database (new tables, added to `db/ddl.ts` + `db/schema.ts`; CREATE TABLE IF NOT EXISTS keeps existing installs safe):**
+
+```sql
+shopping_lists (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+)
+
+shopping_items (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id     INTEGER NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  quantity    TEXT,                               -- free-form ("2", "1 kg"); NULL/'' = none
+  checked     INTEGER NOT NULL DEFAULT 0,         -- 0/1
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+)
+
+CREATE INDEX idx_shopping_items_list_id ON shopping_items(list_id);
+```
+
+`ON DELETE CASCADE` (not SET NULL like recipes): a shopping item has no meaning outside its list.
+
+**Out of scope for the first iteration:** linking products to recipes/ingredients (manual entry only), sharing lists, quantities as structured numbers/units, reordering by drag & drop, Markdown export of lists.
+
 ---
 
 ## 6. Design system
@@ -354,9 +475,9 @@ A warm, appetizing palette evoking the kitchen — paper, wood, ceramics. Not st
 **UX principle:** the app follows the system setting (`useColorScheme()` from React Native). **No in-app toggle** — zero extra settings, in line with the simplicity philosophy.
 
 **Mechanism:**
-- `theme.ts` exports two palettes (`light` / `dark`) with an identical set of tokens; the remaining tokens (typography, spacing, shadows) are shared
-- Components get colors through a `useTheme()` hook (a thin wrapper over `useColorScheme()`), not by importing a palette directly — switching is centralized and components don't know which mode is active
-- Components already avoid hardcoded colors today, so the migration boils down to swapping the token source
+- `theme.ts` exports two palettes, `lightColors` / `darkColors`, with an identical set of tokens; the remaining tokens (typography, spacing, shadows) are shared
+- Components get colors through the `useTheme()` hook (a thin wrapper over `useColorScheme()`), not by importing a palette directly — switching is centralized and components don't know which mode is active
+- Components build their stylesheets with `makeStyles(palette)` factories (and, where present, `makeMarkdownStyles(palette)`), memoized on the active palette via `useMemo` so styles rebuild when the system scheme changes; inline JSX color props read straight from the palette
 
 **Dark palette** — same philosophy: warm, not pitch black, not cold:
 
@@ -408,7 +529,7 @@ Values to be verified on a device for contrast (target: WCAG AA for text). Photo
 
 ### Low priority
 - [ ] **Transition animations** — Reanimated 3, especially when opening a recipe
-- [ ] **Import from .md file** — parsing previously exported files
+- [x] **Import from .md file** — parsing previously exported files (done — see §5.8)
 - [ ] **Tags** — possible return of the feature: global, free-form labels (lowercase + trim, deduplication) + tag filtering; design only once title search stops being enough
 
 ---

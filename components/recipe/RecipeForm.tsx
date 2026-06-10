@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Typography, Spacing, Radius, Shadow } from '@/constants/theme';
+import {
+  useTheme,
+  ThemePalette,
+  Typography,
+  Spacing,
+  Radius,
+  Shadow,
+} from '@/constants/theme';
 import {
   type RecipeFormData,
   emptyRecipeFormData,
@@ -36,6 +43,8 @@ function Field({
   children: React.ReactNode;
   hint?: string;
 }) {
+  const c = useTheme();
+  const fieldStyles = useMemo(() => makeFieldStyles(c), [c]);
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}</Text>
@@ -45,18 +54,18 @@ function Field({
   );
 }
 
-const fieldStyles = StyleSheet.create({
+const makeFieldStyles = (c: ThemePalette) => StyleSheet.create({
   container: { gap: Spacing.xs },
   label: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   hint: {
     fontSize: Typography.size.xs,
-    color: Colors.textMuted,
+    color: c.textMuted,
     lineHeight: Typography.size.xs * 1.5,
   },
 });
@@ -67,6 +76,8 @@ export default function RecipeForm({
   onCancel,
   isLoading,
 }: Props) {
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const initial = initialData ?? emptyRecipeFormData();
   const [form, setForm] = useState<RecipeFormData>(initial);
 
@@ -105,6 +116,15 @@ export default function RecipeForm({
       set('imagePath', result.assets[0].uri);
     }
   };
+
+  const handlePhotoPress = () =>
+    Alert.alert('Photo', 'Where would you like to add a photo from?', [
+      { text: 'Gallery', onPress: handlePickImage },
+      { text: 'Camera', onPress: handleTakePhoto },
+      form.imagePath
+        ? { text: 'Remove photo', style: 'destructive', onPress: () => set('imagePath', '') }
+        : { text: 'Cancel', style: 'cancel' },
+    ]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
@@ -148,44 +168,32 @@ export default function RecipeForm({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Photo */}
-        <TouchableOpacity
-          style={styles.imageArea}
-          onPress={() =>
-            Alert.alert('Photo', 'Where would you like to add a photo from?', [
-              { text: 'Gallery', onPress: handlePickImage },
-              { text: 'Camera', onPress: handleTakePhoto },
-              form.imagePath
-                ? { text: 'Remove photo', style: 'destructive', onPress: () => set('imagePath', '') }
-                : { text: 'Cancel', style: 'cancel' },
-            ])
-          }
-        >
-          {form.imagePath ? (
-            <Image
-              source={{ uri: form.imagePath }}
-              style={styles.imagePreview}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Ionicons name="camera-outline" size={28} color={Colors.textMuted} />
-              <Text style={styles.imagePlaceholderText}>Add photo</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Title */}
-        <Field label="Recipe title">
-          <TextInput
-            style={[styles.input, styles.inputLarge]}
-            placeholder="e.g. Strawberry tart..."
-            placeholderTextColor={Colors.textMuted}
-            value={form.title}
-            onChangeText={(v) => set('title', v)}
-            returnKeyType="next"
-          />
-        </Field>
+        {/* Title + photo */}
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1 }}>
+            <Field label="Recipe title">
+              <TextInput
+                style={[styles.input, styles.inputLarge]}
+                placeholder="e.g. Strawberry tart..."
+                placeholderTextColor={c.textMuted}
+                value={form.title}
+                onChangeText={(v) => set('title', v)}
+                returnKeyType="next"
+              />
+            </Field>
+          </View>
+          <TouchableOpacity style={styles.photoButton} onPress={handlePhotoPress}>
+            {form.imagePath ? (
+              <Image
+                source={{ uri: form.imagePath }}
+                style={styles.photoThumb}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="camera-outline" size={22} color={c.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* Times */}
         <View style={styles.row}>
@@ -194,7 +202,7 @@ export default function RecipeForm({
               <TextInput
                 style={styles.input}
                 placeholder="15"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={c.textMuted}
                 value={form.prepTime}
                 onChangeText={(v) => set('prepTime', v)}
                 keyboardType="numeric"
@@ -207,7 +215,7 @@ export default function RecipeForm({
               <TextInput
                 style={styles.input}
                 placeholder="45"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={c.textMuted}
                 value={form.cookTime}
                 onChangeText={(v) => set('cookTime', v)}
                 keyboardType="numeric"
@@ -220,7 +228,7 @@ export default function RecipeForm({
               <TextInput
                 style={styles.input}
                 placeholder="4"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={c.textMuted}
                 value={form.servings}
                 onChangeText={(v) => set('servings', v)}
                 keyboardType="numeric"
@@ -238,7 +246,7 @@ export default function RecipeForm({
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             placeholder={`200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream`}
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={c.textMuted}
             value={form.ingredients}
             onChangeText={(v) => set('ingredients', v)}
             multiline
@@ -254,7 +262,7 @@ export default function RecipeForm({
           <TextInput
             style={[styles.input, styles.inputMultilineTall]}
             placeholder={`# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.`}
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={c.textMuted}
             value={form.instructions}
             onChangeText={(v) => set('instructions', v)}
             multiline
@@ -270,7 +278,7 @@ export default function RecipeForm({
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             placeholder="Next time add more vanilla sugar..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={c.textMuted}
             value={form.notes}
             onChangeText={(v) => set('notes', v)}
             multiline
@@ -282,7 +290,7 @@ export default function RecipeForm({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemePalette) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -290,15 +298,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: c.border,
   },
   cancelButton: { padding: Spacing.xs },
   cancelText: {
     fontSize: Typography.size.base,
-    color: Colors.textSecondary,
+    color: c.textSecondary,
   },
   saveButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: c.primary,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.full,
@@ -320,39 +328,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
   },
-  imageArea: {
-    borderRadius: Radius.lg,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.md,
+  },
+  photoButton: {
+    width: 52,
+    height: 52,
+    borderRadius: Radius.md,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.border,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
     ...Shadow.sm,
   },
-  imagePreview: {
+  photoThumb: {
     width: '100%',
-    height: 180,
-  },
-  imagePlaceholder: {
-    height: 120,
-    backgroundColor: Colors.surfaceAlt,
-    borderRadius: Radius.lg,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-  },
-  imagePlaceholderText: {
-    fontSize: Typography.size.sm,
-    color: Colors.textMuted,
+    height: '100%',
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: c.border,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: Typography.size.base,
-    color: Colors.text,
+    color: c.text,
   },
   inputLarge: {
     fontSize: Typography.size.lg,

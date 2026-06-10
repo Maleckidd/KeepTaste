@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { runMigrations } from '@/db/client';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/constants/theme';
 
 export default function RootLayout() {
+  const c = useTheme();
+
   useEffect(() => {
     // Run database migrations on app startup
     try {
@@ -16,20 +18,20 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style="auto" />
       <Stack
         screenOptions={{
           headerStyle: {
-            backgroundColor: Colors.background,
+            backgroundColor: c.background,
           },
-          headerTintColor: Colors.text,
+          headerTintColor: c.text,
           headerTitleStyle: {
             fontWeight: '600',
             fontSize: 17,
           },
           headerShadowVisible: false,
           contentStyle: {
-            backgroundColor: Colors.background,
+            backgroundColor: c.background,
           },
         }}
       >

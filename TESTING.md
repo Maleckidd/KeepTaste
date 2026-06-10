@@ -24,7 +24,7 @@ implementation. Every test case below exercises at least one of those gaps.
 
 ### Out of scope of this plan
 - Web-only behavior (the web build is a test environment, not a product platform — SPEC §2).
-- Features not implemented yet: dark mode (SPEC §6 — designed, not built), animations, .md import, tags (SPEC §7/§8).
+- Features not implemented yet: animations, tags (SPEC §7/§8). Dark mode (SPEC §6) and Markdown import (§5.8) are implemented and covered below (DM and MI cases).
 - Performance/load testing — the app is local-only and single-user; not a current risk.
 
 ---
@@ -183,22 +183,22 @@ Pre: recipes in 2 cookbooks + ≥1 recipe without a cookbook.
 1. Home → All recipes.
 - Expected: every recipe appears exactly once, sorted by `updated_at` descending.
 
-**LS-02 · P1 · Recipe grid tiles**
+**LS-02 · P1 · Recipe list cards**
 1. Open a cookbook with R1 and R2.
-- Expected: 2-column grid; tiles show thumbnail (or placeholder), title, total time and servings **only when present**; first tile is "Add recipe".
+- Expected: vertical list of cards — thumbnail on the left (or placeholder), title, total time and servings **only when present**; no search field in a specific cookbook's view.
 
 **LS-03 · P1 · Empty cookbook state**
 1. Create a new cookbook, open it.
-- Expected: only the "Add recipe" tile; no error, no separate empty-state message needed.
+- Expected: empty state with an icon and a "tap + to add" message; adding via the header "+" works.
 
 **LS-04 · P1 · Home empty state**
 Pre: fresh state (no cookbooks).
 - Expected: icon + "No cookbooks" message encouraging creating the first one; "All recipes" row still reachable.
 
-**LS-05 · P1 · Export menu visibility**
-1. Open a specific cookbook → three-dot menu visible with Export.
+**LS-05 · P1 · Export icon visibility**
+1. Open a specific cookbook → export (share) icon visible in the header.
 2. Open All recipes.
-- Expected: **no** Export option in the All recipes view (SPEC §5.6).
+- Expected: **no** export icon in the All recipes view (SPEC §5.6).
 
 ### SR — Search (SPEC §5.1)
 
@@ -245,7 +245,7 @@ Same as IM-01 but for a cookbook cover.
 
 **EX-01 · P0 · Export a cookbook**
 Pre: cookbook with R1 (full) and R2 (title only).
-1. Cookbook view → three-dot menu → Export.
+1. Cookbook view → export (share) icon in the header.
 - Expected: system share sheet opens with a `.md` file named after the cookbook. Share to e.g. email/files and open the file.
 
 **EX-02 · P1 · Export format correctness**
@@ -262,6 +262,34 @@ Inspect the exported file:
 **EX-04 · P2 · Share sheet cancel**
 1. Trigger export, dismiss the share sheet without choosing a target.
 - Expected: app returns to the cookbook view; no crash; export can be re-triggered.
+
+### MI — Markdown import (SPEC §5.8)
+
+**MI-01 · P0 · Export → import round-trip**
+Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (title only).
+1. Export the cookbook (EX-01), save the `.md` file on the device.
+2. Settings → Import from Markdown → pick the file → confirm the "Import ... with 2 recipes?" Alert.
+- Expected: a new cookbook appears on Home with the same name; both recipes intact — R1's times/servings parsed back (incl. an over-an-hour time like "1 hr 30 min" → 90 min), Markdown in ingredients/instructions identical, notes preserved; R2 imported with title only (no metadata row in detail view).
+
+**MI-02 · P1 · Malformed file is rejected**
+1. Import a `.txt`/`.md` file that is not a KeepTaste export (e.g. random text without a `# ` heading).
+- Expected: "Import failed" Alert with a reason; nothing created; app fully usable afterwards.
+
+**MI-03 · P1 · Cancel paths**
+1. Open the picker and dismiss it without choosing a file. 2. Pick a valid file but tap Cancel on the confirmation Alert.
+- Expected: no cookbook created in either path; no crash.
+
+**MI-04 · P2 · Duplicate import**
+1. Import the same file twice, confirming both times.
+- Expected: two separate cookbooks with the same name (duplicates are allowed by design — SPEC §5.8); recipes duplicated accordingly.
+
+**MI-05 · P2 · Empty cookbook file**
+1. Export a cookbook with zero recipes, then import that file.
+- Expected: confirmation says "0 recipes"; an empty cookbook is created; opening it shows only the "Add recipe" tile.
+
+**MI-06 · P2 · Imported recipes have no photos**
+1. After MI-01, open imported R1.
+- Expected: gray placeholder instead of a photo (export does not carry images — known format property, not a bug); everything else intact.
 
 ### DC — Discard-changes dialogs (SPEC §5.2, §5.5)
 
@@ -310,6 +338,13 @@ Same for Camera.
 1. After PM-01, grant the permission from system settings, retry.
 - Expected: picker opens normally.
 
+### DM — Dark mode (SPEC §6)
+
+**DM-01 · P1 · System theme switching**
+1. With the app open on Home, switch the system theme to dark (quick settings tile), then walk through: cookbook view, recipe view, both forms, settings.
+2. Switch back to light mid-session.
+- Expected: every screen switches instantly without reload; no stale light/dark surfaces; text readable on all backgrounds (spot-check contrast per SPEC §6 WCAG AA goal); cookbook tiles and photos unchanged (dark overlay works in both modes); status bar style follows the theme.
+
 ### LC — App lifecycle & data durability (SPEC §4, §9)
 
 **LC-01 · P0 · Data survives app restart**
@@ -333,7 +368,7 @@ Same for Camera.
 ## 5. Smoke suite (run on every build)
 
 The P0 set, in execution order:
-`LC-01 → CB-01 → CB-04 → CB-06 → RC-01 → RC-02 → RC-03 → RV-01 → RV-05 → LS-01 → SR-01 → SR-02 → IM-01 → IM-02 → EX-01 → DC-01 → ST-01 → ST-02`
+`LC-01 → CB-01 → CB-04 → CB-06 → RC-01 → RC-02 → RC-03 → RV-01 → RV-05 → LS-01 → SR-01 → SR-02 → IM-01 → IM-02 → EX-01 → MI-01 → DC-01 → ST-01 → ST-02`
 
 ~20 minutes on one physical Android device. The full plan (P0+P1) is the release gate for the primary platform; P2 and the iOS pass are scheduled per release scope.
 
