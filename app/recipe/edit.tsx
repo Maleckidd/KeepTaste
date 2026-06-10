@@ -1,0 +1,86 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { SafeAreaView, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import RecipeForm from '@/components/recipe/RecipeForm';
+import { type RecipeFormData, recipeToFormData } from '@/utils/recipeForm';
+import { getRecipeById, updateRecipe } from '@/db/recipes';
+import { Colors } from '@/constants/theme';
+import { parsePositiveInt } from '@/utils/numeric';
+import { persistImage } from '@/utils/imageStorage';
+
+export default function EditRecipeScreen() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [initialData, setInitialData] = useState<RecipeFormData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const originalImagePath = useRef<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const recipeId = Number(id);
+      const recipe = await getRecipeById(recipeId);
+      if (recipe) {
+        originalImagePath.current = recipe.imagePath ?? null;
+        setInitialData(recipeToFormData(recipe));
+      }
+    }
+    load();
+  }, [id]);
+
+  const handleSave = async (data: RecipeFormData) => {
+    setIsLoading(true);
+    const recipeId = Number(id);
+    try {
+      const imagePath = await persistImage(
+        data.imagePath || null,
+        originalImagePath.current
+      );
+      await updateRecipe(recipeId, {
+        title: data.title.trim(),
+        prepTime: parsePositiveInt(data.prepTime),
+        cookTime: parsePositiveInt(data.cookTime),
+        servings: parsePositiveInt(data.servings),
+        imagePath,
+        ingredients: data.ingredients,
+        instructions: data.instructions,
+        notes: data.notes || null,
+      });
+
+      router.back();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!initialData) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={Colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <RecipeForm
+        initialData={initialData}
+        onSave={handleSave}
+        onCancel={() => router.back()}
+        isLoading={isLoading}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
+});

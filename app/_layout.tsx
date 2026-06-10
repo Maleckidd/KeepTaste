@@ -1,0 +1,80 @@
+import { useEffect } from 'react';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { runMigrations } from '@/db/client';
+import { Colors } from '@/constants/theme';
+
+export default function RootLayout() {
+  useEffect(() => {
+    // Run database migrations on app startup
+    try {
+      runMigrations();
+    } catch (e) {
+      console.error('Database migration error:', e);
+    }
+  }, []);
+
+  return (
+    <>
+      <StatusBar style="dark" />
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: Colors.background,
+          },
+          headerTintColor: Colors.text,
+          headerTitleStyle: {
+            fontWeight: '600',
+            fontSize: 17,
+          },
+          headerShadowVisible: false,
+          contentStyle: {
+            backgroundColor: Colors.background,
+          },
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="cookbook/[id]"
+          options={{ title: 'Cookbook' }}
+        />
+        <Stack.Screen
+          name="settings"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="recipe/[id]"
+          options={{ title: 'Recipe', presentation: 'card' }}
+        />
+        <Stack.Screen
+          name="recipe/new"
+          options={{
+            title: 'New recipe',
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="recipe/edit"
+          options={{
+            title: 'Edit recipe',
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="cookbook/new"
+          options={{
+            title: 'New cookbook',
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="cookbook/edit"
+          options={{
+            title: 'Edit cookbook',
+            presentation: 'modal',
+          }}
+        />
+      </Stack>
+    </>
+  );
+}

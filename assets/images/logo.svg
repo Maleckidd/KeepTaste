@@ -1,0 +1,40 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="32%" r="90%">
+      <stop offset="0%" stop-color="#D85A3E"/>
+      <stop offset="100%" stop-color="#9E3520"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g fill="#FFFFFF">
+    <!-- steam rising as a heart -->
+    <path d="M512 468
+             C 470 426, 388 404, 388 338
+             C 388 296, 422 270, 460 270
+             C 488 270, 506 286, 512 306
+             C 518 286, 536 270, 564 270
+             C 602 270, 636 296, 636 338
+             C 636 404, 554 426, 512 468 Z"/>
+    <!-- lid knob -->
+    <circle cx="512" cy="518" r="20"/>
+    <!-- lid -->
+    <path d="M352 600
+             C 352 560, 424 538, 512 538
+             C 600 538, 672 560, 672 600 Z"/>
+    <!-- KT monogram carved out of the pot body -->
+    <mask id="kt">
+      <rect x="280" y="530" width="464" height="300" fill="white"/>
+      <text x="484" y="732" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="104" fill="black" text-anchor="middle">K</text>
+      <text x="546" y="784" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="104" fill="black" text-anchor="middle">T</text>
+    </mask>
+    <!-- pot body -->
+    <path mask="url(#kt)" d="M352 618
+             L 672 618
+             L 672 738
+             C 672 786, 600 816, 512 816
+             C 424 816, 352 786, 352 738 Z"/>
+    <!-- handles -->
+    <rect x="292" y="634" width="50" height="30" rx="15"/>
+    <rect x="682" y="634" width="50" height="30" rx="15"/>
+  </g>
+</svg>

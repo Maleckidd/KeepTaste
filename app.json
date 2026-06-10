@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "KeepTaste",
+    "slug": "keeptaste",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "keeptaste",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAFAF7"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.damianmalecki.keeptaste"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#C84B31"
+      },
+      "package": "com.damianmalecki.keeptaste"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to add a recipe image.",
+          "cameraPermission": "The app needs access to the camera to take a photo of a dish."
+        }
+      ],
+      "expo-asset",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

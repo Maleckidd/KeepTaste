@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# native builds
+ios/
+android/
+*.ipa
+*.apk
+*.aab
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# agent/E2E test artifacts
+.playwright-mcp/
