@@ -45,6 +45,11 @@ export const MIGRATION_DDL = `
 
   CREATE INDEX IF NOT EXISTS idx_shopping_items_list_id ON shopping_items(list_id);
 
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
+  );
+
   -- Tags were removed from the MVP (SPEC.md §7/§8); drop legacy tables.
   -- Junction table first because of the FK reference into tags.
   DROP TABLE IF EXISTS recipe_tags;

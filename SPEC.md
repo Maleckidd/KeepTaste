@@ -60,12 +60,20 @@ app/
     [id].tsx             ← recipe view (read-only with Markdown)
     new.tsx              ← modal: new recipe
     edit.tsx             ← modal: edit recipe
+  shopping/
+    [id].tsx             ← shopping list detail: items + "in cart" flow (§5.10)
+    new.tsx              ← modal: new shopping list
+    edit.tsx             ← modal: rename shopping list
 
 components/
   cookbook/
     CookbookForm.tsx     ← shared cookbook form (new + edit)
   recipe/
     RecipeForm.tsx       ← shared recipe form (new + edit)
+
+i18n/
+  dictionary.ts          ← typed EN+PL dictionary of all UI strings (§5.11)
+  LanguageProvider.tsx   ← language context (useT/useLanguage) + persistence
 
 db/
   schema.ts              ← Drizzle table definitions + TypeScript types
@@ -75,6 +83,8 @@ db/
   cookbooks.ts           ← queries: cookbook CRUD
   recipes.ts             ← queries: recipe CRUD, search, delete-all-data
   import.ts              ← writes a parsed Markdown import (cookbook + recipes)
+  shoppingLists.ts       ← queries: shopping list/item CRUD, check/uncheck (§5.10)
+  settings.ts            ← key-value app settings (language preference, §5.11)
 
 utils/
   markdown.ts            ← cookbook → .md file export logic
@@ -84,6 +94,8 @@ utils/
   recipeForm.ts          ← recipe form logic (mapping, dirty-check)
   numeric.ts             ← numeric field parsing (integer ≥ 1 or null)
   search.ts              ← diacritics-safe title search
+  shoppingList.ts        ← shopping list logic: partition, counts, input normalization
+  i18n.ts                ← pure i18n logic: preference/locale resolution, interpolation, PL plurals
 
 constants/
   theme.ts               ← design tokens: light/dark palettes + useTheme(), typography, spacing, shadows
@@ -126,7 +138,14 @@ recipes (
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 )
+
+app_settings (                                   -- key-value preferences (§5.11)
+  key             TEXT PRIMARY KEY NOT NULL,      -- e.g. 'language'
+  value           TEXT NOT NULL                   -- e.g. 'system' | 'en' | 'pl'
+)
 ```
+
+> The `shopping_lists` / `shopping_items` tables are defined alongside the feature in §5.10.
 
 > Tags have been removed from the MVP (see §7 and §8). The `tags` and `recipe_tags` tables do not exist in the schema; leftovers in the existing code must be removed (DDL, schema.ts, form, view, export).
 
@@ -425,7 +444,7 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 - Tapping the checkbox: it becomes checked, the row is **grayed out** (muted text/checkbox) and **moves to the bottom of the list**, under an "In cart" section header (the header appears only when at least one item is checked)
 - Unchecking moves the item back to the unchecked group
 - Item edits update the parent list's `updated_at` (so active lists float to the top of the Shopping tab)
-- Long-press an item → Alert: Delete / Cancel
+- Long-press an item → Alert: **Edit / Delete / Cancel**. Edit reuses the inline row in edit mode: inputs pre-filled with the item's name/quantity, the confirm button shows a checkmark, and saving updates the item in place (clearing quantity stores NULL); editing touches the parent list's `updated_at`
 
 **Database (new tables, added to `db/ddl.ts` + `db/schema.ts`; CREATE TABLE IF NOT EXISTS keeps existing installs safe):**
 
@@ -452,6 +471,16 @@ CREATE INDEX idx_shopping_items_list_id ON shopping_items(list_id);
 `ON DELETE CASCADE` (not SET NULL like recipes): a shopping item has no meaning outside its list.
 
 **Out of scope for the first iteration:** linking products to recipes/ingredients (manual entry only), sharing lists, quantities as structured numbers/units, reordering by drag & drop, Markdown export of lists.
+
+### 5.11 Language selection
+
+The UI ships in two languages: English and Polish. On first launch the app follows the device locale (via `expo-localization`): a device language starting with `pl` shows Polish, everything else shows English.
+
+Users can override this manually in Settings. A "Language" row (above the "Your data" area) shows the current preference's localized label (System / English / Polski) and, on tap, opens an Alert with four buttons: **System**, **English**, **Polski**, **Cancel**. Choosing **System** restores the device-locale default.
+
+The chosen preference is persisted in the SQLite `app_settings` key-value table (key `language`, value `system` | `en` | `pl`). Changing it re-renders the entire app immediately — tab labels, pushed screen titles, and Alerts all switch — through a `LanguageProvider` React context that wraps the app. This whole-app context is the **approved exception** to the otherwise strict no-global-state rule (§3) and the no-extra-settings rule (§7): it is the only in-app preference.
+
+All user-facing strings live in `i18n/dictionary.ts` with an English and a Polish translation; components never hardcode user-facing strings. Pure resolver logic (preference parsing, locale resolution, interpolation, Polish plurals) lives in `utils/i18n.ts`. The **Markdown export/import format stays English-only** regardless of UI language, so exported files round-trip across devices and locales.
 
 ---
 
@@ -515,6 +544,7 @@ Values to be verified on a device for contrast (target: WCAG AA for text). Photo
 | Drag & drop step reordering | Steps live in one text field, not separate records |
 | Notifications / timers | Out of scope |
 | Manual dark mode toggle in the app | Dark mode follows the system setting only (§6) — no extra settings |
+| App language selection | **User-approved exception** to the no-extra-settings rule (the only in-app preference; §5.11). The UI is bilingual EN/PL; the Markdown export/import data format stays English-only |
 
 ---
 

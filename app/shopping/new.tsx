@@ -20,19 +20,21 @@ import {
   Spacing,
   Radius,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 
 export default function NewShoppingListScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClose = () => {
     if (name.trim()) {
-      Alert.alert('Discard changes?', 'Your changes will not be saved.', [
-        { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+      Alert.alert(t('common.discardTitle'), t('common.discardMessage'), [
+        { text: t('common.keepEditing'), style: 'cancel' },
+        { text: t('common.discard'), style: 'destructive', onPress: () => router.back() },
       ]);
       return;
     }
@@ -42,7 +44,7 @@ export default function NewShoppingListScreen() {
   const handleCreate = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      Alert.alert('Missing name', 'Please enter a list name.');
+      Alert.alert(t('shoppingNew.missingName'), t('shoppingNew.missingNameMessage'));
       return;
     }
     setIsLoading(true);
@@ -61,17 +63,17 @@ export default function NewShoppingListScreen() {
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>New shopping list</Text>
+          <Text style={styles.title}>{t('shoppingNew.title')}</Text>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={c.text} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.label}>List name</Text>
+          <Text style={styles.label}>{t('shoppingNew.label')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. Weekly shop..."
+            placeholder={t('shoppingNew.placeholder')}
             placeholderTextColor={c.textMuted}
             value={name}
             onChangeText={setName}
@@ -85,7 +87,7 @@ export default function NewShoppingListScreen() {
             style={[styles.primaryButton, isLoading && styles.disabled]}
             disabled={isLoading}
           >
-            <Text style={styles.primaryButtonText}>Create list</Text>
+            <Text style={styles.primaryButtonText}>{t('shoppingNew.create')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

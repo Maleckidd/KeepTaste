@@ -21,6 +21,7 @@ import {
   Radius,
   Shadow,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import {
   type CookbookFormData,
   emptyCookbookFormData,
@@ -69,6 +70,7 @@ export default function CookbookForm({
   isLoading,
 }: Props) {
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const initial = initialData ?? emptyCookbookFormData();
   const [form, setForm] = useState<CookbookFormData>(initial);
@@ -79,7 +81,7 @@ export default function CookbookForm({
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'The app needs access to your photos.');
+      Alert.alert(t('common.permissionRequired'), t('common.permissionPhotos'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -96,7 +98,7 @@ export default function CookbookForm({
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'The app needs access to the camera.');
+      Alert.alert(t('common.permissionRequired'), t('common.permissionCamera'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -110,21 +112,21 @@ export default function CookbookForm({
   };
 
   const handlePhotoPress = () =>
-    Alert.alert('Cover photo', 'Where would you like to add a photo from?', [
-      { text: 'Gallery', onPress: handlePickImage },
-      { text: 'Camera', onPress: handleTakePhoto },
+    Alert.alert(t('cookbookForm.coverTitle'), t('cookbookForm.coverMessage'), [
+      { text: t('common.gallery'), onPress: handlePickImage },
+      { text: t('common.camera'), onPress: handleTakePhoto },
       form.coverImagePath
         ? {
-            text: 'Remove photo',
+            text: t('common.removePhoto'),
             style: 'destructive',
             onPress: () => set('coverImagePath', ''),
           }
-        : { text: 'Cancel', style: 'cancel' },
+        : { text: t('common.cancel'), style: 'cancel' },
     ]);
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Missing name', 'Please enter a cookbook name.');
+      Alert.alert(t('cookbookForm.missingName'), t('cookbookForm.missingNameMessage'));
       return;
     }
     await onSave(form);
@@ -132,9 +134,9 @@ export default function CookbookForm({
 
   const handleCancel = () => {
     if (isCookbookFormDirty(initial, form)) {
-      Alert.alert('Discard changes?', 'Your changes will not be saved.', [
-        { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: onCancel },
+      Alert.alert(t('common.discardTitle'), t('common.discardMessage'), [
+        { text: t('common.keepEditing'), style: 'cancel' },
+        { text: t('common.discard'), style: 'destructive', onPress: onCancel },
       ]);
       return;
     }
@@ -148,14 +150,14 @@ export default function CookbookForm({
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleSave}
           style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
           disabled={isLoading}
         >
-          <Text style={styles.saveText}>Save</Text>
+          <Text style={styles.saveText}>{t('common.save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -167,10 +169,10 @@ export default function CookbookForm({
         {/* Name + cover */}
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
-            <Field label="Cookbook name">
+            <Field label={t('cookbookForm.name')}>
               <TextInput
                 style={[styles.input, styles.inputLarge]}
-                placeholder="e.g. Desserts..."
+                placeholder={t('cookbookForm.namePlaceholder')}
                 placeholderTextColor={c.textMuted}
                 value={form.name}
                 onChangeText={(v) => set('name', v)}

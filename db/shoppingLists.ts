@@ -86,6 +86,23 @@ export async function createShoppingItem(
   return result[0].id;
 }
 
+export async function updateShoppingItem(
+  id: number,
+  name: string,
+  quantity: string | null
+): Promise<void> {
+  const rows = await db
+    .select({ listId: shoppingItems.listId })
+    .from(shoppingItems)
+    .where(eq(shoppingItems.id, id));
+  const listId = rows[0]?.listId;
+  await db
+    .update(shoppingItems)
+    .set({ name, quantity })
+    .where(eq(shoppingItems.id, id));
+  if (listId != null) await touchList(listId, new Date().toISOString());
+}
+
 export async function setItemChecked(
   id: number,
   checked: boolean

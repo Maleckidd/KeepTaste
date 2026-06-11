@@ -186,6 +186,33 @@ describe('db/shoppingLists — deleteShoppingList', () => {
   });
 });
 
+describe('db/shoppingLists — updateShoppingItem', () => {
+  it('updates name and quantity and touches the parent list', async () => {
+    // implementation looks up the item's listId first
+    selectResults = [[{ listId: 7 }]];
+
+    await (listsModule as any).updateShoppingItem(12, 'Oat milk', '2 l');
+
+    const itemUpdate = updateCalls.find((u) => u.table === shoppingItems);
+    expect(itemUpdate).toBeDefined();
+    expect(itemUpdate!.set).toMatchObject({ name: 'Oat milk', quantity: '2 l' });
+
+    const listTouch = updateCalls.find((u) => u.table === shoppingLists);
+    expect(listTouch).toBeDefined();
+    const set = listTouch!.set as { updatedAt?: string };
+    expect(typeof set.updatedAt).toBe('string');
+  });
+
+  it('stores null quantity when cleared', async () => {
+    selectResults = [[{ listId: 7 }]];
+
+    await (listsModule as any).updateShoppingItem(12, 'Oat milk', null);
+
+    const itemUpdate = updateCalls.find((u) => u.table === shoppingItems);
+    expect(itemUpdate!.set).toMatchObject({ name: 'Oat milk', quantity: null });
+  });
+});
+
 describe('db/shoppingLists — updateShoppingListName', () => {
   it('updates the name and refreshes updatedAt', async () => {
     await (listsModule as any).updateShoppingListName(5, 'Weekend BBQ');

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-KeepTaste — a local-only, offline recipe manager in React Native + Expo (SDK 52, Expo Router 4). No backend, no accounts, no cloud sync; data lives in on-device SQLite and the escape hatch is Markdown export. **SPEC.md is the living product spec — consult it before implementing features and update it on significant design decisions.** UI strings and docs are in English.
+KeepTaste — a local-only, offline recipe manager in React Native + Expo (SDK 52, Expo Router 4). No backend, no accounts, no cloud sync; data lives in on-device SQLite and the escape hatch is Markdown export. **SPEC.md is the living product spec — consult it before implementing features and update it on significant design decisions.** Docs are in English; UI strings live in i18n/dictionary.ts with EN+PL translations — never hardcode user-facing strings in components.
 
 ## Commands
 
@@ -34,6 +34,7 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 - `app/` — Expo Router file-based screens. `index.tsx` (cookbook tiles + title search), `cookbook/[id].tsx` (recipe grid; the literal id `"all"` means all recipes), `recipe/[id].tsx` (view), `recipe/new.tsx` / `recipe/edit.tsx` (modals sharing `components/recipe/RecipeForm.tsx`). Root `_layout.tsx` runs DB migrations on startup.
 - `db/` — the only data-access layer (Drizzle ORM over expo-sqlite). `schema.ts` (tables + TS types), `ddl.ts` (shared migration DDL), `client.ts` (native connection + migrations), `client.web.ts` (web test client: in-memory sql.js via drizzle sqlite-proxy), `cookbooks.ts` / `recipes.ts` (query helpers). Don't scatter raw SQL outside `db/`.
 - `utils/markdown.ts` — cookbook → `.md` export (format defined in SPEC.md §5.6).
+- `i18n/` — bilingual UI strings: `dictionary.ts` (typed EN+PL `Record`) and `LanguageProvider.tsx` (the `useT`/`useLanguage` context, persistence via `db/settings.ts`). Pure resolver logic (preference parsing, locale resolution, interpolation, Polish plurals) lives in `utils/i18n.ts`. See SPEC.md §5.11.
 - `constants/theme.ts` — design tokens (colors, typography, spacing, shadows). Never hardcode style values when a token exists.
 
 **Migrations are manual.** `runMigrations()` in `db/client.ts` executes hand-written `CREATE TABLE IF NOT EXISTS` DDL (defined in `db/ddl.ts`, shared with `db/client.web.ts`) synchronously at app start. Drizzle Kit auto-migrations are intentionally not used. Any schema change requires editing both `db/schema.ts` and the DDL in `db/ddl.ts` (and `ALTER TABLE` for existing tables).

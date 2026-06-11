@@ -17,6 +17,7 @@ import {
   getShoppingListById,
   getItemsForList,
   createShoppingItem,
+  updateShoppingItem,
   setItemChecked,
   deleteShoppingItem,
 } from '@/db/shoppingLists';
@@ -32,6 +33,7 @@ import {
   Spacing,
   Radius,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import type { ShoppingList, ShoppingItem } from '@/db/schema';
 
 type Row =
@@ -43,6 +45,7 @@ export default function ShoppingListScreen() {
   const listId = Number(id);
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const nameInputRef = useRef<TextInput>(null);
 
@@ -51,6 +54,8 @@ export default function ShoppingListScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
+  // Non-null while the inline row edits an existing item instead of adding.
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     const [l, data] = await Promise.all([
@@ -72,33 +77,58 @@ export default function ShoppingListScreen() {
     loadData();
   };
 
-  const handleDeleteItem = (item: ShoppingItem) => {
-    Alert.alert(item.name, 'Remove this product?', [
-      { text: 'Cancel', style: 'cancel' },
+  const handleItemLongPress = (item: ShoppingItem) => {
+    Alert.alert(item.name, t('common.whatToDo'), [
+      { text: t('common.edit'), onPress: () => openEdit(item) },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteShoppingItem(item.id);
+          if (editingItemId === item.id) closeRow();
           loadData();
         },
       },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
-  const handleAdd = async () => {
+  const handleConfirm = async () => {
     const normalized = normalizeItemInput({ name, quantity });
     if (!validateItemName(normalized.name)) return;
-    await createShoppingItem(listId, normalized.name, normalized.quantity);
-    setName('');
-    setQuantity('');
-    nameInputRef.current?.focus();
+    if (editingItemId !== null) {
+      await updateShoppingItem(editingItemId, normalized.name, normalized.quantity);
+      closeRow();
+    } else {
+      await createShoppingItem(listId, normalized.name, normalized.quantity);
+      setName('');
+      setQuantity('');
+      nameInputRef.current?.focus();
+    }
     loadData();
   };
 
   const openAdd = () => {
+    setEditingItemId(null);
+    setName('');
+    setQuantity('');
     setAddOpen(true);
     requestAnimationFrame(() => nameInputRef.current?.focus());
+  };
+
+  const openEdit = (item: ShoppingItem) => {
+    setEditingItemId(item.id);
+    setName(item.name);
+    setQuantity(item.quantity ?? '');
+    setAddOpen(true);
+    requestAnimationFrame(() => nameInputRef.current?.focus());
+  };
+
+  const closeRow = () => {
+    setAddOpen(false);
+    setEditingItemId(null);
+    setName('');
+    setQuantity('');
   };
 
   const { active, inCart } = partitionItems(items);
@@ -118,7 +148,7 @@ export default function ShoppingListScreen() {
         style={styles.row}
         activeOpacity={0.7}
         onPress={() => handleToggle(item)}
-        onLongPress={() => handleDeleteItem(item)}
+        onLongPress={() => handleItemLongPress(item)}
       >
         <View style={styles.rowBody}>
           <Text
@@ -161,7 +191,7 @@ export default function ShoppingListScreen() {
         </Text>
         {items.length > 0 ? (
           <TouchableOpacity
-            onPress={() => (addOpen ? setAddOpen(false) : openAdd())}
+            onPress={() => (addOpen ? closeRow() : openAdd())}
             style={styles.iconButton}
           >
             <Ionicons name="add" size={26} color={c.primary} />
@@ -174,12 +204,12 @@ export default function ShoppingListScreen() {
       {items.length === 0 && !addOpen ? (
         <View style={styles.emptyState}>
           <Ionicons name="cart-outline" size={48} color={c.border} />
-          <Text style={styles.emptyTitle}>Your shopping list is empty</Text>
-          <Text style={styles.emptyText}>
-            Add products and build your shopping list
-          </Text>
+          <Text style={styles.emptyTitle}>{t('shoppingList.emptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('shoppingList.emptyText')}</Text>
           <TouchableOpacity style={styles.primaryButton} onPress={openAdd}>
-            <Text style={styles.primaryButtonText}>Add product</Text>
+            <Text style={styles.primaryButtonText}>
+              {t('shoppingList.addProduct')}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -190,7 +220,7 @@ export default function ShoppingListScreen() {
           }
           renderItem={({ item: row }) =>
             row.kind === 'header' ? (
-              <Text style={styles.sectionHeader}>In cart</Text>
+              <Text style={styles.sectionHeader}>{t('shoppingList.inCartHeader')}</Text>
             ) : (
               renderItem(row.item)
             )
@@ -207,24 +237,32 @@ export default function ShoppingListScreen() {
           <TextInput
             ref={nameInputRef}
             style={styles.addNameInput}
-            placeholder="Add product..."
+            placeholder={
+              editingItemId !== null
+                ? t('shoppingList.productNamePlaceholder')
+                : t('shoppingList.addProductPlaceholder')
+            }
             placeholderTextColor={c.textMuted}
             value={name}
             onChangeText={setName}
             returnKeyType="done"
-            onSubmitEditing={handleAdd}
+            onSubmitEditing={handleConfirm}
           />
           <TextInput
             style={styles.addQtyInput}
-            placeholder="Qty"
+            placeholder={t('shoppingList.qtyPlaceholder')}
             placeholderTextColor={c.textMuted}
             value={quantity}
             onChangeText={setQuantity}
             returnKeyType="done"
-            onSubmitEditing={handleAdd}
+            onSubmitEditing={handleConfirm}
           />
-          <TouchableOpacity onPress={handleAdd} style={styles.confirmButton}>
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+          <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
+            <Ionicons
+              name={editingItemId !== null ? 'checkmark' : 'add'}
+              size={24}
+              color="#FFFFFF"
+            />
           </TouchableOpacity>
         </View>
       ) : null}

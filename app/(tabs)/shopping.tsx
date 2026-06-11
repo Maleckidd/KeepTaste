@@ -14,7 +14,7 @@ import {
   deleteShoppingList,
   type ShoppingListWithCounts,
 } from '@/db/shoppingLists';
-import { progressLabel } from '@/utils/shoppingList';
+import { progressCounts } from '@/utils/shoppingList';
 import {
   useTheme,
   ThemePalette,
@@ -23,10 +23,12 @@ import {
   Radius,
   Shadow,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 
 export default function ShoppingScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const [lists, setLists] = useState<ShoppingListWithCounts[]>([]);
@@ -42,19 +44,19 @@ export default function ShoppingScreen() {
   );
 
   const handleLongPress = (list: ShoppingListWithCounts) => {
-    Alert.alert(list.name, 'What would you like to do?', [
+    Alert.alert(list.name, t('common.whatToDo'), [
       {
-        text: 'Rename',
+        text: t('shopping.rename'),
         onPress: () => router.push(`/shopping/edit?id=${list.id}`),
       },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () =>
-          Alert.alert(list.name, 'Delete this shopping list?', [
-            { text: 'Cancel', style: 'cancel' },
+          Alert.alert(list.name, t('shopping.deleteListMessage'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Delete',
+              text: t('common.delete'),
               style: 'destructive',
               onPress: async () => {
                 await deleteShoppingList(list.id);
@@ -63,7 +65,7 @@ export default function ShoppingScreen() {
             },
           ]),
       },
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -72,8 +74,8 @@ export default function ShoppingScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerSub}>KeepTaste</Text>
-          <Text style={styles.headerTitle}>Shopping</Text>
+          <Text style={styles.headerSub}>{t('shopping.brand')}</Text>
+          <Text style={styles.headerTitle}>{t('shopping.title')}</Text>
         </View>
         <TouchableOpacity
           onPress={() => router.push('/shopping/new')}
@@ -86,17 +88,21 @@ export default function ShoppingScreen() {
       {lists.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="cart-outline" size={56} color={c.border} />
-          <Text style={styles.emptyTitle}>No shopping lists</Text>
-          <Text style={styles.emptyText}>
-            Tap + to create your first list
-          </Text>
+          <Text style={styles.emptyTitle}>{t('shopping.emptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('shopping.emptyText')}</Text>
         </View>
       ) : (
         <FlatList
           data={lists}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => {
-            const label = progressLabel(item);
+            const counts = progressCounts(item);
+            const label = counts
+              ? t('shopping.inCart', {
+                  checked: counts.checkedCount,
+                  total: counts.totalCount,
+                })
+              : null;
             return (
               <TouchableOpacity
                 style={styles.card}
@@ -152,10 +158,13 @@ const makeStyles = (c: ThemePalette) =>
       letterSpacing: -0.5,
     },
     addButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
+      borderRadius: Radius.full,
+      backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      ...Shadow.sm,
     },
     list: {
       paddingHorizontal: Spacing.base,

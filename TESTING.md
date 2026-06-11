@@ -43,7 +43,7 @@ implementation. Every test case below exercises at least one of those gaps.
 ### Preconditions for every session
 1. `npm test` green and `npx tsc --noEmit` clean on the commit under test (entry criteria).
 2. App installed fresh **or** state reset via Settings → Delete all data (each case states which).
-3. Device language set to English (UI strings are English; no i18n).
+3. Language is bilingual (EN/PL, §5.11). Unless a case says otherwise, set the in-app Language to **English** (Settings → Language → English) so expected strings match; the I18N cases below cover the Polish and device-locale paths explicitly.
 4. For permission cases: app permissions reset (`Settings → Apps → Expo Go → Permissions` or `adb shell pm reset-permissions`).
 
 ### Standard test data
@@ -327,6 +327,11 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 1. Long-press a list card → Alert → "Delete".
 - Expected: the list disappears; its `shopping_items` rows are removed via `ON DELETE CASCADE` (verify no orphaned items remain).
 
+**SL-08 · P1 · Edit a product (name and quantity)**
+1. Long-press a product → **Edit** → the bottom inline row opens pre-filled (name + quantity), confirm button shows a checkmark.
+2. Change both values and confirm; also try clearing the quantity entirely.
+- Expected: the row updates in place (no duplicate); cleared quantity disappears from the row; the list floats to the top of the Shopping tab (`updated_at` touched); checked state is unaffected.
+
 **SL-07 · P1 · Rename a list**
 1. Long-press a list card → **Rename** → modal opens pre-filled with the current name.
 2. Change the name, Save; also try: clearing the name (blocked with an Alert) and closing via ✕ after editing (dirty-check Alert).
@@ -389,6 +394,24 @@ Same for Camera.
 1. With the app open on Home, switch the system theme to dark (quick settings tile), then walk through: cookbook view, recipe view, both forms, settings.
 2. Switch back to light mid-session.
 - Expected: every screen switches instantly without reload; no stale light/dark surfaces; text readable on all backgrounds (spot-check contrast per SPEC §6 WCAG AA goal); cookbook tiles and photos unchanged (dark overlay works in both modes); status bar style follows the theme.
+
+### I18N — Language selection (SPEC §5.11)
+
+**I18N-01 · P1 · Polish-locale device defaults to Polish UI**
+1. Fresh install (clear Expo Go data) on a device whose system language is Polish (`pl-PL`). Launch the app without touching Settings.
+- Expected: the whole UI is Polish by default — tab labels (Przepisy / Zakupy), Home title (Książki kucharskie), the "All recipes" tile (Wszystkie przepisy), empty states, and Alerts. A device in any non-Polish locale defaults to English.
+
+**I18N-02 · P1 · Manual override switches the whole app immediately**
+1. In Settings → Language, choose **System**, then **English**, then **Polski**, observing after each.
+- Expected: each choice re-renders the entire app instantly with no reload — tab labels at the bottom, the Settings header, pushed/detail screen titles (open a recipe and a shopping list to confirm Stack titles), and Alert buttons (e.g. long-press a cookbook → Edytuj / Usuń / Anuluj) all switch language together. The Language row subtitle reflects the current choice (System / English / Polski).
+
+**I18N-03 · P1 · Override persists across a full kill + restart**
+1. Set Language to Polski. Force-stop the app, relaunch.
+- Expected: the app comes back in Polish (preference read from the `app_settings` table), regardless of the device locale. Switching back to System and restarting returns to the device-locale default.
+
+**I18N-04 · P2 · Export stays English while UI is Polish (round-trip)**
+1. With UI language set to Polski, export a cookbook to Markdown, inspect the file, then re-import it (Settings → Importuj z Markdown).
+- Expected: the exported `.md` headings/labels are English (the data format never localizes); the import succeeds and round-trips identically — recipe count and content match — even though every surrounding UI string and Alert shown during import is Polish.
 
 ### LC — App lifecycle & data durability (SPEC §4, §9)
 

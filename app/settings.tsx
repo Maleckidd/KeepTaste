@@ -24,12 +24,41 @@ import {
   Radius,
   Shadow,
 } from '@/constants/theme';
+import { useT, useLanguage } from '@/i18n/LanguageProvider';
+import { pluralPl } from '@/utils/i18n';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
+  const { preference, setPreference } = useLanguage();
   const styles = useMemo(() => makeStyles(c), [c]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+
+  const languageSubtitle =
+    preference === 'en'
+      ? t('settings.languageEnglish')
+      : preference === 'pl'
+        ? t('settings.languagePolish')
+        : t('settings.languageSystem');
+
+  const handleLanguagePress = () => {
+    Alert.alert(t('settings.chooseLanguage'), undefined, [
+      {
+        text: t('settings.languageSystem'),
+        onPress: () => setPreference('system'),
+      },
+      {
+        text: t('settings.languageEnglish'),
+        onPress: () => setPreference('en'),
+      },
+      {
+        text: t('settings.languagePolish'),
+        onPress: () => setPreference('pl'),
+      },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
 
   const performDelete = async () => {
     const paths = await deleteAllData();
@@ -39,12 +68,12 @@ export default function SettingsScreen() {
 
   const confirmDeleteFinal = () => {
     Alert.alert(
-      'This cannot be undone',
-      'All cookbooks and recipes will be permanently erased from this device.',
+      t('settings.deleteFinalTitle'),
+      t('settings.deleteFinalMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete everything',
+          text: t('settings.deleteEverything'),
           style: 'destructive',
           onPress: performDelete,
         },
@@ -52,20 +81,40 @@ export default function SettingsScreen() {
     );
   };
 
+  const importCompleteMessage = (name: string, count: number) => {
+    const cat = pluralPl(count);
+    const key =
+      cat === 'one'
+        ? 'settings.importCompleteOne'
+        : cat === 'few'
+          ? 'settings.importCompleteFew'
+          : 'settings.importCompleteMany';
+    return t(key, { name, count });
+  };
+
+  const importConfirmMessage = (name: string, count: number) => {
+    const cat = pluralPl(count);
+    const key =
+      cat === 'one'
+        ? 'settings.importConfirmOne'
+        : cat === 'few'
+          ? 'settings.importConfirmFew'
+          : 'settings.importConfirmMany';
+    return t(key, { name, count });
+  };
+
   const runImport = async (cookbookName: string, recipes: ImportedRecipe[]) => {
     try {
       const { recipeCount } = await importCookbook({ cookbookName, recipes });
       Alert.alert(
-        'Import complete',
-        `Imported "${cookbookName}" with ${recipeCount} ${
-          recipeCount === 1 ? 'recipe' : 'recipes'
-        }.`
+        t('settings.importCompleteTitle'),
+        importCompleteMessage(cookbookName, recipeCount)
       );
       router.back();
     } catch {
       Alert.alert(
-        'Import failed',
-        'Something went wrong while saving. The cookbook may have been imported partially.'
+        t('settings.importFailedTitle'),
+        t('settings.importFailedSaving')
       );
     }
   };
@@ -84,26 +133,24 @@ export default function SettingsScreen() {
     try {
       content = await FileSystem.readAsStringAsync(asset.uri);
     } catch {
-      Alert.alert('Import failed', 'Could not read the selected file.');
+      Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedRead'));
       return;
     }
 
     const result = parseCookbookMarkdown(content);
     if (!result.ok) {
-      Alert.alert('Import failed', result.error);
+      Alert.alert(t('settings.importFailedTitle'), result.error);
       return;
     }
 
     const count = result.recipes.length;
     Alert.alert(
-      'Import cookbook?',
-      `Import "${result.cookbookName}" with ${count} ${
-        count === 1 ? 'recipe' : 'recipes'
-      }?`,
+      t('settings.importConfirmTitle'),
+      importConfirmMessage(result.cookbookName, count),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Import',
+          text: t('settings.importAction'),
           onPress: () => runImport(result.cookbookName, result.recipes),
         },
       ]
@@ -112,12 +159,12 @@ export default function SettingsScreen() {
 
   const handleDeleteAll = () => {
     Alert.alert(
-      'Delete all data?',
-      'This will remove every cookbook, recipe and shopping list stored on this device, along with their images.',
+      t('settings.deleteAllTitle'),
+      t('settings.deleteAllMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: confirmDeleteFinal,
         },
@@ -133,7 +180,7 @@ export default function SettingsScreen() {
           <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
-          Settings
+          {t('settings.title')}
         </Text>
         <View style={styles.backButton} />
       </View>
@@ -145,11 +192,28 @@ export default function SettingsScreen() {
         {/* App info */}
         <View style={styles.card}>
           <Text style={styles.appName}>KeepTaste</Text>
-          <Text style={styles.appVersion}>Version {appVersion}</Text>
+          <Text style={styles.appVersion}>
+            {t('settings.version', { version: appVersion })}
+          </Text>
         </View>
 
+        {/* Language */}
+        <Text style={styles.sectionLabel}>{t('settings.language')}</Text>
+        <TouchableOpacity
+          style={styles.languageRow}
+          onPress={handleLanguagePress}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="language-outline" size={18} color={c.textSecondary} />
+          <View style={styles.languageTextWrap}>
+            <Text style={styles.languageLabel}>{t('settings.language')}</Text>
+            <Text style={styles.languageValue}>{languageSubtitle}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+        </TouchableOpacity>
+
         {/* Your data notice */}
-        <Text style={styles.sectionLabel}>Your data</Text>
+        <Text style={styles.sectionLabel}>{t('settings.yourData')}</Text>
         <View style={styles.card}>
           <View style={styles.noticeRow}>
             <Ionicons
@@ -157,10 +221,7 @@ export default function SettingsScreen() {
               size={18}
               color={c.textSecondary}
             />
-            <Text style={styles.noticeText}>
-              Your recipes are stored only on this device. There are no accounts
-              and no cloud sync.
-            </Text>
+            <Text style={styles.noticeText}>{t('settings.noticeLocal')}</Text>
           </View>
           <View style={styles.noticeRow}>
             <Ionicons
@@ -168,9 +229,7 @@ export default function SettingsScreen() {
               size={18}
               color={c.textSecondary}
             />
-            <Text style={styles.noticeText}>
-              Uninstalling the app deletes all of your recipes.
-            </Text>
+            <Text style={styles.noticeText}>{t('settings.noticeUninstall')}</Text>
           </View>
           <View style={styles.noticeRow}>
             <Ionicons
@@ -178,10 +237,7 @@ export default function SettingsScreen() {
               size={18}
               color={c.textSecondary}
             />
-            <Text style={styles.noticeText}>
-              Exporting a cookbook to Markdown is the only way to back up your
-              recipes.
-            </Text>
+            <Text style={styles.noticeText}>{t('settings.noticeExport')}</Text>
           </View>
         </View>
 
@@ -192,25 +248,21 @@ export default function SettingsScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="download-outline" size={18} color={c.text} />
-          <Text style={styles.importButtonText}>Import from Markdown</Text>
+          <Text style={styles.importButtonText}>{t('settings.import')}</Text>
         </TouchableOpacity>
-        <Text style={styles.importHint}>
-          Adds a new cookbook from a previously exported Markdown file.
-        </Text>
+        <Text style={styles.importHint}>{t('settings.importHint')}</Text>
 
         {/* Delete all data */}
-        <Text style={styles.sectionLabel}>Danger zone</Text>
+        <Text style={styles.sectionLabel}>{t('settings.dangerZone')}</Text>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={handleDeleteAll}
           activeOpacity={0.8}
         >
           <Ionicons name="trash-outline" size={18} color={c.surface} />
-          <Text style={styles.deleteButtonText}>Delete all data</Text>
+          <Text style={styles.deleteButtonText}>{t('settings.deleteAll')}</Text>
         </TouchableOpacity>
-        <Text style={styles.deleteHint}>
-          Permanently erases every cookbook, recipe and shopping list on this device.
-        </Text>
+        <Text style={styles.deleteHint}>{t('settings.deleteHint')}</Text>
       </ScrollView>
     </View>
   );
@@ -268,6 +320,29 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   appVersion: {
     fontSize: Typography.size.base,
+    color: c.textMuted,
+  },
+  languageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: c.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    padding: Spacing.base,
+  },
+  languageTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  languageLabel: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.text,
+  },
+  languageValue: {
+    fontSize: Typography.size.sm,
     color: c.textMuted,
   },
   noticeRow: {

@@ -2,9 +2,11 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 
 export default function TabsLayout() {
   const c = useTheme();
+  const t = useT();
 
   return (
     <Tabs
@@ -18,7 +20,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Recipes',
+          title: t('tabs.recipes'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'book' : 'book-outline'} size={size} color={color} />
           ),
@@ -27,7 +29,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="shopping"
         options={{
-          title: 'Shopping',
+          title: t('tabs.shopping'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'cart' : 'cart-outline'} size={size} color={color} />
           ),

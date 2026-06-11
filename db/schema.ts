@@ -42,6 +42,11 @@ export const shoppingItems = sqliteTable('shopping_items', {
   createdAt: text('created_at').notNull().default(new Date().toISOString()),
 });
 
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});
+
 // TypeScript types derived from the schema
 export type Cookbook = typeof cookbooks.$inferSelect;
 export type NewCookbook = typeof cookbooks.$inferInsert;
@@ -51,3 +56,5 @@ export type ShoppingList = typeof shoppingLists.$inferSelect;
 export type NewShoppingList = typeof shoppingLists.$inferInsert;
 export type ShoppingItem = typeof shoppingItems.$inferSelect;
 export type NewShoppingItem = typeof shoppingItems.$inferInsert;
+export type AppSetting = typeof appSettings.$inferSelect;
+export type NewAppSetting = typeof appSettings.$inferInsert;

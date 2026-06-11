@@ -21,6 +21,7 @@ import {
   Radius,
   Shadow,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import {
   type RecipeFormData,
   emptyRecipeFormData,
@@ -77,6 +78,7 @@ export default function RecipeForm({
   isLoading,
 }: Props) {
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const initial = initialData ?? emptyRecipeFormData();
   const [form, setForm] = useState<RecipeFormData>(initial);
@@ -87,7 +89,7 @@ export default function RecipeForm({
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'The app needs access to your photos.');
+      Alert.alert(t('common.permissionRequired'), t('common.permissionPhotos'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -104,7 +106,7 @@ export default function RecipeForm({
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'The app needs access to the camera.');
+      Alert.alert(t('common.permissionRequired'), t('common.permissionCamera'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -118,17 +120,17 @@ export default function RecipeForm({
   };
 
   const handlePhotoPress = () =>
-    Alert.alert('Photo', 'Where would you like to add a photo from?', [
-      { text: 'Gallery', onPress: handlePickImage },
-      { text: 'Camera', onPress: handleTakePhoto },
+    Alert.alert(t('recipeForm.photoTitle'), t('recipeForm.photoMessage'), [
+      { text: t('common.gallery'), onPress: handlePickImage },
+      { text: t('common.camera'), onPress: handleTakePhoto },
       form.imagePath
-        ? { text: 'Remove photo', style: 'destructive', onPress: () => set('imagePath', '') }
-        : { text: 'Cancel', style: 'cancel' },
+        ? { text: t('common.removePhoto'), style: 'destructive', onPress: () => set('imagePath', '') }
+        : { text: t('common.cancel'), style: 'cancel' },
     ]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
-      Alert.alert('Missing title', 'Please enter a recipe title.');
+      Alert.alert(t('recipeForm.missingTitle'), t('recipeForm.missingTitleMessage'));
       return;
     }
     await onSave(form);
@@ -136,9 +138,9 @@ export default function RecipeForm({
 
   const handleCancel = () => {
     if (isRecipeFormDirty(initial, form)) {
-      Alert.alert('Discard changes?', 'Your changes will not be saved.', [
-        { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: onCancel },
+      Alert.alert(t('common.discardTitle'), t('common.discardMessage'), [
+        { text: t('common.keepEditing'), style: 'cancel' },
+        { text: t('common.discard'), style: 'destructive', onPress: onCancel },
       ]);
       return;
     }
@@ -152,14 +154,14 @@ export default function RecipeForm({
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleSave}
           style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
           disabled={isLoading}
         >
-          <Text style={styles.saveText}>Save</Text>
+          <Text style={styles.saveText}>{t('common.save')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -171,10 +173,10 @@ export default function RecipeForm({
         {/* Title + photo */}
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
-            <Field label="Recipe title">
+            <Field label={t('recipeForm.title')}>
               <TextInput
                 style={[styles.input, styles.inputLarge]}
-                placeholder="e.g. Strawberry tart..."
+                placeholder={t('recipeForm.titlePlaceholder')}
                 placeholderTextColor={c.textMuted}
                 value={form.title}
                 onChangeText={(v) => set('title', v)}
@@ -198,7 +200,7 @@ export default function RecipeForm({
         {/* Times */}
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Field label="Prep (min)">
+            <Field label={t('recipeForm.prep')}>
               <TextInput
                 style={styles.input}
                 placeholder="15"
@@ -211,7 +213,7 @@ export default function RecipeForm({
             </Field>
           </View>
           <View style={{ flex: 1 }}>
-            <Field label="Cook (min)">
+            <Field label={t('recipeForm.cook')}>
               <TextInput
                 style={styles.input}
                 placeholder="45"
@@ -224,7 +226,7 @@ export default function RecipeForm({
             </Field>
           </View>
           <View style={{ flex: 0.7 }}>
-            <Field label="Servings">
+            <Field label={t('recipeForm.servings')}>
               <TextInput
                 style={styles.input}
                 placeholder="4"
@@ -240,12 +242,12 @@ export default function RecipeForm({
 
         {/* Ingredients */}
         <Field
-          label="Ingredients"
-          hint="Use a double line break to separate sections. A dash (-) creates a bullet point."
+          label={t('recipeForm.ingredients')}
+          hint={t('recipeForm.ingredientsHint')}
         >
           <TextInput
             style={[styles.input, styles.inputMultiline]}
-            placeholder={`200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream`}
+            placeholder={t('recipeForm.ingredientsPlaceholder')}
             placeholderTextColor={c.textMuted}
             value={form.ingredients}
             onChangeText={(v) => set('ingredients', v)}
@@ -256,12 +258,12 @@ export default function RecipeForm({
 
         {/* Instructions */}
         <Field
-          label="Instructions"
-          hint="Supports Markdown: # heading, **bold**"
+          label={t('recipeForm.instructions')}
+          hint={t('recipeForm.instructionsHint')}
         >
           <TextInput
             style={[styles.input, styles.inputMultilineTall]}
-            placeholder={`# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.`}
+            placeholder={t('recipeForm.instructionsPlaceholder')}
             placeholderTextColor={c.textMuted}
             value={form.instructions}
             onChangeText={(v) => set('instructions', v)}
@@ -272,12 +274,12 @@ export default function RecipeForm({
 
         {/* Notes */}
         <Field
-          label="Private notes"
-          hint="Your remarks, tweaks, what to change next time..."
+          label={t('recipeForm.notes')}
+          hint={t('recipeForm.notesHint')}
         >
           <TextInput
             style={[styles.input, styles.inputMultiline]}
-            placeholder="Next time add more vanilla sugar..."
+            placeholder={t('recipeForm.notesPlaceholder')}
             placeholderTextColor={c.textMuted}
             value={form.notes}
             onChangeText={(v) => set('notes', v)}

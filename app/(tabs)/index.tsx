@@ -21,6 +21,7 @@ import {
   Radius,
   Shadow,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import type { Cookbook } from '@/db/schema';
 
 function CookbookTile({
@@ -68,6 +69,7 @@ function CookbookTile({
 export default function HomeScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [cookbooks, setCookbooks] = useState<Cookbook[]>([]);
 
@@ -93,12 +95,12 @@ export default function HomeScreen() {
 
   const handleDeleteCookbook = (cookbook: Cookbook) => {
     Alert.alert(
-      `Delete "${cookbook.name}"?`,
-      "Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'.",
+      t('home.deleteTitle', { name: cookbook.name }),
+      t('home.deleteMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             await deleteCookbook(cookbook.id);
@@ -113,18 +115,18 @@ export default function HomeScreen() {
   const handleCookbookLongPress = (cookbook: Cookbook) => {
     Alert.alert(
       cookbook.name,
-      'What would you like to do?',
+      t('common.whatToDo'),
       [
         {
-          text: 'Edit',
+          text: t('common.edit'),
           onPress: () => router.push(`/cookbook/edit?id=${cookbook.id}`),
         },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => handleDeleteCookbook(cookbook),
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]
     );
   };
@@ -143,8 +145,8 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerSub}>KeepTaste</Text>
-          <Text style={styles.headerTitle}>Cookbooks</Text>
+          <Text style={styles.headerSub}>{t('home.brand')}</Text>
+          <Text style={styles.headerTitle}>{t('home.title')}</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -162,7 +164,7 @@ export default function HomeScreen() {
       {/* "All recipes" tile */}
       <TouchableOpacity style={styles.allRecipesTile} onPress={handleOpenAllRecipes}>
         <Ionicons name="search-outline" size={18} color={c.textSecondary} />
-        <Text style={styles.allRecipesText}>All recipes</Text>
+        <Text style={styles.allRecipesText}>{t('home.allRecipes')}</Text>
         <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
       </TouchableOpacity>
 
@@ -170,10 +172,8 @@ export default function HomeScreen() {
       {cookbooks.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="book-outline" size={56} color={c.border} />
-          <Text style={styles.emptyTitle}>No cookbooks</Text>
-          <Text style={styles.emptyText}>
-            Tap + to create your first cookbook
-          </Text>
+          <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
         </View>
       ) : (
         <FlatList

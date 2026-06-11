@@ -50,6 +50,18 @@ export function progressLabel(counts: {
   return `${counts.checkedCount}/${counts.totalCount} in cart`;
 }
 
+/**
+ * Returns the counts for rendering a localized cart-progress label, or null
+ * for an empty list. Pairs with t('shopping.inCart', counts) at the call site.
+ */
+export function progressCounts(counts: {
+  totalCount: number;
+  checkedCount: number;
+}): { checkedCount: number; totalCount: number } | null {
+  if (counts.totalCount === 0) return null;
+  return { checkedCount: counts.checkedCount, totalCount: counts.totalCount };
+}
+
 /** Aggregates per-list totals and checked counts. Lists with no items are absent. */
 export function countItems(
   items: { listId: number; checked: number }[]

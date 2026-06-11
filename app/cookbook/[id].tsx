@@ -22,6 +22,7 @@ import {
   Radius,
   Shadow,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import type { Recipe, Cookbook } from '@/db/schema';
 
 function RecipeCard({
@@ -32,6 +33,7 @@ function RecipeCard({
   onPress: () => void;
 }) {
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
@@ -55,14 +57,18 @@ function RecipeCard({
             <View style={styles.metaItem}>
               <Ionicons name="time-outline" size={13} color={c.textMuted} />
               <Text style={styles.metaText}>
-                {(recipe.prepTime || 0) + (recipe.cookTime || 0)} min
+                {t('cookbook.minutes', {
+                  count: (recipe.prepTime || 0) + (recipe.cookTime || 0),
+                })}
               </Text>
             </View>
           ) : null}
           {recipe.servings ? (
             <View style={styles.metaItem}>
               <Ionicons name="people-outline" size={13} color={c.textMuted} />
-              <Text style={styles.metaText}>{recipe.servings} servings</Text>
+              <Text style={styles.metaText}>
+                {t('cookbook.servings', { count: recipe.servings })}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -76,6 +82,7 @@ export default function CookbookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const isAll = id === 'all';
 
@@ -111,11 +118,14 @@ export default function CookbookScreen() {
     try {
       await exportCookbookToMarkdown(cookbook);
     } catch (e) {
-      Alert.alert('Export failed', 'Could not export the cookbook.');
+      Alert.alert(
+        t('cookbook.exportFailedTitle'),
+        t('cookbook.exportFailedMessage')
+      );
     }
   };
 
-  const headerTitle = isAll ? 'All recipes' : cookbook?.name ?? '';
+  const headerTitle = isAll ? t('home.allRecipes') : cookbook?.name ?? '';
 
   return (
     <View style={styles.container}>
@@ -154,7 +164,7 @@ export default function CookbookScreen() {
           <Ionicons name="search-outline" size={16} color={c.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search recipes..."
+            placeholder={t('cookbook.searchPlaceholder')}
             placeholderTextColor={c.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -170,8 +180,8 @@ export default function CookbookScreen() {
           <Ionicons name="restaurant-outline" size={48} color={c.border} />
           <Text style={styles.emptyText}>
             {searchQuery
-              ? 'No results'
-              : 'No recipes. Tap + to add your first one.'}
+              ? t('cookbook.noResults')
+              : t('cookbook.emptyRecipes')}
           </Text>
         </View>
       ) : (

@@ -20,20 +20,28 @@ import {
   Spacing,
   Radius,
 } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
+import type { Translator } from '@/utils/i18n';
 import type { Recipe } from '@/db/schema';
 
-function formatTime(minutes: number | null | undefined): string {
-  if (!minutes) return '—';
-  if (minutes < 60) return `${minutes} min`;
+function formatTime(
+  t: Translator,
+  minutes: number | null | undefined
+): string {
+  if (!minutes) return '';
+  if (minutes < 60) return t('recipe.minutesShort', { count: minutes });
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return m > 0
+    ? t('recipe.hoursMinutes', { hours: h, minutes: m })
+    : t('recipe.hours', { hours: h });
 }
 
 export default function RecipeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const markdownStyles = useMemo(() => makeMarkdownStyles(c), [c]);
 
@@ -52,12 +60,12 @@ export default function RecipeScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete recipe',
-      `Are you sure you want to delete "${recipe?.title}"?`,
+      t('recipe.deleteTitle'),
+      t('recipe.deleteMessage', { title: recipe?.title ?? '' }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             await deleteRecipe(Number(id));
@@ -122,8 +130,8 @@ export default function RecipeScreen() {
               <View style={styles.metaItem}>
                 <Ionicons name="cut-outline" size={15} color={c.textMuted} />
                 <View>
-                  <Text style={styles.metaLabel}>Prep</Text>
-                  <Text style={styles.metaValue}>{formatTime(recipe.prepTime)}</Text>
+                  <Text style={styles.metaLabel}>{t('recipe.prep')}</Text>
+                  <Text style={styles.metaValue}>{formatTime(t, recipe.prepTime)}</Text>
                 </View>
               </View>
             ) : null}
@@ -131,8 +139,8 @@ export default function RecipeScreen() {
               <View style={styles.metaItem}>
                 <Ionicons name="flame-outline" size={15} color={c.textMuted} />
                 <View>
-                  <Text style={styles.metaLabel}>Cook</Text>
-                  <Text style={styles.metaValue}>{formatTime(recipe.cookTime)}</Text>
+                  <Text style={styles.metaLabel}>{t('recipe.cook')}</Text>
+                  <Text style={styles.metaValue}>{formatTime(t, recipe.cookTime)}</Text>
                 </View>
               </View>
             ) : null}
@@ -140,8 +148,8 @@ export default function RecipeScreen() {
               <View style={styles.metaItem}>
                 <Ionicons name="time-outline" size={15} color={c.textMuted} />
                 <View>
-                  <Text style={styles.metaLabel}>Total</Text>
-                  <Text style={styles.metaValue}>{formatTime(totalTime)}</Text>
+                  <Text style={styles.metaLabel}>{t('recipe.total')}</Text>
+                  <Text style={styles.metaValue}>{formatTime(t, totalTime)}</Text>
                 </View>
               </View>
             ) : null}
@@ -149,7 +157,7 @@ export default function RecipeScreen() {
               <View style={styles.metaItem}>
                 <Ionicons name="people-outline" size={15} color={c.textMuted} />
                 <View>
-                  <Text style={styles.metaLabel}>Servings</Text>
+                  <Text style={styles.metaLabel}>{t('recipe.servingsLabel')}</Text>
                   <Text style={styles.metaValue}>{recipe.servings}</Text>
                 </View>
               </View>
@@ -159,7 +167,7 @@ export default function RecipeScreen() {
           {/* Ingredients */}
           {recipe.ingredients ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Ingredients</Text>
+              <Text style={styles.sectionTitle}>{t('recipe.ingredients')}</Text>
               <Markdown style={markdownStyles}>{recipe.ingredients}</Markdown>
             </View>
           ) : null}
@@ -167,7 +175,7 @@ export default function RecipeScreen() {
           {/* Instructions */}
           {recipe.instructions ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Instructions</Text>
+              <Text style={styles.sectionTitle}>{t('recipe.instructions')}</Text>
               <Markdown style={markdownStyles}>{recipe.instructions}</Markdown>
             </View>
           ) : null}
@@ -177,7 +185,7 @@ export default function RecipeScreen() {
             <View style={styles.notesBox}>
               <View style={styles.notesHeader}>
                 <Ionicons name="document-text-outline" size={15} color={c.primary} />
-                <Text style={styles.notesTitle}>Notes</Text>
+                <Text style={styles.notesTitle}>{t('recipe.notes')}</Text>
               </View>
               <Text style={styles.notesText}>{recipe.notes}</Text>
             </View>

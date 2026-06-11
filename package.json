@@ -20,6 +20,7 @@
     "expo-file-system": "~18.0.12",
     "expo-font": "~13.0.4",
     "expo-image-picker": "~16.0.6",
+    "expo-localization": "~16.0.1",
     "expo-router": "~4.0.0",
     "expo-sharing": "~13.0.1",
     "expo-sqlite": "~15.1.4",
