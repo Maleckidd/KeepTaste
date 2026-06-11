@@ -33,7 +33,7 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 **Layers:**
 - `app/` — Expo Router file-based screens. `index.tsx` (cookbook tiles + title search), `cookbook/[id].tsx` (recipe grid; the literal id `"all"` means all recipes), `recipe/[id].tsx` (view), `recipe/new.tsx` / `recipe/edit.tsx` (modals sharing `components/recipe/RecipeForm.tsx`). Root `_layout.tsx` runs DB migrations on startup.
 - `db/` — the only data-access layer (Drizzle ORM over expo-sqlite). `schema.ts` (tables + TS types), `ddl.ts` (shared migration DDL), `client.ts` (native connection + migrations), `client.web.ts` (web test client: in-memory sql.js via drizzle sqlite-proxy), `cookbooks.ts` / `recipes.ts` (query helpers). Don't scatter raw SQL outside `db/`.
-- `utils/markdown.ts` — cookbook → `.md` export (format defined in SPEC.md §5.6).
+- `utils/` export & share — pure builders (unit-tested): `markdown.ts` (per-recipe/cookbook-body `.md` helpers; format in SPEC.md §5.6), `backupMarkdown.ts` (full-app backup, `# §Uncategorized` sentinel), `importMarkdown.ts` (parsers, incl. multi-cookbook `parseBackupMarkdown`), `cookbookPdfHtml.ts` / `recipeShareText.ts` (localized share content). Native I/O lives in thin wrappers: `backupExport.ts` (write + share `.md`), `cookbookPdf.ts` (expo-print → share sheet).
 - `i18n/` — bilingual UI strings: `dictionary.ts` (typed EN+PL `Record`) and `LanguageProvider.tsx` (the `useT`/`useLanguage` context, persistence via `db/settings.ts`). Pure resolver logic (preference parsing, locale resolution, interpolation, Polish plurals) lives in `utils/i18n.ts`. See SPEC.md §5.11.
 - `constants/theme.ts` — design tokens (colors, typography, spacing, shadows). Never hardcode style values when a token exists.
 
@@ -48,6 +48,7 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 - Dates are stored as ISO 8601 TEXT, not timestamps.
 - The only required form field is the recipe title; numeric fields save an integer ≥ 1 or `null` — never `NaN` (SPEC.md §5.5).
 - Title search must handle non-ASCII characters (e.g. Polish diacritics in recipe titles): filter via `toLowerCase()` in JS, not SQL `LIKE` (SPEC.md §5.1).
-- `updated_at` changes only on edit-save; recipes sort descending by `updated_at` everywhere. Markdown export is only available for a specific cookbook, never the "all" view.
-- Missing metadata (times, servings) is hidden in the UI and omitted in export — no "—" placeholders.
+- `updated_at` changes only on edit-save; recipes sort descending by `updated_at` everywhere.
+- Export vs share (SPEC.md §5.6/§5.13/§5.14): the `.md` backup (Settings) covers the whole app, stays English-only, and must round-trip through import; shares (cookbook → PDF, recipe → text via RN `Share.share`) are localized to the UI language and not importable. PDF share is unavailable in the "all" view.
+- Missing metadata (times, servings) is hidden in the UI and omitted in export/share — no "—" placeholders.
 - Out-of-scope features are listed in SPEC.md §7 (cloud sync, ingredient scaling, tags, etc.) — don't add them speculatively.

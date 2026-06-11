@@ -99,6 +99,10 @@ export const dictionary = {
     en: 'Could not export the cookbook.',
     pl: 'Nie udało się wyeksportować książki kucharskiej.',
   },
+  'cookbook.sharePdfTitle': {
+    en: 'Share cookbook (PDF)',
+    pl: 'Udostępnij książkę (PDF)',
+  },
   'cookbook.minutes': { en: '{count} min', pl: '{count} min' },
   'cookbook.servings': { en: '{count} servings', pl: '{count} porcji' },
 
@@ -122,6 +126,10 @@ export const dictionary = {
   'recipe.addToList': {
     en: 'Add to shopping list',
     pl: 'Dodaj do listy zakupów',
+  },
+  'recipe.shareDialogTitle': {
+    en: 'Share recipe',
+    pl: 'Udostępnij przepis',
   },
 
   // --- Add ingredients to a shopping list (app/recipe/add-to-list.tsx, §5.12) ---
@@ -297,13 +305,30 @@ export const dictionary = {
     pl: 'Odinstalowanie aplikacji usuwa wszystkie Twoje przepisy.',
   },
   'settings.noticeExport': {
-    en: 'Exporting a cookbook to Markdown is the only way to back up your recipes.',
-    pl: 'Eksport książki kucharskiej do Markdown to jedyny sposób na kopię zapasową przepisów.',
+    en: 'Exporting all data to a Markdown file is the only way to back up your recipes.',
+    pl: 'Eksport wszystkich danych do pliku Markdown to jedyny sposób na kopię zapasową przepisów.',
+  },
+  'settings.exportAll': {
+    en: 'Export all data',
+    pl: 'Eksportuj wszystkie dane',
+  },
+  'settings.exportAllHint': {
+    en: 'Saves every cookbook and recipe to a single Markdown backup file you can share or store.',
+    pl: 'Zapisuje wszystkie książki kucharskie i przepisy do jednego pliku kopii zapasowej Markdown, który możesz udostępnić lub przechować.',
+  },
+  'settings.exportAllDialogTitle': {
+    en: 'Export all data',
+    pl: 'Eksportuj wszystkie dane',
+  },
+  'settings.exportFailedTitle': { en: 'Export failed', pl: 'Eksport nieudany' },
+  'settings.exportFailedMessage': {
+    en: 'Could not export your data.',
+    pl: 'Nie udało się wyeksportować danych.',
   },
   'settings.import': { en: 'Import from Markdown', pl: 'Importuj z Markdown' },
   'settings.importHint': {
-    en: 'Adds a new cookbook from a previously exported Markdown file.',
-    pl: 'Dodaje nową książkę kucharską z wcześniej wyeksportowanego pliku Markdown.',
+    en: 'Restores cookbooks and recipes from a previously exported Markdown backup.',
+    pl: 'Przywraca książki kucharskie i przepisy z wcześniej wyeksportowanej kopii zapasowej Markdown.',
   },
   'settings.dangerZone': { en: 'Danger zone', pl: 'Strefa zagrożenia' },
   'settings.deleteAll': { en: 'Delete all data', pl: 'Usuń wszystkie dane' },
@@ -333,6 +358,58 @@ export const dictionary = {
   'settings.importCompleteMany': {
     en: 'Imported "{name}" with {count} recipes.',
     pl: 'Zaimportowano „{name}” z {count} przepisami.',
+  },
+  // Settings: full-app backup import (multi-cookbook).
+  // Cookbook and recipe counts are pluralized independently via the
+  // *CookbooksAcc / *RecipesAcc / *RecipesInstr fragments (Polish needs
+  // accusative after "zaimportowano/zaimportować" and instrumental after "z").
+  'settings.importBackupComplete': {
+    en: 'Imported {cookbooks} and {recipes}.',
+    pl: 'Zaimportowano {cookbooks} i {recipes}.',
+  },
+  'settings.importBackupConfirmTitle': {
+    en: 'Import backup?',
+    pl: 'Zaimportować kopię zapasową?',
+  },
+  'settings.importBackupConfirm': {
+    en: 'Import {cookbooks} with {recipes}?',
+    pl: 'Zaimportować {cookbooks} z {recipes}?',
+  },
+  'settings.backupCookbooksAccOne': {
+    en: '{count} cookbook',
+    pl: '{count} książkę',
+  },
+  'settings.backupCookbooksAccFew': {
+    en: '{count} cookbooks',
+    pl: '{count} książki',
+  },
+  'settings.backupCookbooksAccMany': {
+    en: '{count} cookbooks',
+    pl: '{count} książek',
+  },
+  'settings.backupRecipesAccOne': {
+    en: '{count} recipe',
+    pl: '{count} przepis',
+  },
+  'settings.backupRecipesAccFew': {
+    en: '{count} recipes',
+    pl: '{count} przepisy',
+  },
+  'settings.backupRecipesAccMany': {
+    en: '{count} recipes',
+    pl: '{count} przepisów',
+  },
+  'settings.backupRecipesInstrOne': {
+    en: '{count} recipe',
+    pl: '{count} przepisem',
+  },
+  'settings.backupRecipesInstrFew': {
+    en: '{count} recipes',
+    pl: '{count} przepisami',
+  },
+  'settings.backupRecipesInstrMany': {
+    en: '{count} recipes',
+    pl: '{count} przepisami',
   },
   'settings.importFailedTitle': { en: 'Import failed', pl: 'Import nieudany' },
   'settings.importFailedSaving': {

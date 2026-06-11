@@ -32,8 +32,10 @@ Philosophy: **your data, your device**. Markdown export guarantees the user is n
 | Database | expo-sqlite | Local SQLite built into Expo, works offline |
 | ORM | Drizzle ORM | Typed query builder, minimal abstraction, great DX |
 | Photos | expo-image-picker | Gallery and camera access, permission handling |
-| File export | expo-file-system + expo-sharing | Write .md to cache, system share sheet |
-| File import | expo-document-picker + expo-file-system | Pick a .md file, read its contents for parsing (§5.8) |
+| File export | expo-file-system + expo-sharing | Write .md backup to cache, system share sheet (§5.6) |
+| PDF export | expo-print + expo-sharing | Render cookbook HTML → PDF, share (§5.14) |
+| Recipe text share | React Native `Share` | Ready-to-send plain text for SMS/Messenger (§5.13) |
+| File import | expo-document-picker + expo-file-system | Pick a .md backup file, read its contents for parsing (§5.8) |
 | Markdown | react-native-markdown-display | Lightweight library, good support for a Markdown subset |
 | Icons | @expo/vector-icons (Ionicons) | Bundled with Expo, zero configuration |
 | Language | TypeScript (strict) | Type safety, better DX |
@@ -88,8 +90,13 @@ db/
   settings.ts            ← key-value app settings (language preference, §5.11)
 
 utils/
-  markdown.ts            ← cookbook → .md file export logic
-  importMarkdown.ts      ← parser for previously exported .md files (§5.8)
+  markdown.ts            ← pure per-recipe / per-cookbook-body .md builders + formatTime (§5.6)
+  backupMarkdown.ts      ← pure full-app backup builder + §Uncategorized sentinel (§5.6)
+  backupExport.ts        ← native: gather sections, write backup .md to cache, share (§5.6)
+  importMarkdown.ts      ← parser for backup / legacy .md files (parseBackupMarkdown, §5.8)
+  recipeShareText.ts     ← pure localized recipe → plain-text builder (§5.13)
+  cookbookPdfHtml.ts     ← pure localized cookbook → HTML builder (§5.14)
+  cookbookPdf.ts         ← native: HTML → PDF via expo-print, share (§5.14)
   imageStorage.ts        ← persisting picked images into documentDirectory + cleanup
   cookbookForm.ts        ← cookbook form logic (normalize, dirty-check)
   recipeForm.ts          ← recipe form logic (mapping, dirty-check)
@@ -222,7 +229,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - URL `/cookbook/all` — all recipes from all cookbooks and unassigned ones
 - Recipes sorted descending by `updated_at` (most recently modified on top)
 - "+" button in the header → new recipe (with pre-filled `cookbook_id` when inside a specific cookbook)
-- **Export (share) icon in the header** → exports the cookbook to Markdown (§5.6). Available only in a specific cookbook's view, not in "All recipes"
+- **Share (PDF) icon in the header** → generates and shares the cookbook as a PDF (§5.14). Available only in a specific cookbook's view, not in "All recipes"
 
 **Search (only in the `/cookbook/all` view):**
 - Text field above the list, filtering by recipe title across **all** cookbooks
@@ -257,6 +264,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 
 **Navigation:**
 - Back button (arrow-back)
+- Share button (share-outline) → shares the recipe as plain text (§5.13)
 - Edit button (create-outline) → opens `/recipe/edit?id=X`
 - Delete button (trash) → confirmation Alert; on confirm, deletes and goes back
 
@@ -299,11 +307,11 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 ---
 
-### 5.6 Exporting a cookbook to Markdown
+### 5.6 Full-app backup to Markdown
 
-**Trigger:** export (share) icon in the `/cookbook/[id]` screen header (unavailable in the "All recipes" view) → system share sheet via `Sharing.shareAsync()` (on iOS this includes "Save to Files"; a dedicated "save to device" option was considered and dropped — the share sheet covers the need).
+**Trigger:** an "Export all data" button in the Settings screen (§5.7), in the "Your data" section → the whole library is written to a single `.md` file and shared via the system share sheet (`Sharing.shareAsync()`, `text/markdown`). This replaces the former per-cookbook Markdown export; cookbook headers now share a **PDF** instead (§5.14).
 
-**Format of the resulting `.md` file:**
+**Format of the resulting backup `.md` file:** one file holds every cookbook as a `# Name` section in the per-cookbook body format below, in cookbook order, followed by an optional **uncategorized bucket** for recipes whose `cookbook_id` is `NULL`, under the reserved sentinel heading `# §Uncategorized`. The uncategorized section is omitted entirely when there are no loose recipes. The format is **English-only** (never localized). An empty library yields an empty file.
 
 ```markdown
 # Cookbook Name
@@ -333,21 +341,28 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 ## Next Recipe
 ...
+
+# §Uncategorized
+
+*Exported: 01/06/2026*
+*Recipes: 2*
+
+---
+
+## Loose Recipe
+...
 ```
 
 **Implementation details:**
-- Recipes in the file are sorted the same as in the list (descending by `updated_at`)
+- Pure builders live in `utils/markdown.ts` (`recipeToMarkdown`, `cookbookBodyToMarkdown`, `formatTime`) and `utils/backupMarkdown.ts` (`buildBackupMarkdown`, `UNCATEGORIZED_HEADING`, `BackupSection`); the native gather + write + share wrapper is `utils/backupExport.ts` (`exportAllData`), fed by `db/recipes.ts` `getBackupSections()`.
+- Within each section, recipes are sorted the same as in the list (descending by `updated_at`)
 - The metadata line (`**Prep:** ... | ...`): segments without a value are **omitted**; if a recipe has no metadata at all, the whole line is omitted
 - The "Notes" section appears in the file only if the `notes` field is not empty
 - Export date in `DD/MM/YYYY` format
-- The file is written to `FileSystem.cacheDirectory`, then shared via `Sharing.shareAsync()`
+- The file is written to `FileSystem.cacheDirectory` as `keeptaste-backup.md`, then shared via `Sharing.shareAsync()`
 - The user decides what to do with the file (save to Drive, email it, AirDrop, etc.) — the app does not manage this process
 
-**File name:** `{cookbook_name}.md`, where the name is sanitized:
-- characters not allowed in file names are removed: `/ \ : * ? " < > |` plus control characters
-- spaces and dots trimmed at both ends, sequences of spaces reduced to one
-- non-ASCII letters (e.g. Polish diacritics) are **preserved**
-- if the name is empty after sanitization → fallback `recipes.md`
+**Backward compatibility:** a legacy single-cookbook export (one `# Name` section, no `# §Uncategorized`) is just a one-section backup and remains importable (§5.8).
 
 **Time format (in the app and in export):**
 - < 60 min → `"45 min"`
@@ -360,7 +375,9 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 **Content:**
 - **App info** — the app name ("KeepTaste") and version, read from `Constants.expoConfig?.version` (fallback `1.0.0`).
-- **Data / no-backup notice** — explains that recipes are stored only on this device, that there are no accounts and no cloud sync, that uninstalling the app deletes all recipes, and that exporting a cookbook to Markdown (§5.6) is the only backup mechanism.
+- **Data / no-backup notice** — explains that recipes are stored only on this device, that there are no accounts and no cloud sync, that uninstalling the app deletes all recipes, and that exporting all data to a Markdown file (§5.6) is the only backup mechanism.
+- **Export all data** — a button (in the "Your data" section) that writes the whole library to a single Markdown backup and opens the share sheet (§5.6). On failure surfaces `Alert('Export failed', …)`.
+- **Import from Markdown** — restores cookbooks and recipes from a backup file (§5.8).
 - **Delete all data** — a destructive button that wipes every cookbook, recipe and shopping list.
 
 **Delete all data flow:**
@@ -371,18 +388,20 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 **Entry point:** an "Import from Markdown" button in the Settings screen, in the "Your data" section (above the Danger zone).
 
-**Accepted format:** KeepTaste's own Markdown export (§5.6). The parser (`utils/importMarkdown.ts`, pure, no native imports) is the inverse of the export builder:
-- Cookbook name comes from the first `# ` heading; `*Exported:*` / `*Recipes:*` lines are informational and never trusted (the recipe count is derived from the actual `## ` blocks, not the header).
+**Accepted format:** KeepTaste's own full-app backup (§5.6) **and** legacy single-cookbook exports. The parser (`utils/importMarkdown.ts`, pure, no native imports) is the inverse of the export builder. `parseBackupMarkdown(content)` returns `{ ok: true, sections: { cookbookName: string | null; recipes: ImportedRecipe[] }[] }` or `{ ok: false, error }`:
+- A backup is a sequence of `# Name` sections. A `# ` heading begins a new section **only when not inside an open `## ` recipe block** — recipe bodies may themselves contain `# ` Markdown headings, so a heading is treated as a section boundary only before the first `##` of a section or after a `---` closed the previous recipe.
+- The `# §Uncategorized` sentinel heading maps to a section with `cookbookName: null`; a cookbook literally named `Uncategorized` (no `§`) stays a normal section. A legacy single-cookbook export parses as one section.
+- `*Exported:*` / `*Recipes:*` lines are informational and never trusted (the recipe count is derived from the actual `## ` blocks, not the header).
 - Each `## ` block is a recipe, running until the next `## `, a `---` line, or EOF. Trailing `---` / whitespace produce no phantom recipes.
 - The meta line `**Prep:** … | **Cook:** … | **Servings:** …` is parsed token-by-token; each token is independent and absent tokens stay `null`. Prep/Cook strings are inverted via `parseTimeToMinutes` (the lockstep inverse of export's `formatTime` — "45 min", "1 hr 30 min", "2 hr"; the time-string mapping must stay in sync if `formatTime` ever changes). Servings is a plain integer.
 - `### Ingredients` / `### Instructions` bodies default to `''` when the section is absent. `### Notes` is `null` when absent, the body when present, and `''` when the header is present but the body empty.
 - Internal body Markdown is preserved exactly; only `# `, `## `, and `### Ingredients|Instructions|Notes` are structural. Hand-edited files are best-effort — unescaped bodies that contain those structural markers may mis-split (documented limitation).
 
-**Persistence:** `db/import.ts` `importCookbook()` creates the cookbook (`createCookbook`) then each recipe sequentially (`createRecipe`). No transaction (consistent with the rest of `db/`); a failure mid-import may leave a partial cookbook.
+**Persistence:** `db/import.ts` `importBackup(sections)` walks the sections: each named section creates a cookbook (`createCookbook`) and its recipes (`createRecipe`); the `null`-name section creates recipes with `cookbookId: null` (they appear under "All recipes"). It returns `{ cookbooks, recipes }` counts. No transaction (consistent with the rest of `db/`); a failure mid-import may leave a partial result. (`importCookbook()` is retained for the legacy single-cookbook persistence path / tests.)
 
-**Flow:** pick a file via `DocumentPicker.getDocumentAsync` (canceled → no-op) → read with `FileSystem.readAsStringAsync` → `parseCookbookMarkdown`. Parse failure surfaces via `Alert('Import failed', error)`. On success, a confirm `Alert` (`Import "{name}" with {N} recipes?`) gates the write; on confirm `importCookbook` runs in try/catch, then a success `Alert` with the count and `router.back()` (home reloads via `useFocusEffect`). A thrown error surfaces an Alert noting the import may be partial.
+**Flow:** pick a file via `DocumentPicker.getDocumentAsync` (canceled → no-op) → read with `FileSystem.readAsStringAsync` → `parseBackupMarkdown`. Parse failure surfaces via `Alert('Import failed', error)`. On success, a confirm `Alert` (`Import {C} cookbooks with {R} recipes?`, Polish plurals on the recipe count) gates the write; on confirm `importBackup` runs in try/catch, then a success `Alert` with both counts and `router.back()` (home reloads via `useFocusEffect`). A thrown error surfaces an Alert noting the import may be partial.
 
-**Semantics:** duplicates are allowed — importing the same file twice creates a second cookbook. A zero-recipe file imports an empty cookbook.
+**Semantics:** duplicates are allowed — importing the same file twice creates a second copy of every cookbook. A zero-recipe section imports an empty cookbook.
 
 ---
 
@@ -523,6 +542,24 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 **i18n:** all new strings (button, modal title, section headers, select-all toggle, confirm button with count — using the existing plural rules for Polish, confirmation Alert) get EN+PL entries in `i18n/dictionary.ts` (§5.11).
 
 **Testing:** the parser and any candidate-selection logic are pure and live in `utils/` → unit tests in `__tests__/` (TDD pipeline per CLAUDE.md); the modal UI is verified by running the app.
+
+---
+
+### 5.13 Sharing a recipe as text
+
+**Trigger:** a share icon (`share-outline`) in the recipe view (§5.4) nav bar.
+
+**Behavior:** builds a localized plain-text message via the pure `buildRecipeShareText(recipe, t)` (`utils/recipeShareText.ts`) and hands it to React Native's `Share.share({ message, title })`. Unlike the other share flows it uses **RN `Share`, not `expo-sharing`**, so the result is ready-to-send text for SMS, Messenger, email, etc. — not a file attachment.
+
+**Content:** the title, then (when present) a compact metadata line, then the Ingredients / Instructions / Notes sections, each under its **localized** label (reusing `recipe.prep`, `recipe.cook`, `recipe.servingsLabel`, `recipe.ingredients`, `recipe.instructions`, `recipe.notes`). Missing fields are omitted — a title-only recipe yields essentially just the title, with **no `—` placeholders**. Localized to the current UI language (EN/PL).
+
+### 5.14 Sharing a cookbook as PDF
+
+**Trigger:** the share icon in the `/cookbook/[id]` header (unavailable in "All recipes", same as before).
+
+**Behavior:** the pure `buildCookbookHtml(cookbook, recipes, t)` (`utils/cookbookPdfHtml.ts`) renders a full HTML document; `utils/cookbookPdf.ts` (`shareCookbookPdf`) turns it into a PDF via `expo-print` `printToFileAsync({ html })` and shares it via `Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle })`. On failure surfaces `Alert('Export failed', …)`.
+
+**Content/styling:** cookbook name as the document title, then each recipe (title, optional metadata, then Ingredients / Instructions / Notes). All labels are **localized** (current UI language). User content is **HTML-escaped** (`&`, `<`, `>`) and newlines become `<br>`; missing metadata/sections are omitted (no `—`). Print styling uses values consistent with `constants/theme.ts` (light palette).
 
 ---
 

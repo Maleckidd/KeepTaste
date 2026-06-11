@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCookbookById } from '@/db/cookbooks';
 import { getRecipesByCookbook, getAllRecipes, searchRecipes } from '@/db/recipes';
-import { exportCookbookToMarkdown } from '@/utils/markdown';
+import { shareCookbookPdf } from '@/utils/cookbookPdf';
 import {
   useTheme,
   ThemePalette,
@@ -116,7 +116,7 @@ export default function CookbookScreen() {
   const handleExport = async () => {
     if (!cookbook) return;
     try {
-      await exportCookbookToMarkdown(cookbook);
+      await shareCookbookPdf(cookbook, t, t('cookbook.sharePdfTitle'));
     } catch (e) {
       Alert.alert(
         t('cookbook.exportFailedTitle'),

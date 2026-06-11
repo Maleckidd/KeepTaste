@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Image,
   Alert,
+  Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import Markdown from 'react-native-markdown-display';
 import { getRecipeById, deleteRecipe } from '@/db/recipes';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import { parseIngredients } from '@/utils/ingredients';
+import { buildRecipeShareText } from '@/utils/recipeShareText';
 import {
   useTheme,
   ThemePalette,
@@ -78,6 +80,18 @@ export default function RecipeScreen() {
     );
   };
 
+  const handleShare = async () => {
+    if (!recipe) return;
+    try {
+      await Share.share({
+        message: buildRecipeShareText(recipe, t),
+        title: t('recipe.shareDialogTitle'),
+      });
+    } catch {
+      // User dismissed or share unavailable — nothing to recover.
+    }
+  };
+
   if (!recipe) return null;
 
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
@@ -90,6 +104,9 @@ export default function RecipeScreen() {
           <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
         <View style={styles.navActions}>
+          <TouchableOpacity onPress={handleShare} style={styles.navButton}>
+            <Ionicons name="share-outline" size={22} color={c.text} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() =>
               router.push({ pathname: '/recipe/edit', params: { id } })

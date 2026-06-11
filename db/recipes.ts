@@ -9,6 +9,8 @@ import {
   type NewRecipe,
 } from './schema';
 import { filterRecipesByTitle } from '../utils/search';
+import { getCookbooks } from './cookbooks';
+import type { BackupSection } from '../utils/backupMarkdown';
 
 // --- Recipes ---
 
@@ -36,6 +38,26 @@ export async function getRecipeById(id: number): Promise<Recipe | undefined> {
 export async function searchRecipes(query: string): Promise<Recipe[]> {
   const all = await getAllRecipes();
   return filterRecipesByTitle(all, query);
+}
+
+/**
+ * Assembles the full-app backup as ordered sections: one per cookbook (in
+ * cookbook order) followed by the uncategorized bucket (cookbookName null).
+ * The uncategorized section is always last; the builder drops it when empty.
+ */
+export async function getBackupSections(): Promise<BackupSection[]> {
+  const cookbooks = await getCookbooks();
+  const sections: BackupSection[] = [];
+
+  for (const cookbook of cookbooks) {
+    const cookbookRecipes = await getRecipesByCookbook(cookbook.id);
+    sections.push({ cookbookName: cookbook.name, recipes: cookbookRecipes });
+  }
+
+  const unassigned = await getUnassignedRecipes();
+  sections.push({ cookbookName: null, recipes: unassigned });
+
+  return sections;
 }
 
 export async function createRecipe(data: NewRecipe): Promise<number> {

@@ -1,17 +1,12 @@
-import * as FileSystem from 'expo-file-system';
-
-// Real export code, stubbed DB + file system: we capture the exact bytes the
-// app would write, then feed them to the real parser. Unlike the hand-mirrored
-// fixtures in importMarkdown.test.ts, this round-trip breaks automatically if
-// the export format and the parser ever drift apart.
-jest.mock('../db/recipes', () => ({
-  getRecipesByCookbook: jest.fn(),
-}));
-jest.mock('../db/client', () => ({ db: {}, runMigrations: jest.fn() }));
-
-import { exportCookbookToMarkdown } from '../utils/markdown';
-import { parseCookbookMarkdown } from '../utils/importMarkdown';
-import { getRecipesByCookbook } from '../db/recipes';
+// Round-trip through the pure backup builder + parser. Unlike hand-mirrored
+// fixtures, this breaks automatically if the backup export format and the
+// parser ever drift apart. No native imports — both ends are pure.
+import {
+  buildBackupMarkdown,
+  UNCATEGORIZED_HEADING,
+  type BackupSection,
+} from '../utils/backupMarkdown';
+import { parseBackupMarkdown } from '../utils/importMarkdown';
 
 const fullRecipe = {
   id: 1,
@@ -43,40 +38,26 @@ const titleOnlyRecipe = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-const cookbook = {
-  id: 1,
-  name: 'Polish Classics',
-  coverImagePath: null,
-  createdAt: '2026-01-01T00:00:00.000Z',
-};
-
-async function exportAndReparse() {
-  await exportCookbookToMarkdown(cookbook as any);
-  const mockWrite = FileSystem.writeAsStringAsync as jest.Mock;
-  expect(mockWrite).toHaveBeenCalled();
-  const content = mockWrite.mock.calls[0][1] as string;
-  return parseCookbookMarkdown(content);
+function roundtrip(sections: BackupSection[]) {
+  const md = buildBackupMarkdown(sections);
+  return parseBackupMarkdown(md);
 }
 
-describe('export → import round-trip (real export code, real parser)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('survives a full recipe and a title-only recipe', async () => {
-    (getRecipesByCookbook as jest.Mock).mockResolvedValue([
-      fullRecipe,
-      titleOnlyRecipe,
+describe('backup build → parse round-trip', () => {
+  it('preserves cookbook names, recipe titles and all fields', () => {
+    const result = roundtrip([
+      {
+        cookbookName: 'Polish Classics',
+        recipes: [fullRecipe as any, titleOnlyRecipe as any],
+      },
     ]);
-
-    const result = await exportAndReparse();
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.cookbookName).toBe('Polish Classics');
-    expect(result.recipes).toHaveLength(2);
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0].cookbookName).toBe('Polish Classics');
 
-    const [full, bare] = result.recipes;
+    const [full, bare] = result.sections[0].recipes;
     expect(full.title).toBe('Pierogi Ruskie');
     expect(full.prepTime).toBe(30);
     expect(full.cookTime).toBe(90);
@@ -94,14 +75,28 @@ describe('export → import round-trip (real export code, real parser)', () => {
     expect(bare.notes).toBeNull();
   });
 
-  it('survives an empty cookbook', async () => {
-    (getRecipesByCookbook as jest.Mock).mockResolvedValue([]);
+  it('round-trips the uncategorized bucket as cookbookName null', () => {
+    const result = roundtrip([
+      { cookbookName: 'Mains', recipes: [fullRecipe as any] },
+      { cookbookName: null, recipes: [titleOnlyRecipe as any] },
+    ]);
+    if (!result.ok) throw new Error('expected ok');
 
-    const result = await exportAndReparse();
+    const bucket = result.sections.find((s) => s.cookbookName === null);
+    expect(bucket).toBeDefined();
+    expect(bucket!.recipes.map((r) => r.title)).toEqual(['Żurek staropolski']);
+  });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.cookbookName).toBe('Polish Classics');
-    expect(result.recipes).toEqual([]);
+  it('a cookbook literally named "Uncategorized" round-trips as a normal cookbook', () => {
+    const result = roundtrip([
+      { cookbookName: 'Uncategorized', recipes: [fullRecipe as any] },
+    ]);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0].cookbookName).toBe('Uncategorized');
+    // Must NOT be folded into the null bucket.
+    expect(result.sections[0].cookbookName).not.toBeNull();
+    // Sanity: the sentinel and the literal name are distinct.
+    expect('Uncategorized').not.toBe(UNCATEGORIZED_HEADING);
   });
 });

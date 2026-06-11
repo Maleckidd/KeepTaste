@@ -13,8 +13,12 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { deleteAllData } from '@/db/recipes';
-import { importCookbook } from '@/db/import';
-import { parseCookbookMarkdown, type ImportedRecipe } from '@/utils/importMarkdown';
+import { importBackup } from '@/db/import';
+import {
+  parseBackupMarkdown,
+  type BackupSection,
+} from '@/utils/importMarkdown';
+import { exportAllData } from '@/utils/backupExport';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import {
   useTheme,
@@ -81,40 +85,54 @@ export default function SettingsScreen() {
     );
   };
 
-  const importCompleteMessage = (name: string, count: number) => {
-    const cat = pluralPl(count);
-    const key =
-      cat === 'one'
-        ? 'settings.importCompleteOne'
-        : cat === 'few'
-          ? 'settings.importCompleteFew'
-          : 'settings.importCompleteMany';
-    return t(key, { name, count });
+  const pluralSuffix = (n: number) => {
+    const cat = pluralPl(n);
+    return cat === 'one' ? 'One' : cat === 'few' ? 'Few' : 'Many';
   };
 
-  const importConfirmMessage = (name: string, count: number) => {
-    const cat = pluralPl(count);
-    const key =
-      cat === 'one'
-        ? 'settings.importConfirmOne'
-        : cat === 'few'
-          ? 'settings.importConfirmFew'
-          : 'settings.importConfirmMany';
-    return t(key, { name, count });
-  };
+  const cookbooksFragment = (count: number) =>
+    t(`settings.backupCookbooksAcc${pluralSuffix(count)}` as const, { count });
 
-  const runImport = async (cookbookName: string, recipes: ImportedRecipe[]) => {
+  const importBackupCompleteMessage = (cookbooks: number, recipes: number) =>
+    t('settings.importBackupComplete', {
+      cookbooks: cookbooksFragment(cookbooks),
+      recipes: t(`settings.backupRecipesAcc${pluralSuffix(recipes)}` as const, {
+        count: recipes,
+      }),
+    });
+
+  const importBackupConfirmMessage = (cookbooks: number, recipes: number) =>
+    t('settings.importBackupConfirm', {
+      cookbooks: cookbooksFragment(cookbooks),
+      recipes: t(
+        `settings.backupRecipesInstr${pluralSuffix(recipes)}` as const,
+        { count: recipes }
+      ),
+    });
+
+  const runImport = async (sections: BackupSection[]) => {
     try {
-      const { recipeCount } = await importCookbook({ cookbookName, recipes });
+      const { cookbooks, recipes } = await importBackup(sections);
       Alert.alert(
         t('settings.importCompleteTitle'),
-        importCompleteMessage(cookbookName, recipeCount)
+        importBackupCompleteMessage(cookbooks, recipes)
       );
       router.back();
     } catch {
       Alert.alert(
         t('settings.importFailedTitle'),
         t('settings.importFailedSaving')
+      );
+    }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      await exportAllData(t('settings.exportAllDialogTitle'));
+    } catch {
+      Alert.alert(
+        t('settings.exportFailedTitle'),
+        t('settings.exportFailedMessage')
       );
     }
   };
@@ -137,21 +155,28 @@ export default function SettingsScreen() {
       return;
     }
 
-    const result = parseCookbookMarkdown(content);
+    const result = parseBackupMarkdown(content);
     if (!result.ok) {
       Alert.alert(t('settings.importFailedTitle'), result.error);
       return;
     }
 
-    const count = result.recipes.length;
+    const cookbookCount = result.sections.filter(
+      (s) => s.cookbookName !== null
+    ).length;
+    const recipeCount = result.sections.reduce(
+      (sum, s) => sum + s.recipes.length,
+      0
+    );
+
     Alert.alert(
-      t('settings.importConfirmTitle'),
-      importConfirmMessage(result.cookbookName, count),
+      t('settings.importBackupConfirmTitle'),
+      importBackupConfirmMessage(cookbookCount, recipeCount),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('settings.importAction'),
-          onPress: () => runImport(result.cookbookName, result.recipes),
+          onPress: () => runImport(result.sections),
         },
       ]
     );
@@ -240,6 +265,17 @@ export default function SettingsScreen() {
             <Text style={styles.noticeText}>{t('settings.noticeExport')}</Text>
           </View>
         </View>
+
+        {/* Export all data */}
+        <TouchableOpacity
+          style={styles.importButton}
+          onPress={handleExportAll}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="share-outline" size={18} color={c.text} />
+          <Text style={styles.importButtonText}>{t('settings.exportAll')}</Text>
+        </TouchableOpacity>
+        <Text style={styles.importHint}>{t('settings.exportAllHint')}</Text>
 
         {/* Import */}
         <TouchableOpacity

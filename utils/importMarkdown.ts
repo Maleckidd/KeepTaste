@@ -1,6 +1,7 @@
 // Pure Markdown import parser. Inverts the export format produced by
 // utils/markdown.ts (see SPEC.md §5.6 / §5.8). No native imports — this module
 // must stay testable in plain ts-jest.
+import { UNCATEGORIZED_HEADING } from './backupMarkdown';
 
 export type ImportedRecipe = {
   title: string;
@@ -131,6 +132,106 @@ function parseRecipeBlock(blockLines: string[]): ImportedRecipe {
   flush();
 
   return { title, prepTime, cookTime, servings, ingredients, instructions, notes };
+}
+
+export type BackupSection = {
+  cookbookName: string | null;
+  recipes: ImportedRecipe[];
+};
+
+export type BackupParseResult =
+  | { ok: true; sections: BackupSection[] }
+  | { ok: false; error: string };
+
+/**
+ * Parses a full-app backup: a sequence of "# Name" sections, each holding the
+ * §5.6 per-cookbook body. The "# §Uncategorized" sentinel maps to cookbookName
+ * null; a cookbook literally named "Uncategorized" (no §) stays a normal
+ * section. A legacy single-cookbook export is just a one-section backup.
+ */
+export function parseBackupMarkdown(content: string): BackupParseResult {
+  const normalized = content.replace(/\r\n/g, '\n');
+
+  if (normalized.trim() === '') {
+    return { ok: false, error: 'The file is empty.' };
+  }
+
+  const lines = normalized.split('\n');
+
+  // Detect section boundaries: a "# " heading (not "## "/"### ") starts a new
+  // cookbook section ONLY when we are not currently inside a recipe block.
+  // Recipe content may itself contain "# " markdown headings, so we track
+  // whether a "## " recipe block is open (closed by the next "---").
+  const headingIndexes: number[] = [];
+  let inRecipe = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^##\s+/.test(line)) {
+      inRecipe = true;
+      continue;
+    }
+    if (line.trim() === '---') {
+      inRecipe = false;
+      continue;
+    }
+    if (!inRecipe && /^#\s+/.test(line) && !/^##/.test(line)) {
+      headingIndexes.push(i);
+    }
+  }
+
+  if (headingIndexes.length === 0) {
+    return {
+      ok: false,
+      error: 'No cookbook heading found. The file must start with a "# Name" line.',
+    };
+  }
+
+  const sections: BackupSection[] = [];
+
+  for (let h = 0; h < headingIndexes.length; h++) {
+    const start = headingIndexes[h];
+    const end = h + 1 < headingIndexes.length ? headingIndexes[h + 1] : lines.length;
+    const sectionLines = lines.slice(start, end);
+    const parsed = parseSectionLines(sectionLines);
+    sections.push(parsed);
+  }
+
+  return { ok: true, sections };
+}
+
+/** Parses one "# Name" .. block (the heading line plus its body). */
+function parseSectionLines(sectionLines: string[]): BackupSection {
+  const headingLine = sectionLines[0] ?? '';
+  const rawName = headingLine.replace(/^#\s+/, '').trim();
+  const isUncategorized = rawName === UNCATEGORIZED_HEADING;
+  const cookbookName = isUncategorized ? null : rawName;
+
+  const recipes: ImportedRecipe[] = [];
+  let current: string[] | null = null;
+
+  for (let i = 1; i < sectionLines.length; i++) {
+    const line = sectionLines[i];
+
+    if (/^##\s+/.test(line)) {
+      if (current) recipes.push(parseRecipeBlock(current));
+      current = [line];
+      continue;
+    }
+
+    if (line.trim() === '---') {
+      if (current) {
+        recipes.push(parseRecipeBlock(current));
+        current = null;
+      }
+      continue;
+    }
+
+    if (current) current.push(line);
+  }
+
+  if (current) recipes.push(parseRecipeBlock(current));
+
+  return { cookbookName, recipes };
 }
 
 export function parseCookbookMarkdown(content: string): ParseResult {
