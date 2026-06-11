@@ -1,7 +1,7 @@
 # KeepTaste — Technical Specification (SDD)
 
 > Living document. Update it with every significant design decision.
-> Version: 1.4 | Date: 2026-06
+> Version: 1.5 | Date: 2026-06
 
 ---
 
@@ -60,6 +60,7 @@ app/
     [id].tsx             ← recipe view (read-only with Markdown)
     new.tsx              ← modal: new recipe
     edit.tsx             ← modal: edit recipe
+    add-to-list.tsx      ← modal: add ingredients to a shopping list (§5.12)
   shopping/
     [id].tsx             ← shopping list detail: items + "in cart" flow (§5.10)
     new.tsx              ← modal: new shopping list
@@ -95,6 +96,7 @@ utils/
   numeric.ts             ← numeric field parsing (integer ≥ 1 or null)
   search.ts              ← diacritics-safe title search
   shoppingList.ts        ← shopping list logic: partition, counts, input normalization
+  ingredients.ts         ← pure parser: ingredients Markdown → shopping item candidates (§5.12)
   i18n.ts                ← pure i18n logic: preference/locale resolution, interpolation, PL plurals
 
 constants/
@@ -257,6 +259,8 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Back button (arrow-back)
 - Edit button (create-outline) → opens `/recipe/edit?id=X`
 - Delete button (trash) → confirmation Alert; on confirm, deletes and goes back
+
+**Add to shopping list:** a button below the Ingredients section ("Add to shopping list", cart icon) opens the ingredient-picker modal (§5.12). Shown only when the parsed ingredients yield at least one item (§5.12 parsing rules) — consistent with the no-placeholder rule.
 
 ---
 
@@ -470,7 +474,7 @@ CREATE INDEX idx_shopping_items_list_id ON shopping_items(list_id);
 
 `ON DELETE CASCADE` (not SET NULL like recipes): a shopping item has no meaning outside its list.
 
-**Out of scope for the first iteration:** linking products to recipes/ingredients (manual entry only), sharing lists, quantities as structured numbers/units, reordering by drag & drop, Markdown export of lists.
+**Out of scope for the first iteration:** ~~linking products to recipes/ingredients~~ (now specified — see §5.12), sharing lists, quantities as structured numbers/units, reordering by drag & drop, Markdown export of lists.
 
 ### 5.11 Language selection
 
@@ -481,6 +485,44 @@ Users can override this manually in Settings. A "Language" row (above the "Your 
 The chosen preference is persisted in the SQLite `app_settings` key-value table (key `language`, value `system` | `en` | `pl`). Changing it re-renders the entire app immediately — tab labels, pushed screen titles, and Alerts all switch — through a `LanguageProvider` React context that wraps the app. This whole-app context is the **approved exception** to the otherwise strict no-global-state rule (§3) and the no-extra-settings rule (§7): it is the only in-app preference.
 
 All user-facing strings live in `i18n/dictionary.ts` with an English and a Polish translation; components never hardcode user-facing strings. Pure resolver logic (preference parsing, locale resolution, interpolation, Polish plurals) lives in `utils/i18n.ts`. The **Markdown export/import format stays English-only** regardless of UI language, so exported files round-trip across devices and locales.
+
+---
+
+### 5.12 Adding recipe ingredients to a shopping list
+
+The bridge between the two product areas (§1): a one-way **copy** of a recipe's ingredients into a shopping list. No persistent link is stored — once added, items are ordinary shopping items (editable, deletable, unaffected by later recipe edits). This deliberately sidesteps the structured-ingredients problem (§7): ingredients stay raw text, and each text line simply becomes a product.
+
+**Entry point:** the "Add to shopping list" button in the recipe view, below the Ingredients section (§5.4). It pushes the modal `/recipe/add-to-list?id=X` over the tab bar via the root Stack, like the other modal forms.
+
+**Parsing ingredients into item candidates (`utils/ingredients.ts`, pure, no native imports):**
+
+The ingredients field is raw Markdown (§5.4), so the parser is line-based and forgiving:
+- Split the text on line breaks; trim each line
+- **Skip**: empty/whitespace-only lines, Markdown headings (lines starting with `#`) — headings are grouping labels ("Dough", "Sauce"), not products
+- **Strip leading list markers**: `- `, `* `, `+ `, `• `, and ordered markers (`1. `, `1) `); strip surrounding bold markers (`**…**`) when they wrap the whole line
+- Everything left over is the candidate's **name, verbatim** — quantities embedded in the text ("2 cups flour") stay in the name; the `quantity` column is **not** populated (no numeric/unit parsing, consistent with §5.10 and §7)
+- Result order = order of appearance in the text
+
+If parsing yields zero candidates (e.g. ingredients contain only headings), the entry button in the recipe view is hidden.
+
+**Picker modal — one screen, two decisions:**
+
+1. **Which products** — the parsed candidates as a checklist, **all checked by default**; the user unchecks what they already have. A "Select all / none" toggle in the section header.
+2. **Which list** — below the checklist, a list-picker section showing existing shopping lists (sorted descending by `updated_at`, same as the Shopping tab; the most recently used list is therefore first and is **pre-selected**) plus a **"New list"** option. Choosing "New list" reveals a name input pre-filled with the recipe title.
+
+- Title: "Add to shopping list"; "✕" close button (no dirty-check — nothing here is destructive to abandon, unlike the forms in §5.2/§5.5)
+- Confirm button ("Add N products") shows the live count of checked candidates and is **disabled at 0 checked**; also disabled when "New list" is selected and the trimmed name is empty
+- With no shopping lists in the database, the picker shows only the "New list" option, already expanded
+
+**On confirm:**
+- "New list" selected → `createShoppingList(name)` first (trimmed name)
+- Items are inserted via a bulk helper `createShoppingItems(listId, names)` in `db/shoppingLists.ts` (inserts all rows, touches the list's `updated_at` **once**) — added as **unchecked**, appended after the list's existing items, `quantity = NULL`
+- **Duplicates are allowed** — no merging with items already on the list (same philosophy as import, §5.8: no magic)
+- The modal closes back to the recipe view; a brief confirmation Alert offers **"View list"** (→ `/shopping/[id]`) / **OK**
+
+**i18n:** all new strings (button, modal title, section headers, select-all toggle, confirm button with count — using the existing plural rules for Polish, confirmation Alert) get EN+PL entries in `i18n/dictionary.ts` (§5.11).
+
+**Testing:** the parser and any candidate-selection logic are pure and live in `utils/` → unit tests in `__tests__/` (TDD pipeline per CLAUDE.md); the modal UI is verified by running the app.
 
 ---
 
@@ -558,6 +600,7 @@ Values to be verified on a device for contrast (target: WCAG AA for text). Photo
 - [x] **Copying photos to `documentDirectory`** — critical data-loss risk: the image picker URI points to the system cache. Done in `utils/imageStorage.ts`: (1) on recipe/cookbook save the picked file is copied to `FileSystem.documentDirectory`, (2) the stored copy is deleted when the record is deleted or the photo is replaced/removed, (3) covers both recipe `image_path` and cookbook `cover_image_path`; graceful no-op on web (`documentDirectory` is null there)
 - [x] **Correct numeric field parsing** — the current pattern `value ? Number(value) : null` saves `NaN` for text; implement the rule from §5.5 (integer ≥ 1 or `null`)
 - [x] **Diacritics-safe search** — replace SQL `LIKE` with JS-side `toLowerCase()` filtering (§5.1)
+- [ ] **Add ingredients to a shopping list** — the recipe→shopping bridge per §5.12: line-based ingredient parser (`utils/ingredients.ts`), picker modal (`app/recipe/add-to-list.tsx`), bulk insert `createShoppingItems` in `db/shoppingLists.ts`, "Add to shopping list" button in the recipe view, EN+PL strings
 
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)

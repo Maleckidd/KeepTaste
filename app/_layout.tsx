@@ -45,6 +45,10 @@ function RootStack() {
         options={{ title: t('stack.editRecipe'), presentation: 'modal' }}
       />
       <Stack.Screen
+        name="recipe/add-to-list"
+        options={{ title: t('stack.addToList'), presentation: 'modal' }}
+      />
+      <Stack.Screen
         name="shopping/[id]"
         options={{ title: t('stack.shoppingList'), presentation: 'card' }}
       />

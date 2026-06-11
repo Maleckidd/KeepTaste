@@ -86,6 +86,28 @@ export async function createShoppingItem(
   return result[0].id;
 }
 
+/**
+ * Bulk insert for the recipe → shopping list bridge (SPEC §5.12): all items
+ * are added unchecked with no quantity, and the list is touched once.
+ */
+export async function createShoppingItems(
+  listId: number,
+  names: string[]
+): Promise<void> {
+  if (names.length === 0) return;
+  const now = new Date().toISOString();
+  await db.insert(shoppingItems).values(
+    names.map((name) => ({
+      listId,
+      name,
+      quantity: null,
+      checked: 0,
+      createdAt: now,
+    }))
+  );
+  await touchList(listId, now);
+}
+
 export async function updateShoppingItem(
   id: number,
   name: string,

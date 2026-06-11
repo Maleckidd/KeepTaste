@@ -162,6 +162,33 @@ describe('db/shoppingLists — setItemChecked', () => {
   });
 });
 
+describe('db/shoppingLists — createShoppingItems (bulk, SPEC §5.12)', () => {
+  it('inserts all rows unchecked with NULL quantity and touches the list once', async () => {
+    await listsModule.createShoppingItems(42, ['Milk', 'Eggs', 'Flour']);
+
+    expect(insertCalls).toHaveLength(1);
+    expect(insertCalls[0].table).toBe(shoppingItems);
+    const values = insertCalls[0].values as any[];
+    expect(values).toHaveLength(3);
+    expect(values.map((v) => v.name)).toEqual(['Milk', 'Eggs', 'Flour']);
+    for (const v of values) {
+      expect(v.listId).toBe(42);
+      expect(v.quantity).toBeNull();
+      expect(v.checked).toBe(0);
+    }
+
+    const listUpdates = updateCalls.filter((c) => c.table === shoppingLists);
+    expect(listUpdates).toHaveLength(1);
+    expect(typeof (listUpdates[0].set as any).updatedAt).toBe('string');
+  });
+
+  it('is a no-op for an empty names array', async () => {
+    await listsModule.createShoppingItems(42, []);
+    expect(insertCalls).toHaveLength(0);
+    expect(updateCalls).toHaveLength(0);
+  });
+});
+
 describe('db/shoppingLists — deleteShoppingItem', () => {
   it('deletes the item and touches the parent list updatedAt', async () => {
     // helper may select the item first to learn its listId

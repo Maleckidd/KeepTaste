@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
 import { getRecipeById, deleteRecipe } from '@/db/recipes';
 import { deleteStoredImage } from '@/utils/imageStorage';
+import { parseIngredients } from '@/utils/ingredients';
 import {
   useTheme,
   ThemePalette,
@@ -169,6 +170,22 @@ export default function RecipeScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('recipe.ingredients')}</Text>
               <Markdown style={markdownStyles}>{recipe.ingredients}</Markdown>
+              {parseIngredients(recipe.ingredients).length > 0 ? (
+                <TouchableOpacity
+                  style={styles.addToListButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/recipe/add-to-list',
+                      params: { id },
+                    })
+                  }
+                >
+                  <Ionicons name="cart-outline" size={18} color={c.primary} />
+                  <Text style={styles.addToListText}>
+                    {t('recipe.addToList')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ) : null}
 
@@ -306,6 +323,23 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     color: c.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  addToListButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderWidth: 1,
+    borderColor: c.primary,
+    borderRadius: Radius.full,
+    backgroundColor: c.surface,
+  },
+  addToListText: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
   },
   notesBox: {
     backgroundColor: c.surfaceAlt,

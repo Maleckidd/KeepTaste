@@ -59,6 +59,10 @@ export const dictionary = {
     pl: 'Nowa lista zakupów',
   },
   'stack.renameList': { en: 'Rename list', pl: 'Zmień nazwę listy' },
+  'stack.addToList': {
+    en: 'Add to shopping list',
+    pl: 'Dodaj do listy zakupów',
+  },
   'stack.newCookbook': { en: 'New cookbook', pl: 'Nowa książka kucharska' },
   'stack.editCookbook': {
     en: 'Edit cookbook',
@@ -114,6 +118,50 @@ export const dictionary = {
   'recipe.minutesShort': { en: '{count} min', pl: '{count} min' },
   'recipe.hours': { en: '{hours}h', pl: '{hours}h' },
   'recipe.hoursMinutes': { en: '{hours}h {minutes}m', pl: '{hours}h {minutes}m' },
+
+  'recipe.addToList': {
+    en: 'Add to shopping list',
+    pl: 'Dodaj do listy zakupów',
+  },
+
+  // --- Add ingredients to a shopping list (app/recipe/add-to-list.tsx, §5.12) ---
+  'addToList.title': {
+    en: 'Add to shopping list',
+    pl: 'Dodaj do listy zakupów',
+  },
+  'addToList.products': { en: 'Products', pl: 'Produkty' },
+  'addToList.selectAll': { en: 'Select all', pl: 'Zaznacz wszystkie' },
+  'addToList.selectNone': { en: 'Select none', pl: 'Odznacz wszystkie' },
+  'addToList.targetList': { en: 'Target list', pl: 'Lista docelowa' },
+  'addToList.newList': { en: 'New list', pl: 'Nowa lista' },
+  'addToList.addDisabled': { en: 'Select products', pl: 'Zaznacz produkty' },
+  'addToList.add.one': {
+    en: 'Add {count} product',
+    pl: 'Dodaj {count} produkt',
+  },
+  'addToList.add.few': {
+    en: 'Add {count} products',
+    pl: 'Dodaj {count} produkty',
+  },
+  'addToList.add.many': {
+    en: 'Add {count} products',
+    pl: 'Dodaj {count} produktów',
+  },
+  'addToList.addedTitle': { en: 'Added to list', pl: 'Dodano do listy' },
+  'addToList.added.one': {
+    en: 'Added {count} product to "{name}".',
+    pl: 'Dodano {count} produkt do „{name}”.',
+  },
+  'addToList.added.few': {
+    en: 'Added {count} products to "{name}".',
+    pl: 'Dodano {count} produkty do „{name}”.',
+  },
+  'addToList.added.many': {
+    en: 'Added {count} products to "{name}".',
+    pl: 'Dodano {count} produktów do „{name}”.',
+  },
+  'addToList.viewList': { en: 'View list', pl: 'Zobacz listę' },
+  'addToList.ok': { en: 'OK', pl: 'OK' },
 
   // --- Recipe form (components/recipe/RecipeForm.tsx) ---
   'recipeForm.photoTitle': { en: 'Photo', pl: 'Zdjęcie' },
