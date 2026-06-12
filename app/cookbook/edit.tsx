@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { SafeAreaView, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { StyleSheet, ActivityIndicator, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import CookbookForm from '@/components/cookbook/CookbookForm';
 import { getCookbookById, updateCookbook } from '@/db/cookbooks';
 import { useTheme, ThemePalette } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import {
   type CookbookFormData,
   cookbookToFormData,
@@ -14,6 +16,7 @@ import { persistImage } from '@/utils/imageStorage';
 export default function EditCookbookScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [initialData, setInitialData] = useState<CookbookFormData | null>(null);
@@ -59,6 +62,7 @@ export default function EditCookbookScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <CookbookForm
+        title={t('stack.editCookbook')}
         initialData={initialData}
         onSave={handleSave}
         onCancel={() => router.back()}

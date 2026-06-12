@@ -1,14 +1,8 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   getShoppingLists,
   deleteShoppingList,
@@ -16,14 +10,26 @@ import {
 } from '@/db/shoppingLists';
 import { progressCounts } from '@/utils/shoppingList';
 import {
+  pendingDeleteKey,
+  filterPendingDeletes,
+  subscribePendingDeletes,
+} from '@/utils/pendingDelete';
+import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { lightTap } from '@/utils/haptics';
+import {
   useTheme,
   ThemePalette,
   Typography,
   Spacing,
   Radius,
   Shadow,
+  Touch,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import EmptyState from '@/components/ui/EmptyState';
+import Fab from '@/components/ui/Fab';
+import ActionSheet from '@/components/ui/ActionSheet';
+import SwipeableRow from '@/components/ui/SwipeableRow';
 
 export default function ShoppingScreen() {
   const router = useRouter();
@@ -32,9 +38,12 @@ export default function ShoppingScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const [lists, setLists] = useState<ShoppingListWithCounts[]>([]);
+  const [menuList, setMenuList] = useState<ShoppingListWithCounts | null>(null);
+  const showUndoDelete = useUndoDelete();
 
   const loadData = useCallback(async () => {
-    setLists(await getShoppingLists());
+    const data = await getShoppingLists();
+    setLists(filterPendingDeletes(data, 'shoppingList', (l) => l.id));
   }, []);
 
   useFocusEffect(
@@ -43,54 +52,39 @@ export default function ShoppingScreen() {
     }, [loadData])
   );
 
+  useEffect(() => subscribePendingDeletes(loadData), [loadData]);
+
+  const openRename = (list: ShoppingListWithCounts) =>
+    router.push(`/shopping/${list.id}?rename=1`);
+
+  const handleDelete = (list: ShoppingListWithCounts) => {
+    showUndoDelete(pendingDeleteKey('shoppingList', list.id), list.name, () =>
+      deleteShoppingList(list.id)
+    );
+  };
+
   const handleLongPress = (list: ShoppingListWithCounts) => {
-    Alert.alert(list.name, t('common.whatToDo'), [
-      {
-        text: t('shopping.rename'),
-        onPress: () => router.push(`/shopping/edit?id=${list.id}`),
-      },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert(list.name, t('shopping.deleteListMessage'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-              text: t('common.delete'),
-              style: 'destructive',
-              onPress: async () => {
-                await deleteShoppingList(list.id);
-                loadData();
-              },
-            },
-          ]),
-      },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+    lightTap();
+    setMenuList(list);
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSub}>{t('shopping.brand')}</Text>
-          <Text style={styles.headerTitle}>{t('shopping.title')}</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/shopping/new')}
-          style={styles.addButton}
-        >
-          <Ionicons name="add" size={26} color={c.primary} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle} accessibilityRole="header">
+          {t('shopping.title')}
+        </Text>
       </View>
 
       {lists.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="cart-outline" size={56} color={c.border} />
-          <Text style={styles.emptyTitle}>{t('shopping.emptyTitle')}</Text>
-          <Text style={styles.emptyText}>{t('shopping.emptyText')}</Text>
-        </View>
+        <EmptyState
+          icon="cart-outline"
+          title={t('shopping.emptyTitle')}
+          text={t('shopping.emptyText')}
+          actionLabel={t('shopping.emptyAction')}
+          onAction={() => router.push('/shopping/new')}
+        />
       ) : (
         <FlatList
           data={lists}
@@ -103,30 +97,81 @@ export default function ShoppingScreen() {
                   total: counts.totalCount,
                 })
               : null;
+            const progress = counts
+              ? counts.checkedCount / counts.totalCount
+              : 0;
             return (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => router.push(`/shopping/${item.id}`)}
-                onLongPress={() => handleLongPress(item)}
-                activeOpacity={0.8}
+              <SwipeableRow
+                onEdit={() => openRename(item)}
+                editLabel={t('shopping.rename')}
+                onDelete={() => handleDelete(item)}
               >
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>
-                    {item.name}
-                  </Text>
-                  {label ? (
-                    <Text style={styles.cardMeta}>{label}</Text>
-                  ) : null}
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={c.border} />
-              </TouchableOpacity>
+                <Pressable
+                  style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+                  onPress={() => router.push(`/shopping/${item.id}`)}
+                  onLongPress={() => handleLongPress(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label ? `${item.name}, ${label}` : item.name}
+                >
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {item.name}
+                    </Text>
+                    {label ? (
+                      <View style={styles.metaRow}>
+                        <View style={styles.progressTrack}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              { width: `${Math.round(progress * 100)}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.cardMeta}>{label}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+                </Pressable>
+              </SwipeableRow>
             );
           }}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+      {lists.length > 0 ? (
+        // Tab bar already sits below — no extra bottom inset needed
+        <Fab
+          accessibilityLabel={t('a11y.addList')}
+          onPress={() => router.push('/shopping/new')}
+          withBottomInset={false}
+        />
+      ) : null}
+
+      <ActionSheet
+        visible={menuList !== null}
+        title={menuList?.name}
+        onClose={() => setMenuList(null)}
+        actions={
+          menuList
+            ? [
+                {
+                  label: t('shopping.rename'),
+                  icon: 'create-outline',
+                  onPress: () => openRename(menuList),
+                },
+                {
+                  label: t('shopping.deleteList'),
+                  icon: 'trash-outline',
+                  destructive: true,
+                  onPress: () => handleDelete(menuList),
+                },
+              ]
+            : []
+        }
+      />
+    </SafeAreaView>
   );
 }
 
@@ -141,15 +186,8 @@ const makeStyles = (c: ThemePalette) =>
       justifyContent: 'space-between',
       alignItems: 'flex-end',
       paddingHorizontal: Spacing.base,
-      paddingTop: Spacing.xl,
+      paddingTop: Spacing.md,
       paddingBottom: Spacing.base,
-    },
-    headerSub: {
-      fontSize: Typography.size.sm,
-      color: c.textMuted,
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-      marginBottom: 2,
     },
     headerTitle: {
       fontSize: Typography.size.xxl,
@@ -157,23 +195,16 @@ const makeStyles = (c: ThemePalette) =>
       color: c.text,
       letterSpacing: -0.5,
     },
-    addButton: {
-      width: 44,
-      height: 44,
-      borderRadius: Radius.full,
-      backgroundColor: c.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      ...Shadow.sm,
-    },
     list: {
       paddingHorizontal: Spacing.base,
-      paddingBottom: Spacing.xxxl,
+      // Clears the floating action button.
+      paddingBottom: Spacing.xxxl * 2,
       gap: Spacing.sm,
     },
     card: {
       flexDirection: 'row',
       alignItems: 'center',
+      minHeight: Touch.list,
       backgroundColor: c.surface,
       borderRadius: Radius.md,
       paddingVertical: Spacing.base,
@@ -181,36 +212,41 @@ const makeStyles = (c: ThemePalette) =>
       gap: Spacing.md,
       ...Shadow.sm,
     },
+    // Opaque pressed state — the card sits over the swipe-action panel, so it
+    // must never go translucent (the panel would show through).
+    cardPressed: {
+      backgroundColor: c.surfaceAlt,
+    },
     cardBody: {
       flex: 1,
-      gap: Spacing.xs,
+      gap: Spacing.sm,
     },
     cardTitle: {
-      fontSize: Typography.size.base,
+      fontSize: Typography.size.md,
       fontWeight: Typography.weight.semibold,
       color: c.text,
-      lineHeight: Typography.size.base * 1.3,
+      lineHeight: Typography.size.md * 1.3,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+    },
+    progressTrack: {
+      flex: 1,
+      maxWidth: 96,
+      height: 4,
+      borderRadius: Radius.full,
+      backgroundColor: c.surfaceAlt,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: Radius.full,
+      backgroundColor: c.primary,
     },
     cardMeta: {
-      fontSize: Typography.size.xs,
+      fontSize: Typography.size.sm,
       color: c.textMuted,
-    },
-    emptyState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: Spacing.xxxl,
-      gap: Spacing.md,
-    },
-    emptyTitle: {
-      fontSize: Typography.size.lg,
-      fontWeight: Typography.weight.semibold,
-      color: c.textSecondary,
-    },
-    emptyText: {
-      fontSize: Typography.size.base,
-      color: c.textMuted,
-      textAlign: 'center',
-      lineHeight: Typography.size.base * 1.5,
     },
   });

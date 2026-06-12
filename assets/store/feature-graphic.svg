@@ -1,0 +1,46 @@
+<svg width="1024" height="500" viewBox="0 0 1024 500" xmlns="http://www.w3.org/2000/svg">
+<rect width="1024" height="500" fill="#FAFAF7"/>
+<rect x="0" y="0" width="1024" height="8" fill="#C84B31"/>
+<circle cx="820" cy="250" r="340" fill="#F5F3EE"/>
+<circle cx="820" cy="250" r="260" fill="#EDE9E0"/>
+
+<rect x="700" y="100" width="240" height="300" rx="16" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1"/>
+<rect x="700" y="100" width="240" height="90" rx="16" fill="#C84B31"/>
+<rect x="700" y="168" width="240" height="22" fill="#C84B31"/>
+<text x="820" y="152" text-anchor="middle" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#FFFFFF">Spaghetti Carbonara</text>
+<rect x="720" y="215" width="120" height="8" rx="4" fill="#E8E2D8"/>
+<rect x="720" y="232" width="90" height="8" rx="4" fill="#E8E2D8"/>
+<rect x="720" y="249" width="150" height="8" rx="4" fill="#E8E2D8"/>
+<rect x="720" y="266" width="110" height="8" rx="4" fill="#E8E2D8"/>
+<rect x="720" y="295" width="60" height="24" rx="6" fill="#F5F3EE"/>
+<text x="750" y="311" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#756C65">30 min</text>
+<rect x="792" y="295" width="60" height="24" rx="6" fill="#F5F3EE"/>
+<text x="822" y="311" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#756C65">2 osoby</text>
+<rect x="720" y="338" width="200" height="8" rx="4" fill="#E8E2D8"/>
+<rect x="720" y="354" width="160" height="8" rx="4" fill="#E8E2D8"/>
+<rect x="720" y="370" width="180" height="8" rx="4" fill="#E8E2D8"/>
+
+<rect x="570" y="160" width="200" height="260" rx="16" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1"/>
+<rect x="570" y="160" width="200" height="75" rx="16" fill="#7A3020"/>
+<rect x="570" y="214" width="200" height="21" fill="#7A3020"/>
+<text x="670" y="205" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" fill="#FFFFFF">Tiramisu</text>
+<rect x="588" y="258" width="100" height="7" rx="3" fill="#E8E2D8"/>
+<rect x="588" y="273" width="130" height="7" rx="3" fill="#E8E2D8"/>
+<rect x="588" y="288" width="80" height="7" rx="3" fill="#E8E2D8"/>
+<rect x="588" y="310" width="50" height="22" rx="5" fill="#F5F3EE"/>
+<text x="613" y="325" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#756C65">45 min</text>
+<rect x="588" y="352" width="164" height="7" rx="3" fill="#E8E2D8"/>
+<rect x="588" y="368" width="130" height="7" rx="3" fill="#E8E2D8"/>
+
+<text x="108" y="210" font-family="Georgia, serif" font-size="72" font-weight="700" fill="#1A1714" letter-spacing="-2">Keep</text>
+<text x="108" y="290" font-family="Georgia, serif" font-size="72" font-weight="700" fill="#C84B31" letter-spacing="-2">Taste</text>
+<line x1="108" y1="318" x2="440" y2="318" stroke="#C84B31" stroke-width="2.5"/>
+<text x="108" y="355" font-family="sans-serif" font-size="20" font-weight="400" fill="#756C65">Your recipes. Offline. Always.</text>
+<circle cx="108" cy="390" r="5" fill="#C84B31"/>
+<text x="122" y="395" font-family="sans-serif" font-size="14" fill="#756C65">No account required</text>
+<circle cx="240" cy="390" r="5" fill="#C84B31"/>
+<text x="254" y="395" font-family="sans-serif" font-size="14" fill="#756C65">No cloud</text>
+<circle cx="320" cy="390" r="5" fill="#C84B31"/>
+<text x="334" y="395" font-family="sans-serif" font-size="14" fill="#756C65">No ads</text>
+<rect x="0" y="492" width="1024" height="8" fill="#C84B31"/>
+</svg>

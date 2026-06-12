@@ -2,17 +2,20 @@ import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   StyleSheet,
-  Image,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+import ModalHeader from '@/components/ui/ModalHeader';
+import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import {
   useTheme,
   ThemePalette,
@@ -29,6 +32,8 @@ import {
 } from '@/utils/cookbookForm';
 
 type Props = {
+  /** Modal title, e.g. "New cookbook" / "Edit cookbook". */
+  title: string;
   initialData?: CookbookFormData;
   onSave: (data: CookbookFormData) => Promise<void>;
   onCancel: () => void;
@@ -64,6 +69,7 @@ const makeFieldStyles = (c: ThemePalette) => StyleSheet.create({
 });
 
 export default function CookbookForm({
+  title,
   initialData,
   onSave,
   onCancel,
@@ -74,6 +80,9 @@ export default function CookbookForm({
   const styles = useMemo(() => makeStyles(c), [c]);
   const initial = initialData ?? emptyCookbookFormData();
   const [form, setForm] = useState<CookbookFormData>(initial);
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  // Inline validation instead of an Alert; cleared as soon as the user types.
+  const [nameError, setNameError] = useState(false);
 
   const set = (key: keyof CookbookFormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -111,22 +120,24 @@ export default function CookbookForm({
     }
   };
 
-  const handlePhotoPress = () =>
-    Alert.alert(t('cookbookForm.coverTitle'), t('cookbookForm.coverMessage'), [
-      { text: t('common.gallery'), onPress: handlePickImage },
-      { text: t('common.camera'), onPress: handleTakePhoto },
-      form.coverImagePath
-        ? {
-            text: t('common.removePhoto'),
-            style: 'destructive',
+  const photoActions: ActionSheetAction[] = [
+    { label: t('common.gallery'), icon: 'images-outline', onPress: handlePickImage },
+    { label: t('common.camera'), icon: 'camera-outline', onPress: handleTakePhoto },
+    ...(form.coverImagePath
+      ? [
+          {
+            label: t('common.removePhoto'),
+            icon: 'trash-outline' as const,
+            destructive: true,
             onPress: () => set('coverImagePath', ''),
-          }
-        : { text: t('common.cancel'), style: 'cancel' },
-    ]);
+          },
+        ]
+      : []),
+  ];
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      Alert.alert(t('cookbookForm.missingName'), t('cookbookForm.missingNameMessage'));
+      setNameError(true);
       return;
     }
     await onSave(form);
@@ -148,18 +159,7 @@ export default function CookbookForm({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleSave}
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-          disabled={isLoading}
-        >
-          <Text style={styles.saveText}>{t('common.save')}</Text>
-        </TouchableOpacity>
-      </View>
+      <ModalHeader title={title} onClose={handleCancel} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -170,61 +170,70 @@ export default function CookbookForm({
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
             <Field label={t('cookbookForm.name')}>
-              <TextInput
-                style={[styles.input, styles.inputLarge]}
+              <Input
+                large
                 placeholder={t('cookbookForm.namePlaceholder')}
-                placeholderTextColor={c.textMuted}
                 value={form.name}
-                onChangeText={(v) => set('name', v)}
+                onChangeText={(v) => {
+                  if (nameError) setNameError(false);
+                  set('name', v);
+                }}
                 returnKeyType="done"
+                style={nameError ? { borderColor: c.error } : undefined}
               />
+              {nameError ? (
+                <Text style={styles.fieldError} accessibilityLiveRegion="polite">
+                  {t('cookbookForm.missingNameMessage')}
+                </Text>
+              ) : null}
             </Field>
           </View>
-          <TouchableOpacity style={styles.photoButton} onPress={handlePhotoPress}>
+          <Pressable
+            style={({ pressed }) => [styles.photoButton, pressed && { opacity: 0.7 }]}
+            onPress={() => setPhotoMenuOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.changePhoto')}
+          >
             {form.coverImagePath ? (
               <Image
                 source={{ uri: form.coverImagePath }}
                 style={styles.photoThumb}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : (
               <Ionicons name="camera-outline" size={22} color={c.primary} />
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
+
+      {/* Save stays pinned in the thumb zone, above the keyboard */}
+      <View style={styles.footer}>
+        <Button
+          label={t('common.save')}
+          onPress={handleSave}
+          loading={isLoading}
+        />
+      </View>
+
+      <ActionSheet
+        visible={photoMenuOpen}
+        title={t('cookbookForm.coverTitle')}
+        actions={photoActions}
+        onClose={() => setPhotoMenuOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (c: ThemePalette) => StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  footer: {
     paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  cancelButton: { padding: Spacing.xs },
-  cancelText: {
-    fontSize: Typography.size.base,
-    color: c.textSecondary,
-  },
-  saveButton: {
-    backgroundColor: c.primary,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveText: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.semibold,
-    color: '#FFFFFF',
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    backgroundColor: c.background,
   },
   scrollContent: {
     padding: Spacing.base,
@@ -252,19 +261,9 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  input: {
-    backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: Typography.size.base,
-    color: c.text,
-  },
-  inputLarge: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.medium,
-    paddingVertical: Spacing.md,
+  fieldError: {
+    fontSize: Typography.size.sm,
+    color: c.error,
+    marginTop: Spacing.xs,
   },
 });

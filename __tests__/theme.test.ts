@@ -2,9 +2,10 @@ import { lightColors, darkColors } from '../constants/theme';
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
-// The 8 SPEC §6 tokens + error + cookbookColors form the palette contract.
+// The 9 SPEC §6 tokens + error + cookbookColors form the palette contract.
 const EXPECTED_KEYS = [
   'primary',
+  'onPrimary',
   'background',
   'surface',
   'surfaceAlt',
@@ -55,12 +56,13 @@ describe('theme palettes', () => {
   describe('3. exact dark values (SPEC §6)', () => {
     it('matches the dark palette table', () => {
       expect(darkColors.primary).toBe('#E06A4F');
+      expect(darkColors.onPrimary).toBe('#1C1814');
       expect(darkColors.background).toBe('#1C1814');
       expect(darkColors.surface).toBe('#262019');
       expect(darkColors.surfaceAlt).toBe('#2F2820');
       expect(darkColors.text).toBe('#F0EBE4');
       expect(darkColors.textSecondary).toBe('#A89F95');
-      expect(darkColors.textMuted).toBe('#7A716A');
+      expect(darkColors.textMuted).toBe('#948A82');
       expect(darkColors.border).toBe('#3A322A');
     });
 
@@ -72,8 +74,10 @@ describe('theme palettes', () => {
   describe('4. light values unchanged (SPEC §6 light table)', () => {
     it('spot-checks the light palette', () => {
       expect(lightColors.primary).toBe('#C84B31');
+      expect(lightColors.onPrimary).toBe('#FFFFFF');
       expect(lightColors.background).toBe('#FAFAF7');
       expect(lightColors.text).toBe('#1A1714');
+      expect(lightColors.textMuted).toBe('#756C65');
     });
   });
 

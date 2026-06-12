@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { SafeAreaView, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { StyleSheet, ActivityIndicator, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RecipeForm from '@/components/recipe/RecipeForm';
 import { type RecipeFormData, recipeToFormData } from '@/utils/recipeForm';
 import { getRecipeById, updateRecipe } from '@/db/recipes';
 import { useTheme, ThemePalette } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import { parsePositiveInt } from '@/utils/numeric';
 import { persistImage } from '@/utils/imageStorage';
 
 export default function EditRecipeScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [initialData, setInitialData] = useState<RecipeFormData | null>(null);
@@ -65,6 +68,7 @@ export default function EditRecipeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <RecipeForm
+        title={t('stack.editRecipe')}
         initialData={initialData}
         onSave={handleSave}
         onCancel={() => router.back()}

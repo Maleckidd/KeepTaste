@@ -1,19 +1,30 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
-  TextInput,
-  Image,
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getCookbookById } from '@/db/cookbooks';
-import { getRecipesByCookbook, getAllRecipes, searchRecipes } from '@/db/recipes';
+import { Image } from 'expo-image';
+import { getCookbookById, deleteCookbook } from '@/db/cookbooks';
+import {
+  getRecipesByCookbook,
+  getAllRecipes,
+  searchRecipes,
+  deleteRecipe,
+} from '@/db/recipes';
+import { deleteStoredImage } from '@/utils/imageStorage';
 import { shareCookbookPdf } from '@/utils/cookbookPdf';
+import {
+  pendingDeleteKey,
+  filterPendingDeletes,
+  subscribePendingDeletes,
+} from '@/utils/pendingDelete';
+import { useUndoDelete } from '@/components/ui/SnackbarProvider';
 import {
   useTheme,
   ThemePalette,
@@ -21,9 +32,19 @@ import {
   Spacing,
   Radius,
   Shadow,
+  Motion,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import IconButton from '@/components/ui/IconButton';
+import EmptyState from '@/components/ui/EmptyState';
+import Input from '@/components/ui/Input';
+import Fab from '@/components/ui/Fab';
+import ActionSheet from '@/components/ui/ActionSheet';
+import SwipeableRow from '@/components/ui/SwipeableRow';
 import type { Recipe, Cookbook } from '@/db/schema';
+
+const CARD_IMAGE_HEIGHT = 150;
 
 function RecipeCard({
   recipe,
@@ -35,46 +56,68 @@ function RecipeCard({
   const c = useTheme();
   const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={recipe.title}
+    >
       {recipe.imagePath ? (
         <Image
           source={{ uri: recipe.imagePath }}
           style={styles.cardImage}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={Motion.duration.base}
+          accessibilityLabel={t('a11y.recipePhoto')}
         />
       ) : (
         <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-          <Ionicons name="restaurant-outline" size={28} color={c.border} />
+          <Ionicons name="restaurant-outline" size={36} color={c.border} />
         </View>
       )}
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={2}>
           {recipe.title}
         </Text>
-        <View style={styles.cardMeta}>
-          {recipe.prepTime || recipe.cookTime ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={13} color={c.textMuted} />
-              <Text style={styles.metaText}>
-                {t('cookbook.minutes', {
-                  count: (recipe.prepTime || 0) + (recipe.cookTime || 0),
-                })}
-              </Text>
-            </View>
-          ) : null}
-          {recipe.servings ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="people-outline" size={13} color={c.textMuted} />
-              <Text style={styles.metaText}>
-                {t('cookbook.servings', { count: recipe.servings })}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        {totalTime > 0 || recipe.servings ? (
+          <View style={styles.cardMeta}>
+            {totalTime > 0 ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="time-outline" size={14} color={c.textMuted} />
+                <Text style={styles.metaText}>
+                  {t('cookbook.minutes', { count: totalTime })}
+                </Text>
+              </View>
+            ) : null}
+            {recipe.servings ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="people-outline" size={14} color={c.textMuted} />
+                <Text style={styles.metaText}>
+                  {t('cookbook.servings', { count: recipe.servings })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={c.border} />
-    </TouchableOpacity>
+    </Pressable>
+  );
+}
+
+function SkeletonCard() {
+  const c = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  return (
+    <View style={styles.card}>
+      <View style={[styles.cardImage, { backgroundColor: c.surfaceAlt }]} />
+      <View style={styles.cardBody}>
+        <View style={styles.skeletonLine} />
+        <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+      </View>
+    </View>
   );
 }
 
@@ -89,13 +132,16 @@ export default function CookbookScreen() {
   const [cookbook, setCookbook] = useState<Cookbook | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
+  const showUndoDelete = useUndoDelete();
 
   const loadData = useCallback(async () => {
     if (isAll) {
       const data = searchQuery
         ? await searchRecipes(searchQuery)
         : await getAllRecipes();
-      setRecipes(data);
+      setRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
     } else {
       const cbId = Number(id);
       const [cb, data] = await Promise.all([
@@ -103,8 +149,9 @@ export default function CookbookScreen() {
         getRecipesByCookbook(cbId),
       ]);
       setCookbook(cb || null);
-      setRecipes(data);
+      setRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
     }
+    setIsLoaded(true);
   }, [id, isAll, searchQuery]);
 
   useFocusEffect(
@@ -112,6 +159,55 @@ export default function CookbookScreen() {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => subscribePendingDeletes(loadData), [loadData]);
+
+  // Confirmation first (deliberate speed bump for recipes and cookbooks),
+  // then the delete still goes through the undo snackbar before committing.
+  const handleDeleteRecipe = (recipe: Recipe) => {
+    Alert.alert(t('confirm.deleteRecipe', { title: recipe.title }), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () =>
+          showUndoDelete(
+            pendingDeleteKey('recipe', recipe.id),
+            recipe.title,
+            async () => {
+              await deleteRecipe(recipe.id);
+              await deleteStoredImage(recipe.imagePath ?? null);
+            }
+          ),
+      },
+    ]);
+  };
+
+  const handleDeleteCookbook = () => {
+    if (!cookbook) return;
+    Alert.alert(
+      t('confirm.deleteCookbook', { name: cookbook.name }),
+      t('confirm.deleteCookbookMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            showUndoDelete(
+              pendingDeleteKey('cookbook', cookbook.id),
+              cookbook.name,
+              async () => {
+                await deleteCookbook(cookbook.id);
+                await deleteStoredImage(cookbook.coverImagePath);
+              }
+            );
+            router.back();
+          },
+        },
+      ]
+    );
+  };
 
   const handleExport = async () => {
     if (!cookbook) return;
@@ -125,79 +221,113 @@ export default function CookbookScreen() {
     }
   };
 
+  const handleAddRecipe = () =>
+    router.push({
+      pathname: '/recipe/new',
+      params: isAll ? {} : { cookbookId: id },
+    });
+
   const headerTitle = isAll ? t('home.allRecipes') : cookbook?.name ?? '';
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {headerTitle}
-        </Text>
-        <View style={styles.headerActions}>
-          {!isAll && cookbook && (
-            <TouchableOpacity onPress={handleExport} style={styles.iconButton}>
-              <Ionicons name="share-outline" size={22} color={c.text} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: '/recipe/new',
-                params: isAll ? {} : { cookbookId: id },
-              })
-            }
-            style={styles.iconButton}
-          >
-            <Ionicons name="add" size={26} color={c.primary} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScreenHeader title={headerTitle} back>
+        {!isAll && cookbook ? (
+          <>
+            <IconButton
+              icon="share-outline"
+              accessibilityLabel={t('a11y.shareCookbook')}
+              onPress={handleExport}
+            />
+            <IconButton
+              icon="ellipsis-horizontal"
+              accessibilityLabel={t('a11y.moreActions')}
+              onPress={() => setCookbookMenuOpen(true)}
+            />
+          </>
+        ) : null}
+      </ScreenHeader>
 
       {/* Search bar — title search works across all cookbooks (SPEC §5.3),
           so it only appears in the "All recipes" view */}
       {isAll ? (
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={16} color={c.textMuted} />
-          <TextInput
+          <Input
             style={styles.searchInput}
             placeholder={t('cookbook.searchPlaceholder')}
-            placeholderTextColor={c.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
             clearButtonMode="while-editing"
+            accessibilityLabel={t('cookbook.searchPlaceholder')}
           />
         </View>
       ) : null}
 
       {/* Recipe list */}
-      {recipes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="restaurant-outline" size={48} color={c.border} />
-          <Text style={styles.emptyText}>
-            {searchQuery
-              ? t('cookbook.noResults')
-              : t('cookbook.emptyRecipes')}
-          </Text>
+      {!isLoaded ? (
+        <View style={styles.list}>
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
+      ) : recipes.length === 0 ? (
+        searchQuery ? (
+          <EmptyState icon="search-outline" text={t('cookbook.noResults')} />
+        ) : (
+          <EmptyState
+            icon="restaurant-outline"
+            text={t('cookbook.emptyRecipes')}
+            actionLabel={t('cookbook.emptyAction')}
+            onAction={handleAddRecipe}
+          />
+        )
       ) : (
         <FlatList
           data={recipes}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <RecipeCard
-              recipe={item}
-              onPress={() => router.push(`/recipe/${item.id}`)}
-            />
+            <SwipeableRow
+              onEdit={() =>
+                router.push({ pathname: '/recipe/edit', params: { id: item.id } })
+              }
+              onDelete={() => handleDeleteRecipe(item)}
+            >
+              <RecipeCard
+                recipe={item}
+                onPress={() => router.push(`/recipe/${item.id}`)}
+              />
+            </SwipeableRow>
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
       )}
+      {isLoaded && recipes.length > 0 ? (
+        <Fab
+          accessibilityLabel={t('a11y.addRecipe')}
+          onPress={handleAddRecipe}
+        />
+      ) : null}
+
+      <ActionSheet
+        visible={cookbookMenuOpen}
+        title={cookbook?.name}
+        onClose={() => setCookbookMenuOpen(false)}
+        actions={[
+          {
+            label: t('common.edit'),
+            icon: 'create-outline',
+            onPress: () => router.push(`/cookbook/edit?id=${id}`),
+          },
+          {
+            label: t('common.delete'),
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: handleDeleteCookbook,
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -207,35 +337,6 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  backButton: {
-    padding: Spacing.xs,
-  },
-  title: {
-    flex: 1,
-    fontSize: Typography.size.xl,
-    fontWeight: Typography.weight.bold,
-    color: c.text,
-    letterSpacing: -0.3,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  iconButton: {
-    padding: Spacing.xs,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -243,7 +344,6 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     marginHorizontal: Spacing.base,
     marginBottom: Spacing.base,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
     backgroundColor: c.surface,
     borderRadius: Radius.full,
     borderWidth: 1,
@@ -251,28 +351,30 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: Typography.size.base,
-    color: c.text,
-    paddingVertical: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
   },
   list: {
     paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing.xxxl,
-    gap: Spacing.sm,
+    // Clears the floating action button.
+    paddingBottom: Spacing.xxxl * 2,
+    gap: Spacing.base,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: c.surface,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
-    gap: Spacing.md,
-    paddingRight: Spacing.md,
-    ...Shadow.sm,
+    ...Shadow.md,
+  },
+  // Opaque pressed state — the card sits over the swipe-action panel, so it
+  // must never go translucent or shrink (the panel would show through).
+  cardPressed: {
+    backgroundColor: c.surfaceAlt,
   },
   cardImage: {
-    width: 80,
-    height: 80,
+    width: '100%',
+    height: CARD_IMAGE_HEIGHT,
   },
   cardImagePlaceholder: {
     backgroundColor: c.surfaceAlt,
@@ -280,40 +382,36 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     justifyContent: 'center',
   },
   cardBody: {
-    flex: 1,
-    paddingVertical: Spacing.md,
+    padding: Spacing.base,
     gap: Spacing.xs,
   },
   cardTitle: {
-    fontSize: Typography.size.base,
+    fontSize: Typography.size.md,
     fontWeight: Typography.weight.semibold,
     color: c.text,
-    lineHeight: Typography.size.base * 1.3,
+    lineHeight: Typography.size.md * 1.3,
   },
   cardMeta: {
     flexDirection: 'row',
     gap: Spacing.md,
+    marginTop: 2,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
   },
   metaText: {
-    fontSize: Typography.size.xs,
+    fontSize: Typography.size.sm,
     color: c.textMuted,
   },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.xxxl,
+  skeletonLine: {
+    height: 14,
+    borderRadius: Radius.sm,
+    backgroundColor: c.surfaceAlt,
+    width: '70%',
   },
-  emptyText: {
-    fontSize: Typography.size.base,
-    color: c.textMuted,
-    textAlign: 'center',
-    lineHeight: Typography.size.base * 1.5,
+  skeletonLineShort: {
+    width: '40%',
   },
 });

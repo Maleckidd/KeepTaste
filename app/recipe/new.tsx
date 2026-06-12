@@ -1,16 +1,19 @@
 import React, { useState, useMemo } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RecipeForm from '@/components/recipe/RecipeForm';
 import { type RecipeFormData } from '@/utils/recipeForm';
 import { createRecipe } from '@/db/recipes';
 import { useTheme, ThemePalette } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import { parsePositiveInt } from '@/utils/numeric';
 import { persistImage } from '@/utils/imageStorage';
 
 export default function NewRecipeScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { cookbookId } = useLocalSearchParams<{ cookbookId?: string }>();
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +43,7 @@ export default function NewRecipeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <RecipeForm
+        title={t('stack.newRecipe')}
         onSave={handleSave}
         onCancel={() => router.back()}
         isLoading={isLoading}

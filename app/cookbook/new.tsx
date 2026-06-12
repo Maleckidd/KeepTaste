@@ -1,15 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import CookbookForm from '@/components/cookbook/CookbookForm';
 import { createCookbook } from '@/db/cookbooks';
 import { useTheme, ThemePalette } from '@/constants/theme';
+import { useT } from '@/i18n/LanguageProvider';
 import { type CookbookFormData, normalizeCookbookInput } from '@/utils/cookbookForm';
 import { persistImage } from '@/utils/imageStorage';
 
 export default function NewCookbookScreen() {
   const router = useRouter();
   const c = useTheme();
+  const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,6 +31,7 @@ export default function NewCookbookScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <CookbookForm
+        title={t('stack.newCookbook')}
         onSave={handleSave}
         onCancel={() => router.back()}
         isLoading={isLoading}

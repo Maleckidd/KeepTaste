@@ -2,25 +2,19 @@ import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { createShoppingList } from '@/db/shoppingLists';
-import {
-  useTheme,
-  ThemePalette,
-  Typography,
-  Spacing,
-  Radius,
-} from '@/constants/theme';
+import { useTheme, ThemePalette, Typography, Spacing } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import ModalHeader from '@/components/ui/ModalHeader';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
 
 export default function NewShoppingListScreen() {
   const router = useRouter();
@@ -29,6 +23,8 @@ export default function NewShoppingListScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Inline validation instead of an Alert; cleared as soon as the user types.
+  const [nameError, setNameError] = useState(false);
 
   const handleClose = () => {
     if (name.trim()) {
@@ -44,7 +40,7 @@ export default function NewShoppingListScreen() {
   const handleCreate = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      Alert.alert(t('shoppingNew.missingName'), t('shoppingNew.missingNameMessage'));
+      setNameError(true);
       return;
     }
     setIsLoading(true);
@@ -57,38 +53,40 @@ export default function NewShoppingListScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>{t('shoppingNew.title')}</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={c.text} />
-          </TouchableOpacity>
-        </View>
+        <ModalHeader title={t('shoppingNew.title')} onClose={handleClose} />
 
         <View style={styles.body}>
           <Text style={styles.label}>{t('shoppingNew.label')}</Text>
-          <TextInput
-            style={styles.input}
+          <Input
+            large
             placeholder={t('shoppingNew.placeholder')}
-            placeholderTextColor={c.textMuted}
             value={name}
-            onChangeText={setName}
+            onChangeText={(v) => {
+              if (nameError) setNameError(false);
+              setName(v);
+            }}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={handleCreate}
+            style={nameError ? { borderColor: c.error } : undefined}
           />
+          {nameError ? (
+            <Text style={styles.fieldError} accessibilityLiveRegion="polite">
+              {t('shoppingNew.missingNameMessage')}
+            </Text>
+          ) : null}
 
-          <TouchableOpacity
+          <Button
+            label={t('shoppingNew.create')}
             onPress={handleCreate}
-            style={[styles.primaryButton, isLoading && styles.disabled]}
-            disabled={isLoading}
-          >
-            <Text style={styles.primaryButtonText}>{t('shoppingNew.create')}</Text>
-          </TouchableOpacity>
+            loading={isLoading}
+            style={styles.submit}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -101,23 +99,6 @@ const makeStyles = (c: ThemePalette) =>
       flex: 1,
       backgroundColor: c.background,
     },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: Spacing.base,
-      paddingVertical: Spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
-    },
-    title: {
-      fontSize: Typography.size.md,
-      fontWeight: Typography.weight.semibold,
-      color: c.text,
-    },
-    closeButton: {
-      padding: Spacing.xs,
-    },
     body: {
       padding: Spacing.base,
       gap: Spacing.md,
@@ -129,30 +110,11 @@ const makeStyles = (c: ThemePalette) =>
       textTransform: 'uppercase',
       letterSpacing: 0.4,
     },
-    input: {
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: Radius.md,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.md,
-      fontSize: Typography.size.lg,
-      fontWeight: Typography.weight.medium,
-      color: c.text,
-    },
-    primaryButton: {
-      backgroundColor: c.primary,
-      paddingVertical: Spacing.md,
-      borderRadius: Radius.full,
-      alignItems: 'center',
+    submit: {
       marginTop: Spacing.sm,
     },
-    disabled: {
-      opacity: 0.5,
-    },
-    primaryButtonText: {
-      fontSize: Typography.size.base,
-      fontWeight: Typography.weight.semibold,
-      color: '#FFFFFF',
+    fieldError: {
+      fontSize: Typography.size.sm,
+      color: c.error,
     },
   });

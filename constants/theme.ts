@@ -12,6 +12,7 @@ const cookbookColors = [
 
 export const lightColors = {
   primary: '#C84B31',       // deep red / brick
+  onPrimary: '#FFFFFF',     // text/icons on primary surfaces
 
   background: '#FAFAF7',    // warm white
   surface: '#FFFFFF',
@@ -19,7 +20,7 @@ export const lightColors = {
 
   text: '#1A1714',          // near-black, warm
   textSecondary: '#6B6560',
-  textMuted: '#A09890',
+  textMuted: '#756C65',     // ≥4.5:1 on background (WCAG AA)
 
   border: '#E8E4DE',
 
@@ -30,6 +31,7 @@ export const lightColors = {
 
 export const darkColors = {
   primary: '#E06A4F',
+  onPrimary: '#1C1814',     // dark text reads better than white on the lightened primary
 
   background: '#1C1814',
   surface: '#262019',
@@ -37,7 +39,7 @@ export const darkColors = {
 
   text: '#F0EBE4',
   textSecondary: '#A89F95',
-  textMuted: '#7A716A',
+  textMuted: '#948A82',     // ≥4.5:1 on background (WCAG AA)
 
   border: '#3A322A',
 
@@ -63,6 +65,7 @@ export const Typography = {
     sm: 13,
     base: 15,
     md: 17,
+    reading: 18,  // recipe ingredients/steps — readable with the phone on the counter
     lg: 20,
     xl: 24,
     xxl: 30,
@@ -98,6 +101,23 @@ export const Radius = {
   lg: 16,
   xl: 24,
   full: 9999,
+};
+
+// Animation timings — subtle, 150–250ms. Used with LayoutAnimation via
+// utils/motion.ts, which also respects the system reduce-motion setting.
+export const Motion = {
+  duration: {
+    fast: 150,
+    base: 200,
+    slow: 250,
+  },
+};
+
+// Minimum touch target sizes (pt). `list` is deliberately larger — shopping
+// list rows are tapped one-handed while walking through a store.
+export const Touch = {
+  min: 44,
+  list: 56,
 };
 
 export const Shadow = {

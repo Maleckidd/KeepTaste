@@ -3,12 +3,15 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import Button from '@/components/ui/Button';
+import ActionSheet from '@/components/ui/ActionSheet';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -26,7 +29,6 @@ import {
   Typography,
   Spacing,
   Radius,
-  Shadow,
 } from '@/constants/theme';
 import { useT, useLanguage } from '@/i18n/LanguageProvider';
 import { pluralPl } from '@/utils/i18n';
@@ -38,6 +40,7 @@ export default function SettingsScreen() {
   const { preference, setPreference } = useLanguage();
   const styles = useMemo(() => makeStyles(c), [c]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const [languageMenuOpen, setLanguageMenuOpen] = React.useState(false);
 
   const languageSubtitle =
     preference === 'en'
@@ -45,24 +48,6 @@ export default function SettingsScreen() {
       : preference === 'pl'
         ? t('settings.languagePolish')
         : t('settings.languageSystem');
-
-  const handleLanguagePress = () => {
-    Alert.alert(t('settings.chooseLanguage'), undefined, [
-      {
-        text: t('settings.languageSystem'),
-        onPress: () => setPreference('system'),
-      },
-      {
-        text: t('settings.languageEnglish'),
-        onPress: () => setPreference('en'),
-      },
-      {
-        text: t('settings.languagePolish'),
-        onPress: () => setPreference('pl'),
-      },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
-  };
 
   const performDelete = async () => {
     const paths = await deleteAllData();
@@ -199,16 +184,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {t('settings.title')}
-        </Text>
-        <View style={styles.backButton} />
-      </View>
+      <ScreenHeader title={t('settings.title')} back />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -224,10 +200,14 @@ export default function SettingsScreen() {
 
         {/* Language */}
         <Text style={styles.sectionLabel}>{t('settings.language')}</Text>
-        <TouchableOpacity
-          style={styles.languageRow}
-          onPress={handleLanguagePress}
-          activeOpacity={0.8}
+        <Pressable
+          style={({ pressed }) => [
+            styles.languageRow,
+            pressed && { backgroundColor: c.surfaceAlt },
+          ]}
+          onPress={() => setLanguageMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('settings.language')}: ${languageSubtitle}`}
         >
           <Ionicons name="language-outline" size={18} color={c.textSecondary} />
           <View style={styles.languageTextWrap}>
@@ -235,7 +215,7 @@ export default function SettingsScreen() {
             <Text style={styles.languageValue}>{languageSubtitle}</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Your data notice */}
         <Text style={styles.sectionLabel}>{t('settings.yourData')}</Text>
@@ -267,39 +247,58 @@ export default function SettingsScreen() {
         </View>
 
         {/* Export all data */}
-        <TouchableOpacity
-          style={styles.importButton}
+        <Button
+          variant="secondary"
+          icon="share-outline"
+          label={t('settings.exportAll')}
           onPress={handleExportAll}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="share-outline" size={18} color={c.text} />
-          <Text style={styles.importButtonText}>{t('settings.exportAll')}</Text>
-        </TouchableOpacity>
+          style={styles.actionButton}
+        />
         <Text style={styles.importHint}>{t('settings.exportAllHint')}</Text>
 
         {/* Import */}
-        <TouchableOpacity
-          style={styles.importButton}
+        <Button
+          variant="secondary"
+          icon="download-outline"
+          label={t('settings.import')}
           onPress={handleImport}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="download-outline" size={18} color={c.text} />
-          <Text style={styles.importButtonText}>{t('settings.import')}</Text>
-        </TouchableOpacity>
+          style={styles.actionButton}
+        />
         <Text style={styles.importHint}>{t('settings.importHint')}</Text>
 
         {/* Delete all data */}
         <Text style={styles.sectionLabel}>{t('settings.dangerZone')}</Text>
-        <TouchableOpacity
-          style={styles.deleteButton}
+        <Button
+          variant="destructive"
+          icon="trash-outline"
+          label={t('settings.deleteAll')}
           onPress={handleDeleteAll}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="trash-outline" size={18} color={c.surface} />
-          <Text style={styles.deleteButtonText}>{t('settings.deleteAll')}</Text>
-        </TouchableOpacity>
+        />
         <Text style={styles.deleteHint}>{t('settings.deleteHint')}</Text>
       </ScrollView>
+
+      <ActionSheet
+        visible={languageMenuOpen}
+        title={t('settings.chooseLanguage')}
+        onClose={() => setLanguageMenuOpen(false)}
+        actions={[
+          {
+            label: t('settings.languageSystem'),
+            icon: 'phone-portrait-outline',
+            onPress: () => setPreference('system'),
+          },
+          {
+            label: t('settings.languageEnglish'),
+            icon: 'language-outline',
+            onPress: () => setPreference('en'),
+          },
+          {
+            label: t('settings.languagePolish'),
+            icon: 'language-outline',
+            onPress: () => setPreference('pl'),
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -308,25 +307,6 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  backButton: {
-    padding: Spacing.xs,
-    width: 30,
-  },
-  title: {
-    flex: 1,
-    fontSize: Typography.size.xl,
-    fontWeight: Typography.weight.bold,
-    color: c.text,
-    letterSpacing: -0.3,
   },
   content: {
     paddingHorizontal: Spacing.base,
@@ -392,22 +372,8 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     color: c.textSecondary,
     lineHeight: Typography.size.base * 1.5,
   },
-  importButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    backgroundColor: c.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: c.border,
-    paddingVertical: Spacing.base,
+  actionButton: {
     marginTop: Spacing.md,
-  },
-  importButtonText: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.semibold,
-    color: c.text,
   },
   importHint: {
     fontSize: Typography.size.sm,
@@ -415,21 +381,6 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.sm,
     lineHeight: Typography.size.sm * 1.4,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    backgroundColor: c.error,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.base,
-    ...Shadow.sm,
-  },
-  deleteButtonText: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.semibold,
-    color: c.surface,
   },
   deleteHint: {
     fontSize: Typography.size.sm,

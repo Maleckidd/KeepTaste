@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runMigrations } from '@/db/client';
 import { useTheme } from '@/constants/theme';
 import { LanguageProvider, useT } from '@/i18n/LanguageProvider';
+import { SnackbarProvider } from '@/components/ui/SnackbarProvider';
 
 function RootStack() {
   const c = useTheme();
@@ -12,6 +14,9 @@ function RootStack() {
   return (
     <Stack
       screenOptions={{
+        // Every screen renders its own header (ScreenHeader / ModalHeader /
+        // form header) — the native bar would duplicate it.
+        headerShown: false,
         headerStyle: {
           backgroundColor: c.background,
         },
@@ -26,12 +31,12 @@ function RootStack() {
         },
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="cookbook/[id]"
         options={{ title: t('stack.cookbook') }}
       />
-      <Stack.Screen name="settings" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" />
       <Stack.Screen
         name="recipe/[id]"
         options={{ title: t('stack.recipe'), presentation: 'card' }}
@@ -57,10 +62,6 @@ function RootStack() {
         options={{ title: t('stack.newShoppingList'), presentation: 'modal' }}
       />
       <Stack.Screen
-        name="shopping/edit"
-        options={{ title: t('stack.renameList'), presentation: 'modal' }}
-      />
-      <Stack.Screen
         name="cookbook/new"
         options={{ title: t('stack.newCookbook'), presentation: 'modal' }}
       />
@@ -84,9 +85,13 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <LanguageProvider>
-      <StatusBar style="auto" />
-      <RootStack />
-    </LanguageProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <LanguageProvider>
+        <SnackbarProvider>
+          <StatusBar style="auto" />
+          <RootStack />
+        </SnackbarProvider>
+      </LanguageProvider>
+    </GestureHandlerRootView>
   );
 }

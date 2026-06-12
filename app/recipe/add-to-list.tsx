@@ -2,17 +2,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import ModalHeader from '@/components/ui/ModalHeader';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { getRecipeById } from '@/db/recipes';
 import {
   getShoppingLists,
@@ -60,6 +63,7 @@ export default function AddToShoppingListScreen() {
   const [newListName, setNewListName] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { showSnackbar } = useSnackbar();
 
   useEffect(() => {
     (async () => {
@@ -108,42 +112,34 @@ export default function AddToShoppingListScreen() {
       }
       await createShoppingItems(listId, names);
       router.back();
-      Alert.alert(
-        t('addToList.addedTitle'),
-        t(addedKeys[pluralPl(names.length)], {
+      showSnackbar({
+        message: t(addedKeys[pluralPl(names.length)], {
           count: names.length,
           name: listName,
         }),
-        [
-          {
-            text: t('addToList.viewList'),
-            onPress: () => router.push(`/shopping/${listId}`),
-          },
-          { text: t('addToList.ok') },
-        ]
-      );
+        actionLabel: t('addToList.viewList'),
+        onAction: () => router.push(`/shopping/${listId}`),
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    return (
+      <View style={[styles.container, styles.loading]}>
+        <ActivityIndicator color={c.primary} />
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>{t('addToList.title')}</Text>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.closeButton}
-          >
-            <Ionicons name="close" size={24} color={c.text} />
-          </TouchableOpacity>
-        </View>
+        <ModalHeader title={t('addToList.title')} onClose={() => router.back()} />
 
         <ScrollView
           contentContainerStyle={styles.body}
@@ -153,21 +149,33 @@ export default function AddToShoppingListScreen() {
             <Text style={styles.sectionTitle}>
               {t('addToList.products')} ({checkedCount}/{candidates.length})
             </Text>
-            <TouchableOpacity onPress={toggleAll}>
+            <Pressable
+              onPress={toggleAll}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
               <Text style={styles.toggleAll}>
                 {allChecked
                   ? t('addToList.selectNone')
                   : t('addToList.selectAll')}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           <View style={styles.card}>
             {candidates.map((name, index) => (
-              <TouchableOpacity
+              <Pressable
                 key={index}
-                style={[styles.row, index > 0 && styles.rowBorder]}
+                style={({ pressed }) => [
+                  styles.row,
+                  index > 0 && styles.rowBorder,
+                  pressed && { backgroundColor: c.surfaceAlt },
+                ]}
                 onPress={() => toggleItem(index)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: checked[index] }}
+                accessibilityLabel={name}
               >
                 <Ionicons
                   name={checked[index] ? 'checkbox' : 'square-outline'}
@@ -182,7 +190,7 @@ export default function AddToShoppingListScreen() {
                 >
                   {name}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
 
@@ -192,10 +200,17 @@ export default function AddToShoppingListScreen() {
 
           <View style={styles.card}>
             {lists.map((list, index) => (
-              <TouchableOpacity
+              <Pressable
                 key={list.id}
-                style={[styles.row, index > 0 && styles.rowBorder]}
+                style={({ pressed }) => [
+                  styles.row,
+                  index > 0 && styles.rowBorder,
+                  pressed && { backgroundColor: c.surfaceAlt },
+                ]}
                 onPress={() => setTarget(list.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: target === list.id }}
+                accessibilityLabel={list.name}
               >
                 <Ionicons
                   name={
@@ -215,11 +230,18 @@ export default function AddToShoppingListScreen() {
                     })}
                   </Text>
                 ) : null}
-              </TouchableOpacity>
+              </Pressable>
             ))}
-            <TouchableOpacity
-              style={[styles.row, lists.length > 0 && styles.rowBorder]}
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                lists.length > 0 && styles.rowBorder,
+                pressed && { backgroundColor: c.surfaceAlt },
+              ]}
               onPress={() => setTarget(NEW_LIST)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: target === NEW_LIST }}
+              accessibilityLabel={t('addToList.newList')}
             >
               <Ionicons
                 name={
@@ -231,13 +253,12 @@ export default function AddToShoppingListScreen() {
               <Text style={[styles.rowText, styles.newListText]}>
                 {t('addToList.newList')}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
             {target === NEW_LIST ? (
               <View style={styles.newListInputWrap}>
-                <TextInput
-                  style={styles.input}
+                <Input
+                  style={{ backgroundColor: c.background }}
                   placeholder={t('shoppingNew.placeholder')}
-                  placeholderTextColor={c.textMuted}
                   value={newListName}
                   onChangeText={setNewListName}
                   returnKeyType="done"
@@ -246,17 +267,17 @@ export default function AddToShoppingListScreen() {
             ) : null}
           </View>
 
-          <TouchableOpacity
+          <Button
             onPress={handleAdd}
-            style={[styles.primaryButton, !canSubmit && styles.disabled]}
             disabled={!canSubmit}
-          >
-            <Text style={styles.primaryButtonText}>
-              {checkedCount === 0
+            loading={isSaving}
+            label={
+              checkedCount === 0
                 ? t('addToList.addDisabled')
-                : t(addKeys[pluralPl(checkedCount)], { count: checkedCount })}
-            </Text>
-          </TouchableOpacity>
+                : t(addKeys[pluralPl(checkedCount)], { count: checkedCount })
+            }
+            style={styles.submit}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -269,22 +290,9 @@ const makeStyles = (c: ThemePalette) =>
       flex: 1,
       backgroundColor: c.background,
     },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+    loading: {
       alignItems: 'center',
-      paddingHorizontal: Spacing.base,
-      paddingVertical: Spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border,
-    },
-    title: {
-      fontSize: Typography.size.md,
-      fontWeight: Typography.weight.semibold,
-      color: c.text,
-    },
-    closeButton: {
-      padding: Spacing.xs,
+      justifyContent: 'center',
     },
     body: {
       padding: Spacing.base,
@@ -325,6 +333,7 @@ const makeStyles = (c: ThemePalette) =>
       gap: Spacing.sm,
       paddingHorizontal: Spacing.md,
       paddingVertical: Spacing.md,
+      minHeight: 48,
     },
     rowBorder: {
       borderTopWidth: 1,
@@ -350,29 +359,7 @@ const makeStyles = (c: ThemePalette) =>
       paddingHorizontal: Spacing.md,
       paddingBottom: Spacing.md,
     },
-    input: {
-      backgroundColor: c.background,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: Radius.md,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
-      fontSize: Typography.size.base,
-      color: c.text,
-    },
-    primaryButton: {
-      backgroundColor: c.primary,
-      paddingVertical: Spacing.md,
-      borderRadius: Radius.full,
-      alignItems: 'center',
+    submit: {
       marginTop: Spacing.lg,
-    },
-    disabled: {
-      opacity: 0.5,
-    },
-    primaryButtonText: {
-      fontSize: Typography.size.base,
-      fontWeight: Typography.weight.semibold,
-      color: '#FFFFFF',
     },
   });

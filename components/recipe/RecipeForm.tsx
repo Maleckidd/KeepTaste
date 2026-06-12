@@ -2,17 +2,20 @@ import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   StyleSheet,
-  Image,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+import ModalHeader from '@/components/ui/ModalHeader';
+import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import {
   useTheme,
   ThemePalette,
@@ -29,6 +32,8 @@ import {
 } from '@/utils/recipeForm';
 
 type Props = {
+  /** Modal title, e.g. "New recipe" / "Edit recipe". */
+  title: string;
   initialData?: RecipeFormData;
   onSave: (data: RecipeFormData) => Promise<void>;
   onCancel: () => void;
@@ -72,6 +77,7 @@ const makeFieldStyles = (c: ThemePalette) => StyleSheet.create({
 });
 
 export default function RecipeForm({
+  title,
   initialData,
   onSave,
   onCancel,
@@ -82,6 +88,9 @@ export default function RecipeForm({
   const styles = useMemo(() => makeStyles(c), [c]);
   const initial = initialData ?? emptyRecipeFormData();
   const [form, setForm] = useState<RecipeFormData>(initial);
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  // Inline validation instead of an Alert; cleared as soon as the user types.
+  const [titleError, setTitleError] = useState(false);
 
   const set = (key: keyof RecipeFormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -119,18 +128,24 @@ export default function RecipeForm({
     }
   };
 
-  const handlePhotoPress = () =>
-    Alert.alert(t('recipeForm.photoTitle'), t('recipeForm.photoMessage'), [
-      { text: t('common.gallery'), onPress: handlePickImage },
-      { text: t('common.camera'), onPress: handleTakePhoto },
-      form.imagePath
-        ? { text: t('common.removePhoto'), style: 'destructive', onPress: () => set('imagePath', '') }
-        : { text: t('common.cancel'), style: 'cancel' },
-    ]);
+  const photoActions: ActionSheetAction[] = [
+    { label: t('common.gallery'), icon: 'images-outline', onPress: handlePickImage },
+    { label: t('common.camera'), icon: 'camera-outline', onPress: handleTakePhoto },
+    ...(form.imagePath
+      ? [
+          {
+            label: t('common.removePhoto'),
+            icon: 'trash-outline' as const,
+            destructive: true,
+            onPress: () => set('imagePath', ''),
+          },
+        ]
+      : []),
+  ];
 
   const handleSave = async () => {
     if (!form.title.trim()) {
-      Alert.alert(t('recipeForm.missingTitle'), t('recipeForm.missingTitleMessage'));
+      setTitleError(true);
       return;
     }
     await onSave(form);
@@ -152,18 +167,7 @@ export default function RecipeForm({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleSave}
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-          disabled={isLoading}
-        >
-          <Text style={styles.saveText}>{t('common.save')}</Text>
-        </TouchableOpacity>
-      </View>
+      <ModalHeader title={title} onClose={handleCancel} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -174,66 +178,76 @@ export default function RecipeForm({
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.title')}>
-              <TextInput
-                style={[styles.input, styles.inputLarge]}
+              <Input
+                large
                 placeholder={t('recipeForm.titlePlaceholder')}
-                placeholderTextColor={c.textMuted}
                 value={form.title}
-                onChangeText={(v) => set('title', v)}
+                onChangeText={(v) => {
+                  if (titleError) setTitleError(false);
+                  set('title', v);
+                }}
                 returnKeyType="next"
+                style={titleError ? { borderColor: c.error } : undefined}
               />
+              {titleError ? (
+                <Text style={styles.fieldError} accessibilityLiveRegion="polite">
+                  {t('recipeForm.missingTitleMessage')}
+                </Text>
+              ) : null}
             </Field>
           </View>
-          <TouchableOpacity style={styles.photoButton} onPress={handlePhotoPress}>
+          <Pressable
+            style={({ pressed }) => [styles.photoButton, pressed && { opacity: 0.7 }]}
+            onPress={() => setPhotoMenuOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.changePhoto')}
+          >
             {form.imagePath ? (
               <Image
                 source={{ uri: form.imagePath }}
                 style={styles.photoThumb}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : (
               <Ionicons name="camera-outline" size={22} color={c.primary} />
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {/* Times */}
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.prep')}>
-              <TextInput
-                style={styles.input}
+              <Input
                 placeholder="15"
-                placeholderTextColor={c.textMuted}
                 value={form.prepTime}
                 onChangeText={(v) => set('prepTime', v)}
                 keyboardType="numeric"
+                maxLength={4}
                 returnKeyType="next"
               />
             </Field>
           </View>
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.cook')}>
-              <TextInput
-                style={styles.input}
+              <Input
                 placeholder="45"
-                placeholderTextColor={c.textMuted}
                 value={form.cookTime}
                 onChangeText={(v) => set('cookTime', v)}
                 keyboardType="numeric"
+                maxLength={4}
                 returnKeyType="next"
               />
             </Field>
           </View>
           <View style={{ flex: 0.7 }}>
             <Field label={t('recipeForm.servings')}>
-              <TextInput
-                style={styles.input}
+              <Input
                 placeholder="4"
-                placeholderTextColor={c.textMuted}
                 value={form.servings}
                 onChangeText={(v) => set('servings', v)}
                 keyboardType="numeric"
+                maxLength={3}
                 returnKeyType="next"
               />
             </Field>
@@ -245,14 +259,11 @@ export default function RecipeForm({
           label={t('recipeForm.ingredients')}
           hint={t('recipeForm.ingredientsHint')}
         >
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
+          <Input
             placeholder={t('recipeForm.ingredientsPlaceholder')}
-            placeholderTextColor={c.textMuted}
             value={form.ingredients}
             onChangeText={(v) => set('ingredients', v)}
             multiline
-            textAlignVertical="top"
           />
         </Field>
 
@@ -261,14 +272,12 @@ export default function RecipeForm({
           label={t('recipeForm.instructions')}
           hint={t('recipeForm.instructionsHint')}
         >
-          <TextInput
-            style={[styles.input, styles.inputMultilineTall]}
+          <Input
+            style={styles.inputMultilineTall}
             placeholder={t('recipeForm.instructionsPlaceholder')}
-            placeholderTextColor={c.textMuted}
             value={form.instructions}
             onChangeText={(v) => set('instructions', v)}
             multiline
-            textAlignVertical="top"
           />
         </Field>
 
@@ -277,54 +286,47 @@ export default function RecipeForm({
           label={t('recipeForm.notes')}
           hint={t('recipeForm.notesHint')}
         >
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
+          <Input
             placeholder={t('recipeForm.notesPlaceholder')}
-            placeholderTextColor={c.textMuted}
             value={form.notes}
             onChangeText={(v) => set('notes', v)}
             multiline
-            textAlignVertical="top"
           />
         </Field>
       </ScrollView>
+
+      {/* Save stays pinned in the thumb zone, above the keyboard */}
+      <View style={styles.footer}>
+        <Button
+          label={t('common.save')}
+          onPress={handleSave}
+          loading={isLoading}
+        />
+      </View>
+
+      <ActionSheet
+        visible={photoMenuOpen}
+        title={t('recipeForm.photoTitle')}
+        actions={photoActions}
+        onClose={() => setPhotoMenuOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (c: ThemePalette) => StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  cancelButton: { padding: Spacing.xs },
-  cancelText: {
-    fontSize: Typography.size.base,
-    color: c.textSecondary,
-  },
-  saveButton: {
-    backgroundColor: c.primary,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveText: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.semibold,
-    color: '#FFFFFF',
-  },
   scrollContent: {
     padding: Spacing.base,
     gap: Spacing.base,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: Spacing.xl,
+  },
+  footer: {
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    backgroundColor: c.background,
   },
   row: {
     flexDirection: 'row',
@@ -351,29 +353,12 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  input: {
-    backgroundColor: c.surface,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: Typography.size.base,
-    color: c.text,
-  },
-  inputLarge: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.medium,
-    paddingVertical: Spacing.md,
-  },
-  inputMultiline: {
-    minHeight: 120,
-    paddingTop: Spacing.md,
-    lineHeight: Typography.size.base * 1.6,
-  },
   inputMultilineTall: {
     minHeight: 220,
-    paddingTop: Spacing.md,
-    lineHeight: Typography.size.base * 1.6,
+  },
+  fieldError: {
+    fontSize: Typography.size.sm,
+    color: c.error,
+    marginTop: Spacing.xs,
   },
 });

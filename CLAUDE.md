@@ -33,9 +33,11 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 **Layers:**
 - `app/` — Expo Router file-based screens. `index.tsx` (cookbook tiles + title search), `cookbook/[id].tsx` (recipe grid; the literal id `"all"` means all recipes), `recipe/[id].tsx` (view), `recipe/new.tsx` / `recipe/edit.tsx` (modals sharing `components/recipe/RecipeForm.tsx`). Root `_layout.tsx` runs DB migrations on startup.
 - `db/` — the only data-access layer (Drizzle ORM over expo-sqlite). `schema.ts` (tables + TS types), `ddl.ts` (shared migration DDL), `client.ts` (native connection + migrations), `client.web.ts` (web test client: in-memory sql.js via drizzle sqlite-proxy), `cookbooks.ts` / `recipes.ts` (query helpers). Don't scatter raw SQL outside `db/`.
+- `components/ui/` — base UI kit (SPEC.md §6): `Button`, `IconButton` (requires `accessibilityLabel`), `Input`, `ScreenHeader`/`ModalHeader`, `Fab`, `EmptyState`, `ActionSheet` (context menus — never `Alert.alert` for menus), `SwipeableRow` (gesture-handler swipe Edit/Delete), `SnackbarProvider` (snackbar + `useUndoDelete`). Reuse these instead of restyling per screen; native stack headers are disabled globally.
+- `utils/` UI helpers — `pendingDelete.ts` (deferred-delete registry behind the Undo snackbar; unit-tested), `haptics.ts` (`lightTap`), `motion.ts` (`animateLayout`, reduce-motion aware — never call it in the same frame a snackbar mounts), `keepAwake.ts` (web-safe keep-awake for the recipe view).
 - `utils/` export & share — pure builders (unit-tested): `markdown.ts` (per-recipe/cookbook-body `.md` helpers; format in SPEC.md §5.6), `backupMarkdown.ts` (full-app backup, `# §Uncategorized` sentinel), `importMarkdown.ts` (parsers, incl. multi-cookbook `parseBackupMarkdown`), `cookbookPdfHtml.ts` / `recipeShareText.ts` (localized share content). Native I/O lives in thin wrappers: `backupExport.ts` (write + share `.md`), `cookbookPdf.ts` (expo-print → share sheet).
 - `i18n/` — bilingual UI strings: `dictionary.ts` (typed EN+PL `Record`) and `LanguageProvider.tsx` (the `useT`/`useLanguage` context, persistence via `db/settings.ts`). Pure resolver logic (preference parsing, locale resolution, interpolation, Polish plurals) lives in `utils/i18n.ts`. See SPEC.md §5.11.
-- `constants/theme.ts` — design tokens (colors, typography, spacing, shadows). Never hardcode style values when a token exists.
+- `constants/theme.ts` — design tokens (colors incl. `onPrimary`, typography incl. `size.reading` for recipe content, spacing, radii, shadows, `Motion` durations, `Touch` target sizes). Never hardcode style values when a token exists.
 
 **Migrations are manual.** `runMigrations()` in `db/client.ts` executes hand-written `CREATE TABLE IF NOT EXISTS` DDL (defined in `db/ddl.ts`, shared with `db/client.web.ts`) synchronously at app start. Drizzle Kit auto-migrations are intentionally not used. Any schema change requires editing both `db/schema.ts` and the DDL in `db/ddl.ts` (and `ALTER TABLE` for existing tables).
 
@@ -44,6 +46,7 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 ## Domain rules
 
 - Deleting a cookbook sets `recipes.cookbook_id` to NULL (recipes survive, visible under "all").
+- Deletes are deferred behind a 5s Undo snackbar (`utils/pendingDelete.ts` + `useUndoDelete`); recipes and cookbooks additionally get a confirmation Alert first, shopping lists/items don't. Don't add immediate `db` deletes in screens.
 - Tags are removed from the MVP entirely (SPEC.md §7/§8) — strip leftover tag code when touched, don't add tag features.
 - Dates are stored as ISO 8601 TEXT, not timestamps.
 - The only required form field is the recipe title; numeric fields save an integer ≥ 1 or `null` — never `NaN` (SPEC.md §5.5).

@@ -310,6 +310,21 @@ describe('db/shoppingLists — getItemsForList', () => {
     expect(db.select).toHaveBeenCalled();
     expect(items).toHaveLength(2);
   });
+
+  it('orders active before in-cart, newest first within each group', async () => {
+    selectResults = [
+      [
+        { id: 1, listId: 42, name: 'Milk', checked: 0 },
+        { id: 3, listId: 42, name: 'Eggs', checked: 1 },
+        { id: 2, listId: 42, name: 'Bread', checked: 0 },
+        { id: 4, listId: 42, name: 'Butter', checked: 1 },
+      ],
+    ];
+
+    const items = await listsModule.getItemsForList(42);
+    // A just-added product must show up at the top of its section.
+    expect(items.map((i: { id: number }) => i.id)).toEqual([2, 1, 4, 3]);
+  });
 });
 
 describe('db/shoppingLists — getShoppingListById', () => {

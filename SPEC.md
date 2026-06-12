@@ -64,15 +64,17 @@ app/
     edit.tsx             ← modal: edit recipe
     add-to-list.tsx      ← modal: add ingredients to a shopping list (§5.12)
   shopping/
-    [id].tsx             ← shopping list detail: items + "in cart" flow (§5.10)
+    [id].tsx             ← shopping list detail: items + "in cart" flow (§5.10); inline title rename
     new.tsx              ← modal: new shopping list
-    edit.tsx             ← modal: rename shopping list
 
 components/
   cookbook/
     CookbookForm.tsx     ← shared cookbook form (new + edit)
   recipe/
     RecipeForm.tsx       ← shared recipe form (new + edit)
+  ui/                    ← base components (§6): Button, IconButton, Input,
+                           Card-level pieces, ScreenHeader, ModalHeader, Fab,
+                           EmptyState, ActionSheet, SwipeableRow, SnackbarProvider
 
 i18n/
   dictionary.ts          ← typed EN+PL dictionary of all UI strings (§5.11)
@@ -187,9 +189,9 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - If a cookbook has a cover (`cover_image_path`), the photo covers the background color with a slight dark overlay for title readability
 - Header (left): "KeepTaste" eyebrow + "Cookbooks" title; header (right): a **settings gear** (→ §5.7) and a **"+" button → new cookbook modal** (§5.2)
 - A fixed "All recipes" row above the grid — the **only entry point** to the `/cookbook/all` view
-- Long-press on a tile → Alert with options: **Edit / Delete / Cancel**
+- Long-press on a tile (with a light haptic) → bottom **ActionSheet**: **Edit / Delete / Cancel**
   - **Edit** → opens the cookbook modal (§5.2) pre-filled with the current name and cover
-  - **Delete** → second confirmation Alert with the message: *"Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'."* + Delete (destructive) / Cancel buttons
+  - **Delete** → confirmation Alert with the message: *"Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'."*; on confirm the cookbook disappears behind a 5s **Undo** snackbar before the delete commits (§6)
 
 **Edge cases:**
 - No cookbooks → empty state with an icon and a message encouraging the user to create their first one
@@ -212,7 +214,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Edit: long-press on a cookbook tile → "Edit" → form pre-filled with the current name and cover
 
 **On save:**
-- Name is trimmed before saving; empty name → Alert, the form is not saved
+- Name is trimmed before saving; empty name → inline error under the field, the form is not saved
 - Cover is stored as a local URI (path to a file on the device)
 - Edit: saving overwrites the name and cover; removing the cover sets `cover_image_path` to NULL
 - Editing the name/cover **does not affect** the recipes in the cookbook
@@ -265,8 +267,9 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 **Navigation:**
 - Back button (arrow-back)
 - Share button (share-outline) → shares the recipe as plain text (§5.13)
-- Edit button (create-outline) → opens `/recipe/edit?id=X`
-- Delete button (trash) → confirmation Alert; on confirm, deletes and goes back
+- "⋯" menu (ActionSheet, same pattern as the cookbook and shopping-list headers):
+  - **Edit** → opens `/recipe/edit?id=X`
+  - **Delete** → confirmation Alert ("Delete \"{title}\"?"); on confirm goes back and the delete commits after a 5s **Undo** snackbar (§6)
 
 **Add to shopping list:** a button below the Ingredients section ("Add to shopping list", cart icon) opens the ingredient-picker modal (§5.12). Shown only when the parsed ingredients yield at least one item (§5.12 parsing rules) — consistent with the no-placeholder rule.
 
@@ -290,11 +293,11 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 | Notes | TextInput multiline | NO | Exported together with the recipe (it's a cookbook, not a diary) |
 
 **Validation:**
-- The only required field: title. Missing title → `Alert` with a message, the form is not saved.
+- The only required field: title. Missing title → inline error under the field, the form is not saved.
 - Numeric fields — **unambiguous parsing rule:** the value is parsed to an integer (`parseInt`); it is saved only if the result is an integer ≥ 1. Everything else (empty field, text, zero, negative values, `NaN`) → we save `null`. Implementation note: the pattern `value ? Number(value) : null` is **wrong** — for text it saves `NaN` to the database.
 
 **Photo:**
-- The title field sits at the very top of the form with a small icon-only camera button on the same row (right side) as the photo entry point. Once a photo is picked, the button shows it as a thumbnail; tapping it opens an Alert with options: Gallery / Camera / Remove photo (if one exists)
+- The title field sits at the very top of the form with a small icon-only camera button on the same row (right side) as the photo entry point. Once a photo is picked, the button shows it as a thumbnail; tapping it opens an ActionSheet with options: Gallery / Camera / Remove photo (if one exists)
 - Photo processed by ImagePicker with `allowsEditing: true`, aspect ratio 4:3, quality 0.8
 - The photo file is **copied to `FileSystem.documentDirectory`** when the recipe is saved (the picker URI points to the system cache, which may be cleared — see §8, high priority); the same applies to cookbook covers
 - Deleting a recipe/cookbook or replacing a photo → delete the copied file from `documentDirectory` (cleanup so the directory doesn't grow indefinitely)
@@ -441,15 +444,17 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 - Lists sorted descending by `updated_at`
 - "+" button in the header → "New shopping list" form
 - Tap a card → opens the list detail view
-- Long-press a card → Alert: **Rename / Delete / Cancel**. Rename opens a "Rename list" modal (same single-field form as creation, pre-filled, "Save" button, ✕ with dirty-check); renaming refreshes the list's `updated_at`. Delete asks for a second, destructive confirmation (deleting a list deletes its items — unlike cookbooks there is no orphan pool)
+- Long-press a card (light haptic) → bottom **ActionSheet**: **Rename / Delete / Cancel**; swipe-left on a card reveals the same two actions. Rename opens the list detail with the inline title editor active (`?rename=1`); renaming refreshes the list's `updated_at`. Delete removes the list immediately behind a 5s **Undo** snackbar — no confirmation dialog (deleting a list deletes its items — unlike cookbooks there is no orphan pool)
 - Empty state: icon + a message encouraging creating the first list
 
 **"New shopping list" form (modal):**
 - Title: "New shopping list"
-- Input: "List name" (required; trimmed; empty → Alert, not saved)
+- Input: "List name" (required; trimmed; empty → inline error under the field, not saved)
 - Button: "Create list"
 - An "✕" close button in the corner dismisses the form (dirty-check Alert like other forms, §5.2/§5.5)
 - On create → navigates straight to the new (empty) list's detail view
+
+**List detail view — header:** the title is tappable (pencil affordance) and turns into an inline text input for renaming (done/blur saves, empty input cancels); a "⋯" menu offers Rename and Delete list (undo snackbar, then back). There is no separate rename modal.
 
 **List detail view — empty state:**
 - Title: "Your shopping list is empty"
@@ -463,11 +468,11 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 
 **List items & the "In cart" flow:**
 - Each product renders as a row: name (+ quantity, muted, when present) with a **checkbox on the right**
-- Unchecked items appear at the top, in the order they were added
+- Unchecked items appear at the top, newest first — a just-added product shows up at the top of the list, not below the fold
 - Tapping the checkbox: it becomes checked, the row is **grayed out** (muted text/checkbox) and **moves to the bottom of the list**, under an "In cart" section header (the header appears only when at least one item is checked)
 - Unchecking moves the item back to the unchecked group
 - Item edits update the parent list's `updated_at` (so active lists float to the top of the Shopping tab)
-- Long-press an item → Alert: **Edit / Delete / Cancel**. Edit reuses the inline row in edit mode: inputs pre-filled with the item's name/quantity, the confirm button shows a checkmark, and saving updates the item in place (clearing quantity stores NULL); editing touches the parent list's `updated_at`
+- Long-press an item (light haptic) → bottom **ActionSheet**: **Edit / Delete / Cancel**; swipe-left reveals the same actions. Delete removes the item behind a 5s **Undo** snackbar, no confirmation. Edit reuses the inline row in edit mode: inputs pre-filled with the item's name/quantity, the confirm button shows a checkmark, and saving updates the item in place (clearing quantity stores NULL); editing touches the parent list's `updated_at`
 
 **Database (new tables, added to `db/ddl.ts` + `db/schema.ts`; CREATE TABLE IF NOT EXISTS keeps existing installs safe):**
 
@@ -499,7 +504,7 @@ CREATE INDEX idx_shopping_items_list_id ON shopping_items(list_id);
 
 The UI ships in two languages: English and Polish. On first launch the app follows the device locale (via `expo-localization`): a device language starting with `pl` shows Polish, everything else shows English.
 
-Users can override this manually in Settings. A "Language" row (above the "Your data" area) shows the current preference's localized label (System / English / Polski) and, on tap, opens an Alert with four buttons: **System**, **English**, **Polski**, **Cancel**. Choosing **System** restores the device-locale default.
+Users can override this manually in Settings. A "Language" row (above the "Your data" area) shows the current preference's localized label (System / English / Polski) and, on tap, opens a bottom ActionSheet with options: **System**, **English**, **Polski**, **Cancel**. Choosing **System** restores the device-locale default.
 
 The chosen preference is persisted in the SQLite `app_settings` key-value table (key `language`, value `system` | `en` | `pl`). Changing it re-renders the entire app immediately — tab labels, pushed screen titles, and Alerts all switch — through a `LanguageProvider` React context that wraps the app. This whole-app context is the **approved exception** to the otherwise strict no-global-state rule (§3) and the no-extra-settings rule (§7): it is the only in-app preference.
 
@@ -537,9 +542,9 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 - "New list" selected → `createShoppingList(name)` first (trimmed name)
 - Items are inserted via a bulk helper `createShoppingItems(listId, names)` in `db/shoppingLists.ts` (inserts all rows, touches the list's `updated_at` **once**) — added as **unchecked**, appended after the list's existing items, `quantity = NULL`
 - **Duplicates are allowed** — no merging with items already on the list (same philosophy as import, §5.8: no magic)
-- The modal closes back to the recipe view; a brief confirmation Alert offers **"View list"** (→ `/shopping/[id]`) / **OK**
+- The modal closes back to the recipe view; a snackbar confirms the add and offers a **"View list"** action (→ `/shopping/[id]`)
 
-**i18n:** all new strings (button, modal title, section headers, select-all toggle, confirm button with count — using the existing plural rules for Polish, confirmation Alert) get EN+PL entries in `i18n/dictionary.ts` (§5.11).
+**i18n:** all new strings (button, modal title, section headers, select-all toggle, confirm button with count — using the existing plural rules for Polish, snackbar confirmation) get EN+PL entries in `i18n/dictionary.ts` (§5.11).
 
 **Testing:** the parser and any candidate-selection logic are pure and live in `utils/` → unit tests in `__tests__/` (TDD pipeline per CLAUDE.md); the modal UI is verified by running the app.
 
@@ -572,12 +577,13 @@ All tokens live in `constants/theme.ts`. Components do not use hardcoded color, 
 | Token | Value | Usage |
 |---|---|---|
 | `primary` | `#C84B31` | Actions, CTA buttons, accents |
+| `onPrimary` | `#FFFFFF` | Text/icons on primary surfaces |
 | `background` | `#FAFAF7` | Screen backgrounds |
 | `surface` | `#FFFFFF` | Cards, inputs |
 | `surfaceAlt` | `#F5F3EE` | Tabs, note boxes |
 | `text` | `#1A1714` | Primary text |
 | `textSecondary` | `#6B6560` | Labels, section headings |
-| `textMuted` | `#A09890` | Placeholders, metadata, "No results" |
+| `textMuted` | `#756C65` | Placeholders, metadata, "No results" — darkened to meet WCAG AA (4.5:1) on `background` |
 | `border` | `#E8E4DE` | Borders |
 
 ### Design philosophy
@@ -597,15 +603,38 @@ A warm, appetizing palette evoking the kitchen — paper, wood, ceramics. Not st
 | Token | Value | Notes |
 |---|---|---|
 | `primary` | `#E06A4F` | Lightened primary for contrast on a dark background |
+| `onPrimary` | `#1C1814` | Dark text on the lightened primary (better contrast than white) |
 | `background` | `#1C1814` | Warm dark base (not #000) |
 | `surface` | `#262019` | Cards, inputs |
 | `surfaceAlt` | `#2F2820` | Tabs, note boxes |
 | `text` | `#F0EBE4` | Primary text |
 | `textSecondary` | `#A89F95` | Labels, section headings |
-| `textMuted` | `#7A716A` | Placeholders, metadata, "No results" |
+| `textMuted` | `#948A82` | Placeholders, metadata, "No results" — lightened to meet WCAG AA (4.5:1) on `background` |
 | `border` | `#3A322A` | Borders |
 
 Values to be verified on a device for contrast (target: WCAG AA for text). Photos and covers unchanged; the dark overlay on cookbook covers (§5.1) works in both modes.
+
+### Base UI components and interaction patterns (June 2026 redesign)
+
+Shared presentational components live in `components/ui/`: `ScreenHeader` (custom header with safe-area top inset and back button), `ModalHeader` (title + close for modals), `IconButton` (44pt round pressable, **requires** `accessibilityLabel`), `Button` (primary/secondary/destructive pill with loading spinner), `Input` (themed `TextInput`), `EmptyState` (icon + copy + optional action button). Native stack headers are disabled globally in `app/_layout.tsx` — every screen renders its own header.
+
+Interaction rules:
+- `Pressable` with a visible pressed state everywhere (no bare `TouchableOpacity`); touch targets ≥ 44pt, shopping-list rows ≥ 56pt (`Touch` tokens in `theme.ts`).
+- Safe areas via `react-native-safe-area-context` only (the deprecated RN `SafeAreaView` is not used).
+- The recipe view keeps the screen awake (`expo-keep-awake`) and renders ingredients/steps at ≥ 18pt (`Typography.size.reading`).
+- Checking off a shopping item gives light haptic feedback (`utils/haptics.ts`) and animates via `LayoutAnimation` (`utils/motion.ts`), which is suppressed when the system reduce-motion setting is on.
+- Images render through `expo-image` (fade-in transition, cover-fit); cookbook tiles get a bottom gradient scrim (`expo-linear-gradient`) so the white name stays readable on any photo.
+- Animation durations come from `Motion` in `theme.ts` (150–250ms).
+- Text on `primary`/`error` surfaces uses the `onPrimary` token, never hardcoded white.
+
+Editing & deleting (June 2026 iteration):
+- **Deletes go through a 5-second Undo snackbar** — the actual DB mutation (and image cleanup) is deferred in `utils/pendingDelete.ts` until the snackbar expires; screens hide pending objects and re-render via its subscription API. **Recipes and cookbooks additionally get a confirmation Alert first** (deliberate speed bump, user-requested); shopping lists and items rely on undo alone. "Delete all data" (Settings) keeps its double `Alert` confirmation. Avoid `LayoutAnimation` in the same frame a snackbar mounts — `configureNext` is global and makes the bar flicker.
+- **Context menus are a themed bottom `ActionSheet`** (`components/ui/ActionSheet.tsx`), not `Alert.alert`: long-press on cookbook tiles / list cards / shopping items, "⋯" header menus in the cookbook and shopping-list views, the photo-source picker in forms, and the language picker in Settings. If the project ever moves to a development build, this is the single component to swap for native context menus (Zeego).
+- **Swipe-left reveals Edit/Delete** (`components/ui/SwipeableRow.tsx`, gesture-handler + Reanimated) on shopping items, shopping list cards and recipe cards; long-press menus remain as the discoverable alternative.
+- **Shopping list rename is inline** — tap the title on the list screen (also reachable via `?rename=1` from the lists tab). The `shopping/edit` modal route was removed.
+- **Form validation is inline** (error text under the field) instead of Alerts; "Added to list" feedback is a snackbar with a "View list" action. `Alert` remains only for: discard-changes, permissions, import/export dialogs and delete-all.
+
+Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 
 ---
 

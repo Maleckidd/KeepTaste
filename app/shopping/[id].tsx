@@ -1,25 +1,26 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   Pressable,
   TextInput,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getShoppingListById,
   getItemsForList,
   createShoppingItem,
   updateShoppingItem,
+  updateShoppingListName,
   setItemChecked,
   deleteShoppingItem,
+  deleteShoppingList,
 } from '@/db/shoppingLists';
 import {
   partitionItems,
@@ -27,13 +28,27 @@ import {
   validateItemName,
 } from '@/utils/shoppingList';
 import {
+  pendingDeleteKey,
+  filterPendingDeletes,
+  subscribePendingDeletes,
+} from '@/utils/pendingDelete';
+import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { lightTap } from '@/utils/haptics';
+import { animateLayout } from '@/utils/motion';
+import {
   useTheme,
   ThemePalette,
   Typography,
   Spacing,
-  Radius,
+  Touch,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import EmptyState from '@/components/ui/EmptyState';
+import IconButton from '@/components/ui/IconButton';
+import Input from '@/components/ui/Input';
+import Fab from '@/components/ui/Fab';
+import ActionSheet from '@/components/ui/ActionSheet';
+import SwipeableRow from '@/components/ui/SwipeableRow';
 import type { ShoppingList, ShoppingItem } from '@/db/schema';
 
 type Row =
@@ -41,13 +56,15 @@ type Row =
   | { kind: 'header'; key: string };
 
 export default function ShoppingListScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, rename } = useLocalSearchParams<{ id: string; rename?: string }>();
   const listId = Number(id);
   const router = useRouter();
   const c = useTheme();
   const t = useT();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(c), [c]);
   const nameInputRef = useRef<TextInput>(null);
+  const titleInputRef = useRef<TextInput>(null);
 
   const [list, setList] = useState<ShoppingList | null>(null);
   const [items, setItems] = useState<ShoppingItem[]>([]);
@@ -56,6 +73,12 @@ export default function ShoppingListScreen() {
   const [quantity, setQuantity] = useState('');
   // Non-null while the inline row edits an existing item instead of adding.
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null);
+  const [listMenuOpen, setListMenuOpen] = useState(false);
+  // Inline title rename (replaces the old "Rename list" modal).
+  const [renaming, setRenaming] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const showUndoDelete = useUndoDelete();
 
   const loadData = useCallback(async () => {
     const [l, data] = await Promise.all([
@@ -63,7 +86,7 @@ export default function ShoppingListScreen() {
       getItemsForList(listId),
     ]);
     setList(l ?? null);
-    setItems(data);
+    setItems(filterPendingDeletes(data, 'shoppingItem', (item) => item.id));
   }, [listId]);
 
   useFocusEffect(
@@ -72,25 +95,60 @@ export default function ShoppingListScreen() {
     }, [loadData])
   );
 
-  const handleToggle = async (item: ShoppingItem) => {
-    await setItemChecked(item.id, !item.checked);
+  useEffect(() => subscribePendingDeletes(loadData), [loadData]);
+
+  // Entering via "Rename" on the lists screen opens the title editor directly.
+  useEffect(() => {
+    if (rename === '1' && list && !renaming) startRename(list.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rename, list?.id]);
+
+  const startRename = (currentName: string) => {
+    setTitleDraft(currentName);
+    setRenaming(true);
+    requestAnimationFrame(() => titleInputRef.current?.focus());
+  };
+
+  const commitRename = async () => {
+    const trimmed = titleDraft.trim();
+    setRenaming(false);
+    // Empty input cancels the rename instead of saving a blank name.
+    if (!trimmed || !list || trimmed === list.name) return;
+    await updateShoppingListName(listId, trimmed);
     loadData();
   };
 
+  const handleToggle = async (item: ShoppingItem) => {
+    lightTap();
+    await setItemChecked(item.id, !item.checked);
+    // Animate the row sliding between the active and "in cart" sections.
+    animateLayout();
+    loadData();
+  };
+
+  // No animateLayout() here: LayoutAnimation.configureNext is global and
+  // would also catch the snackbar mounting in the same frame, making it
+  // flicker or not appear at all.
+  const handleDeleteItem = (item: ShoppingItem) => {
+    if (editingItemId === item.id) closeRow();
+    showUndoDelete(pendingDeleteKey('shoppingItem', item.id), item.name, () =>
+      deleteShoppingItem(item.id)
+    );
+  };
+
+  const handleDeleteList = () => {
+    if (!list) return;
+    showUndoDelete(
+      pendingDeleteKey('shoppingList', list.id),
+      list.name,
+      () => deleteShoppingList(list.id)
+    );
+    router.back();
+  };
+
   const handleItemLongPress = (item: ShoppingItem) => {
-    Alert.alert(item.name, t('common.whatToDo'), [
-      { text: t('common.edit'), onPress: () => openEdit(item) },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          await deleteShoppingItem(item.id);
-          if (editingItemId === item.id) closeRow();
-          loadData();
-        },
-      },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+    lightTap();
+    setMenuItem(item);
   };
 
   const handleConfirm = async () => {
@@ -105,6 +163,7 @@ export default function ShoppingListScreen() {
       setQuantity('');
       nameInputRef.current?.focus();
     }
+    animateLayout();
     loadData();
   };
 
@@ -144,35 +203,42 @@ export default function ShoppingListScreen() {
   const renderItem = (item: ShoppingItem) => {
     const isChecked = !!item.checked;
     return (
-      <TouchableOpacity
-        style={styles.row}
-        activeOpacity={0.7}
-        onPress={() => handleToggle(item)}
-        onLongPress={() => handleItemLongPress(item)}
+      <SwipeableRow
+        onEdit={() => openEdit(item)}
+        onDelete={() => handleDeleteItem(item)}
       >
-        <View style={styles.rowBody}>
-          <Text
-            style={[styles.itemName, isChecked && styles.itemNameChecked]}
-            numberOfLines={2}
-          >
-            {item.name}
-          </Text>
-          {item.quantity ? (
-            <Text style={styles.itemQty}>{item.quantity}</Text>
-          ) : null}
-        </View>
         <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => handleToggle(item)}
-          hitSlop={8}
-          style={styles.checkbox}
+          onLongPress={() => handleItemLongPress(item)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: isChecked }}
+          accessibilityLabel={
+            item.quantity ? `${item.name}, ${item.quantity}` : item.name
+          }
         >
+          <View style={styles.rowBody}>
+            <Text
+              style={[styles.itemName, isChecked && styles.itemNameChecked]}
+              numberOfLines={2}
+            >
+              {item.name}
+            </Text>
+            {item.quantity ? (
+              <Text
+                style={[styles.itemQty, isChecked && styles.itemNameChecked]}
+              >
+                {item.quantity}
+              </Text>
+            ) : null}
+          </View>
           <Ionicons
             name={isChecked ? 'checkmark-circle' : 'ellipse-outline'}
-            size={26}
+            size={28}
             color={isChecked ? c.primary : c.textMuted}
           />
         </Pressable>
-      </TouchableOpacity>
+      </SwipeableRow>
     );
   };
 
@@ -181,37 +247,54 @@ export default function ShoppingListScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {list?.name ?? ''}
-        </Text>
-        {items.length > 0 ? (
-          <TouchableOpacity
-            onPress={() => (addOpen ? closeRow() : openAdd())}
-            style={styles.iconButton}
-          >
-            <Ionicons name="add" size={26} color={c.primary} />
-          </TouchableOpacity>
+      {/* Header with inline-renamable title */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <IconButton
+          icon="arrow-back"
+          accessibilityLabel={t('a11y.back')}
+          onPress={() => router.back()}
+        />
+        {renaming ? (
+          <Input
+            ref={titleInputRef}
+            style={styles.titleInput}
+            value={titleDraft}
+            onChangeText={setTitleDraft}
+            onSubmitEditing={commitRename}
+            onBlur={commitRename}
+            returnKeyType="done"
+            selectTextOnFocus
+            accessibilityLabel={t('shopping.rename')}
+          />
         ) : (
-          <View style={styles.iconButton} />
+          <Pressable
+            style={styles.titleWrap}
+            onPress={() => list && startRename(list.name)}
+            accessibilityRole="button"
+            accessibilityLabel={list?.name ?? ''}
+            accessibilityHint={t('shopping.rename')}
+          >
+            <Text style={styles.title} numberOfLines={1}>
+              {list?.name ?? ''}
+            </Text>
+            <Ionicons name="pencil-outline" size={14} color={c.textMuted} />
+          </Pressable>
         )}
+        <IconButton
+          icon="ellipsis-horizontal"
+          accessibilityLabel={t('a11y.moreActions')}
+          onPress={() => setListMenuOpen(true)}
+        />
       </View>
 
       {items.length === 0 && !addOpen ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="cart-outline" size={48} color={c.border} />
-          <Text style={styles.emptyTitle}>{t('shoppingList.emptyTitle')}</Text>
-          <Text style={styles.emptyText}>{t('shoppingList.emptyText')}</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={openAdd}>
-            <Text style={styles.primaryButtonText}>
-              {t('shoppingList.addProduct')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon="cart-outline"
+          title={t('shoppingList.emptyTitle')}
+          text={t('shoppingList.emptyText')}
+          actionLabel={t('shoppingList.addProduct')}
+          onAction={openAdd}
+        />
       ) : (
         <FlatList
           data={rows}
@@ -220,21 +303,32 @@ export default function ShoppingListScreen() {
           }
           renderItem={({ item: row }) =>
             row.kind === 'header' ? (
-              <Text style={styles.sectionHeader}>{t('shoppingList.inCartHeader')}</Text>
+              <Text style={styles.sectionHeader} accessibilityRole="header">
+                {t('shoppingList.inCartHeader')}
+              </Text>
             ) : (
               renderItem(row.item)
             )
           }
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            // Keep the last rows reachable above the FAB.
+            { paddingBottom: Spacing.xxxl + Touch.list + insets.bottom },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         />
       )}
 
-      {/* Inline add row */}
+      {/* Inline add/edit row — pinned to the bottom, in thumb range */}
       {addOpen ? (
-        <View style={styles.addRow}>
-          <TextInput
+        <View
+          style={[
+            styles.addRow,
+            { paddingBottom: Spacing.md + insets.bottom },
+          ]}
+        >
+          <Input
             ref={nameInputRef}
             style={styles.addNameInput}
             placeholder={
@@ -242,30 +336,83 @@ export default function ShoppingListScreen() {
                 ? t('shoppingList.productNamePlaceholder')
                 : t('shoppingList.addProductPlaceholder')
             }
-            placeholderTextColor={c.textMuted}
             value={name}
             onChangeText={setName}
             returnKeyType="done"
             onSubmitEditing={handleConfirm}
           />
-          <TextInput
+          <Input
             style={styles.addQtyInput}
             placeholder={t('shoppingList.qtyPlaceholder')}
-            placeholderTextColor={c.textMuted}
             value={quantity}
             onChangeText={setQuantity}
             returnKeyType="done"
             onSubmitEditing={handleConfirm}
           />
-          <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
-            <Ionicons
-              name={editingItemId !== null ? 'checkmark' : 'add'}
-              size={24}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
+          <IconButton
+            icon={editingItemId !== null ? 'checkmark' : 'add'}
+            size={24}
+            color={c.onPrimary}
+            accessibilityLabel={t('a11y.confirmProduct')}
+            onPress={handleConfirm}
+            style={styles.confirmButton}
+          />
+          <IconButton
+            icon="close"
+            size={22}
+            color={c.textSecondary}
+            accessibilityLabel={t('a11y.close')}
+            onPress={closeRow}
+          />
         </View>
+      ) : items.length > 0 ? (
+        // FAB — the primary "add product" action stays in the thumb zone.
+        <Fab accessibilityLabel={t('a11y.addProduct')} onPress={openAdd} />
       ) : null}
+
+      {/* Item context menu (long-press) */}
+      <ActionSheet
+        visible={menuItem !== null}
+        title={menuItem?.name}
+        onClose={() => setMenuItem(null)}
+        actions={
+          menuItem
+            ? [
+                {
+                  label: t('common.edit'),
+                  icon: 'create-outline',
+                  onPress: () => openEdit(menuItem),
+                },
+                {
+                  label: t('common.delete'),
+                  icon: 'trash-outline',
+                  destructive: true,
+                  onPress: () => handleDeleteItem(menuItem),
+                },
+              ]
+            : []
+        }
+      />
+
+      {/* List menu ("…" in the header) */}
+      <ActionSheet
+        visible={listMenuOpen}
+        title={list?.name}
+        onClose={() => setListMenuOpen(false)}
+        actions={[
+          {
+            label: t('shopping.rename'),
+            icon: 'create-outline',
+            onPress: () => list && startRename(list.name),
+          },
+          {
+            label: t('shopping.deleteList'),
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: handleDeleteList,
+          },
+        ]}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -279,39 +426,44 @@ const makeStyles = (c: ThemePalette) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: Spacing.base,
-      paddingTop: Spacing.xxl,
-      paddingBottom: Spacing.md,
-      gap: Spacing.sm,
+      paddingHorizontal: Spacing.md,
+      paddingBottom: Spacing.sm,
+      gap: Spacing.xs,
     },
-    backButton: {
-      padding: Spacing.xs,
+    titleWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      minHeight: Touch.min,
     },
     title: {
-      flex: 1,
+      flexShrink: 1,
       fontSize: Typography.size.xl,
       fontWeight: Typography.weight.bold,
       color: c.text,
       letterSpacing: -0.3,
     },
-    iconButton: {
-      padding: Spacing.xs,
-      width: 40,
-      height: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
+    titleInput: {
+      flex: 1,
+      fontSize: Typography.size.lg,
+      fontWeight: Typography.weight.semibold,
     },
     list: {
       paddingHorizontal: Spacing.base,
-      paddingBottom: Spacing.xxxl,
     },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: Spacing.md,
+      minHeight: Touch.list,
+      paddingVertical: Spacing.sm,
       gap: Spacing.md,
       borderBottomWidth: 1,
       borderBottomColor: c.border,
+      backgroundColor: c.background,
+    },
+    rowPressed: {
+      backgroundColor: c.surfaceAlt,
     },
     rowBody: {
       flex: 1,
@@ -320,7 +472,7 @@ const makeStyles = (c: ThemePalette) =>
       gap: Spacing.sm,
     },
     itemName: {
-      fontSize: Typography.size.base,
+      fontSize: Typography.size.md,
       color: c.text,
       flexShrink: 1,
     },
@@ -330,10 +482,7 @@ const makeStyles = (c: ThemePalette) =>
     },
     itemQty: {
       fontSize: Typography.size.sm,
-      color: c.textMuted,
-    },
-    checkbox: {
-      padding: Spacing.xs,
+      color: c.textSecondary,
     },
     sectionHeader: {
       fontSize: Typography.size.sm,
@@ -344,42 +493,12 @@ const makeStyles = (c: ThemePalette) =>
       marginTop: Spacing.lg,
       marginBottom: Spacing.xs,
     },
-    emptyState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: Spacing.xxxl,
-      gap: Spacing.md,
-    },
-    emptyTitle: {
-      fontSize: Typography.size.lg,
-      fontWeight: Typography.weight.semibold,
-      color: c.textSecondary,
-    },
-    emptyText: {
-      fontSize: Typography.size.base,
-      color: c.textMuted,
-      textAlign: 'center',
-      lineHeight: Typography.size.base * 1.5,
-    },
-    primaryButton: {
-      backgroundColor: c.primary,
-      paddingHorizontal: Spacing.xl,
-      paddingVertical: Spacing.md,
-      borderRadius: Radius.full,
-      marginTop: Spacing.sm,
-    },
-    primaryButtonText: {
-      fontSize: Typography.size.base,
-      fontWeight: Typography.weight.semibold,
-      color: '#FFFFFF',
-    },
     addRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: Spacing.sm,
       paddingHorizontal: Spacing.base,
-      paddingVertical: Spacing.md,
+      paddingTop: Spacing.md,
       borderTopWidth: 1,
       borderTopColor: c.border,
       backgroundColor: c.surface,
@@ -387,27 +506,15 @@ const makeStyles = (c: ThemePalette) =>
     addNameInput: {
       flex: 1,
       backgroundColor: c.surfaceAlt,
-      borderRadius: Radius.md,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
-      fontSize: Typography.size.base,
-      color: c.text,
+      borderWidth: 0,
     },
     addQtyInput: {
       width: 72,
       backgroundColor: c.surfaceAlt,
-      borderRadius: Radius.md,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
+      borderWidth: 0,
       fontSize: Typography.size.sm,
-      color: c.text,
     },
     confirmButton: {
-      width: 40,
-      height: 40,
-      borderRadius: Radius.full,
       backgroundColor: c.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
   });

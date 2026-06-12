@@ -1,18 +1,19 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  Image,
-} from 'react-native';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCookbooks, deleteCookbook } from '@/db/cookbooks';
 import { deleteStoredImage } from '@/utils/imageStorage';
+import {
+  pendingDeleteKey,
+  filterPendingDeletes,
+  subscribePendingDeletes,
+} from '@/utils/pendingDelete';
+import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { lightTap } from '@/utils/haptics';
 import {
   useTheme,
   ThemePalette,
@@ -20,8 +21,13 @@ import {
   Spacing,
   Radius,
   Shadow,
+  Motion,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import IconButton from '@/components/ui/IconButton';
+import EmptyState from '@/components/ui/EmptyState';
+import Fab from '@/components/ui/Fab';
+import ActionSheet from '@/components/ui/ActionSheet';
 import type { Cookbook } from '@/db/schema';
 
 function CookbookTile({
@@ -41,28 +47,38 @@ function CookbookTile({
   const tileColor = tileColors[index % tileColors.length];
 
   return (
-    <TouchableOpacity
-      style={[styles.tile, { backgroundColor: tileColor }]}
+    <Pressable
+      style={({ pressed }) => [
+        styles.tile,
+        { backgroundColor: tileColor },
+        pressed && styles.tilePressed,
+      ]}
       onPress={onPress}
       onLongPress={onLongPress}
-      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={item.name}
     >
       {item.coverImagePath ? (
         <Image
           source={{ uri: item.coverImagePath }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={Motion.duration.base}
         />
       ) : null}
+      {/* Scrim keeps the white name readable on any cover photo */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.55)']}
+        locations={[0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.tileOverlay}>
-        <View style={styles.tileIcon}>
-          <Ionicons name="book-outline" size={22} color="rgba(255,255,255,0.8)" />
-        </View>
+        <Ionicons name="book-outline" size={22} color="rgba(255,255,255,0.85)" />
         <Text style={styles.tileName} numberOfLines={2}>
           {item.name}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -72,10 +88,12 @@ export default function HomeScreen() {
   const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [cookbooks, setCookbooks] = useState<Cookbook[]>([]);
+  const [menuCookbook, setMenuCookbook] = useState<Cookbook | null>(null);
+  const showUndoDelete = useUndoDelete();
 
   const loadCookbooks = useCallback(async () => {
     const data = await getCookbooks();
-    setCookbooks(data);
+    setCookbooks(filterPendingDeletes(data, 'cookbook', (cb) => cb.id));
   }, []);
 
   // Reload when the screen regains focus
@@ -83,6 +101,12 @@ export default function HomeScreen() {
     useCallback(() => {
       loadCookbooks();
     }, [loadCookbooks])
+  );
+
+  // Re-render when a pending delete is scheduled, undone or committed.
+  useEffect(
+    () => subscribePendingDeletes(loadCookbooks),
+    [loadCookbooks]
   );
 
   const handleAddCookbook = () => {
@@ -93,42 +117,35 @@ export default function HomeScreen() {
     router.push('/cookbook/all');
   };
 
+  // Confirmation first (deliberate speed bump for cookbooks), then the
+  // delete still goes through the undo snackbar before committing.
+  // Recipes are not touched until commit (and survive it under "All recipes").
   const handleDeleteCookbook = (cookbook: Cookbook) => {
     Alert.alert(
-      t('home.deleteTitle', { name: cookbook.name }),
-      t('home.deleteMessage'),
+      t('confirm.deleteCookbook', { name: cookbook.name }),
+      t('confirm.deleteCookbookMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.delete'),
           style: 'destructive',
-          onPress: async () => {
-            await deleteCookbook(cookbook.id);
-            await deleteStoredImage(cookbook.coverImagePath);
-            loadCookbooks();
-          },
+          onPress: () =>
+            showUndoDelete(
+              pendingDeleteKey('cookbook', cookbook.id),
+              cookbook.name,
+              async () => {
+                await deleteCookbook(cookbook.id);
+                await deleteStoredImage(cookbook.coverImagePath);
+              }
+            ),
         },
       ]
     );
   };
 
   const handleCookbookLongPress = (cookbook: Cookbook) => {
-    Alert.alert(
-      cookbook.name,
-      t('common.whatToDo'),
-      [
-        {
-          text: t('common.edit'),
-          onPress: () => router.push(`/cookbook/edit?id=${cookbook.id}`),
-        },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => handleDeleteCookbook(cookbook),
-        },
-        { text: t('common.cancel'), style: 'cancel' },
-      ]
-    );
+    lightTap();
+    setMenuCookbook(cookbook);
   };
 
   const renderItem = ({ item, index }: { item: Cookbook; index: number }) => (
@@ -141,56 +158,91 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSub}>{t('home.brand')}</Text>
-          <Text style={styles.headerTitle}>{t('home.title')}</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push('/settings')}
-          >
-            <Ionicons name="settings-outline" size={22} color={c.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddCookbook}>
-            <Ionicons name="add" size={26} color={c.primary} />
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.headerTitle} accessibilityRole="header">
+          {t('home.title')}
+        </Text>
+        <IconButton
+          icon="settings-outline"
+          accessibilityLabel={t('a11y.settings')}
+          color={c.primary}
+          raised
+          onPress={() => router.push('/settings')}
+        />
       </View>
 
       {/* "All recipes" tile */}
-      <TouchableOpacity style={styles.allRecipesTile} onPress={handleOpenAllRecipes}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.allRecipesTile,
+          pressed && { backgroundColor: c.surfaceAlt },
+        ]}
+        onPress={handleOpenAllRecipes}
+        accessibilityRole="button"
+        accessibilityLabel={t('home.allRecipes')}
+      >
         <Ionicons name="search-outline" size={18} color={c.textSecondary} />
         <Text style={styles.allRecipesText}>{t('home.allRecipes')}</Text>
         <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-      </TouchableOpacity>
+      </Pressable>
 
       {/* Cookbook grid */}
       {cookbooks.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="book-outline" size={56} color={c.border} />
-          <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
-          <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={cookbooks}
-          renderItem={renderItem}
-          keyExtractor={(item) => String(item.id)}
-          numColumns={2}
-          contentContainerStyle={styles.grid}
-          columnWrapperStyle={styles.row}
-          showsVerticalScrollIndicator={false}
+        <EmptyState
+          icon="book-outline"
+          title={t('home.emptyTitle')}
+          text={t('home.emptyText')}
+          actionLabel={t('home.emptyAction')}
+          onAction={handleAddCookbook}
         />
+      ) : (
+        <>
+          <FlatList
+            data={cookbooks}
+            renderItem={renderItem}
+            keyExtractor={(item) => String(item.id)}
+            numColumns={2}
+            contentContainerStyle={styles.grid}
+            columnWrapperStyle={styles.row}
+            showsVerticalScrollIndicator={false}
+          />
+          {/* Tab bar already sits below — no extra bottom inset needed */}
+          <Fab
+            accessibilityLabel={t('a11y.addCookbook')}
+            onPress={handleAddCookbook}
+            withBottomInset={false}
+          />
+        </>
       )}
+
+      <ActionSheet
+        visible={menuCookbook !== null}
+        title={menuCookbook?.name}
+        onClose={() => setMenuCookbook(null)}
+        actions={
+          menuCookbook
+            ? [
+                {
+                  label: t('common.edit'),
+                  icon: 'create-outline',
+                  onPress: () =>
+                    router.push(`/cookbook/edit?id=${menuCookbook.id}`),
+                },
+                {
+                  label: t('common.delete'),
+                  icon: 'trash-outline',
+                  destructive: true,
+                  onPress: () => handleDeleteCookbook(menuCookbook),
+                },
+              ]
+            : []
+        }
+      />
     </SafeAreaView>
   );
 }
-
-const TILE_SIZE = 160;
 
 const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
@@ -202,35 +254,14 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.xl,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.base,
-  },
-  headerSub: {
-    fontSize: Typography.size.sm,
-    color: c.textMuted,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 2,
   },
   headerTitle: {
     fontSize: Typography.size.xxl,
     fontWeight: Typography.weight.bold,
     color: c.text,
     letterSpacing: -0.5,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.full,
-    backgroundColor: c.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadow.sm,
   },
   allRecipesTile: {
     flexDirection: 'row',
@@ -240,6 +271,7 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     marginBottom: Spacing.base,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
+    minHeight: 48,
     backgroundColor: c.surface,
     borderRadius: Radius.md,
     borderWidth: 1,
@@ -252,50 +284,36 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   grid: {
     paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing.xxxl,
+    // Clears the floating action button.
+    paddingBottom: Spacing.xxxl * 2,
   },
   row: {
     gap: Spacing.md,
     marginBottom: Spacing.md,
   },
   tile: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
+    flex: 1,
+    // Keeps a lone tile in the last row at half width instead of stretching.
+    maxWidth: '48.4%',
+    aspectRatio: 1,
     borderRadius: Radius.lg,
     overflow: 'hidden',
     ...Shadow.md,
+  },
+  tilePressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   tileOverlay: {
     flex: 1,
     padding: Spacing.base,
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  tileIcon: {
-    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
   },
   tileName: {
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.semibold,
     color: '#FFFFFF',
     letterSpacing: -0.2,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xxxl,
-    gap: Spacing.md,
-  },
-  emptyTitle: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.semibold,
-    color: c.textSecondary,
-  },
-  emptyText: {
-    fontSize: Typography.size.base,
-    color: c.textMuted,
-    textAlign: 'center',
-    lineHeight: Typography.size.base * 1.5,
   },
 });

@@ -66,9 +66,11 @@ export async function getItemsForList(listId: number): Promise<ShoppingItem[]> {
     .select()
     .from(shoppingItems)
     .where(eq(shoppingItems.listId, listId));
-  // Order active (checked 0) before in-cart (checked 1), then by id.
+  // Order active (checked 0) before in-cart (checked 1); within each group
+  // newest first, so a just-added product appears at the top of the list
+  // instead of below the fold.
   return [...rows].sort(
-    (a, b) => a.checked - b.checked || a.id - b.id
+    (a, b) => a.checked - b.checked || b.id - a.id
   );
 }
 

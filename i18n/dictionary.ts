@@ -24,10 +24,6 @@ export const dictionary = {
   },
   'common.keepEditing': { en: 'Keep editing', pl: 'Kontynuuj edycję' },
   'common.discard': { en: 'Discard', pl: 'Odrzuć' },
-  'common.whatToDo': {
-    en: 'What would you like to do?',
-    pl: 'Co chcesz zrobić?',
-  },
   'common.gallery': { en: 'Gallery', pl: 'Galeria' },
   'common.camera': { en: 'Camera', pl: 'Aparat' },
   'common.removePhoto': { en: 'Remove photo', pl: 'Usuń zdjęcie' },
@@ -44,6 +40,25 @@ export const dictionary = {
     pl: 'Aplikacja potrzebuje dostępu do aparatu.',
   },
 
+  // --- Undo snackbar ---
+  'undo.deleted': { en: 'Deleted "{name}"', pl: 'Usunięto „{name}”' },
+  'undo.action': { en: 'Undo', pl: 'Cofnij' },
+
+  // --- Accessibility labels (icon-only controls) ---
+  'a11y.moreActions': { en: 'More options', pl: 'Więcej opcji' },
+  'a11y.back': { en: 'Go back', pl: 'Wstecz' },
+  'a11y.close': { en: 'Close', pl: 'Zamknij' },
+  'a11y.settings': { en: 'Settings', pl: 'Ustawienia' },
+  'a11y.addCookbook': { en: 'Add cookbook', pl: 'Dodaj książkę kucharską' },
+  'a11y.addRecipe': { en: 'Add recipe', pl: 'Dodaj przepis' },
+  'a11y.addList': { en: 'New shopping list', pl: 'Nowa lista zakupów' },
+  'a11y.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
+  'a11y.shareRecipe': { en: 'Share recipe', pl: 'Udostępnij przepis' },
+  'a11y.shareCookbook': { en: 'Share cookbook', pl: 'Udostępnij książkę' },
+  'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
+  'a11y.recipePhoto': { en: 'Recipe photo', pl: 'Zdjęcie przepisu' },
+  'a11y.changePhoto': { en: 'Add or change photo', pl: 'Dodaj lub zmień zdjęcie' },
+
   // --- Tabs ---
   'tabs.recipes': { en: 'Recipes', pl: 'Przepisy' },
   'tabs.shopping': { en: 'Shopping', pl: 'Zakupy' },
@@ -58,7 +73,6 @@ export const dictionary = {
     en: 'New shopping list',
     pl: 'Nowa lista zakupów',
   },
-  'stack.renameList': { en: 'Rename list', pl: 'Zmień nazwę listy' },
   'stack.addToList': {
     en: 'Add to shopping list',
     pl: 'Dodaj do listy zakupów',
@@ -70,18 +84,18 @@ export const dictionary = {
   },
 
   // --- Home / cookbooks list (app/(tabs)/index.tsx) ---
-  'home.brand': { en: 'KeepTaste', pl: 'KeepTaste' },
-  'home.title': { en: 'Cookbooks', pl: 'Książki kucharskie' },
+  // The home header carries the brand; the "Recipes" tab label below already
+  // names the screen's function. App name stays untranslated.
+  'home.title': { en: 'KeepTaste', pl: 'KeepTaste' },
   'home.allRecipes': { en: 'All recipes', pl: 'Wszystkie przepisy' },
   'home.emptyTitle': { en: 'No cookbooks', pl: 'Brak książek kucharskich' },
   'home.emptyText': {
-    en: 'Tap + to create your first cookbook',
-    pl: 'Naciśnij +, aby stworzyć pierwszą książkę kucharską',
+    en: 'Create your first cookbook and start collecting recipes',
+    pl: 'Stwórz pierwszą książkę kucharską i zacznij zbierać przepisy',
   },
-  'home.deleteTitle': { en: 'Delete "{name}"?', pl: 'Usunąć „{name}”?' },
-  'home.deleteMessage': {
-    en: "Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'.",
-    pl: 'Przepisy z tej książki nie zostaną usunięte — znajdziesz je w „Wszystkie przepisy”.',
+  'home.emptyAction': {
+    en: 'Create a cookbook',
+    pl: 'Stwórz książkę kucharską',
   },
 
   // --- Cookbook / recipes grid (app/cookbook/[id].tsx) ---
@@ -91,9 +105,10 @@ export const dictionary = {
   },
   'cookbook.noResults': { en: 'No results', pl: 'Brak wyników' },
   'cookbook.emptyRecipes': {
-    en: 'No recipes. Tap + to add your first one.',
-    pl: 'Brak przepisów. Naciśnij +, aby dodać pierwszy.',
+    en: 'No recipes here yet — add your first one.',
+    pl: 'Nie ma tu jeszcze przepisów — dodaj pierwszy.',
   },
+  'cookbook.emptyAction': { en: 'Add recipe', pl: 'Dodaj przepis' },
   'cookbook.exportFailedTitle': { en: 'Export failed', pl: 'Eksport nieudany' },
   'cookbook.exportFailedMessage': {
     en: 'Could not export the cookbook.',
@@ -107,11 +122,6 @@ export const dictionary = {
   'cookbook.servings': { en: '{count} servings', pl: '{count} porcji' },
 
   // --- Recipe view (app/recipe/[id].tsx) ---
-  'recipe.deleteTitle': { en: 'Delete recipe', pl: 'Usuń przepis' },
-  'recipe.deleteMessage': {
-    en: 'Are you sure you want to delete "{title}"?',
-    pl: 'Czy na pewno chcesz usunąć „{title}”?',
-  },
   'recipe.prep': { en: 'Prep', pl: 'Przygotowanie' },
   'recipe.cook': { en: 'Cook', pl: 'Gotowanie' },
   'recipe.total': { en: 'Total', pl: 'Razem' },
@@ -155,7 +165,6 @@ export const dictionary = {
     en: 'Add {count} products',
     pl: 'Dodaj {count} produktów',
   },
-  'addToList.addedTitle': { en: 'Added to list', pl: 'Dodano do listy' },
   'addToList.added.one': {
     en: 'Added {count} product to "{name}".',
     pl: 'Dodano {count} produkt do „{name}”.',
@@ -169,15 +178,9 @@ export const dictionary = {
     pl: 'Dodano {count} produktów do „{name}”.',
   },
   'addToList.viewList': { en: 'View list', pl: 'Zobacz listę' },
-  'addToList.ok': { en: 'OK', pl: 'OK' },
 
   // --- Recipe form (components/recipe/RecipeForm.tsx) ---
   'recipeForm.photoTitle': { en: 'Photo', pl: 'Zdjęcie' },
-  'recipeForm.photoMessage': {
-    en: 'Where would you like to add a photo from?',
-    pl: 'Skąd chcesz dodać zdjęcie?',
-  },
-  'recipeForm.missingTitle': { en: 'Missing title', pl: 'Brak tytułu' },
   'recipeForm.missingTitleMessage': {
     en: 'Please enter a recipe title.',
     pl: 'Wpisz tytuł przepisu.',
@@ -220,11 +223,6 @@ export const dictionary = {
 
   // --- Cookbook form (components/cookbook/CookbookForm.tsx) ---
   'cookbookForm.coverTitle': { en: 'Cover photo', pl: 'Zdjęcie okładki' },
-  'cookbookForm.coverMessage': {
-    en: 'Where would you like to add a photo from?',
-    pl: 'Skąd chcesz dodać zdjęcie?',
-  },
-  'cookbookForm.missingName': { en: 'Missing name', pl: 'Brak nazwy' },
   'cookbookForm.missingNameMessage': {
     en: 'Please enter a cookbook name.',
     pl: 'Wpisz nazwę książki kucharskiej.',
@@ -236,24 +234,36 @@ export const dictionary = {
   },
 
   // --- Shopping lists (app/(tabs)/shopping.tsx) ---
-  'shopping.brand': { en: 'KeepTaste', pl: 'KeepTaste' },
   'shopping.title': { en: 'Shopping', pl: 'Zakupy' },
   'shopping.emptyTitle': {
     en: 'No shopping lists',
     pl: 'Brak list zakupów',
   },
   'shopping.emptyText': {
-    en: 'Tap + to create your first list',
-    pl: 'Naciśnij +, aby stworzyć pierwszą listę',
+    en: 'Create your first list and plan your shopping',
+    pl: 'Stwórz pierwszą listę i zaplanuj zakupy',
   },
   'shopping.inCart': {
     en: '{checked}/{total} in cart',
     pl: '{checked}/{total} w koszyku',
   },
+  'shopping.emptyAction': { en: 'Create a list', pl: 'Stwórz listę' },
   'shopping.rename': { en: 'Rename', pl: 'Zmień nazwę' },
-  'shopping.deleteListMessage': {
-    en: 'Delete this shopping list?',
-    pl: 'Usunąć tę listę zakupów?',
+  'shopping.deleteList': { en: 'Delete list', pl: 'Usuń listę' },
+
+  // --- Delete confirmations (recipes & cookbooks get a speed bump on top of
+  // the undo snackbar; shopping lists/items rely on undo alone) ---
+  'confirm.deleteRecipe': {
+    en: 'Delete "{title}"?',
+    pl: 'Usunąć „{title}”?',
+  },
+  'confirm.deleteCookbook': {
+    en: 'Delete "{name}"?',
+    pl: 'Usunąć „{name}”?',
+  },
+  'confirm.deleteCookbookMessage': {
+    en: "Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'.",
+    pl: 'Przepisy z tej książki nie zostaną usunięte — znajdziesz je w „Wszystkie przepisy”.',
   },
 
   // --- Shopping list detail (app/shopping/[id].tsx) ---
@@ -285,12 +295,10 @@ export const dictionary = {
     pl: 'np. Cotygodniowe zakupy...',
   },
   'shoppingNew.create': { en: 'Create list', pl: 'Stwórz listę' },
-  'shoppingNew.missingName': { en: 'Missing name', pl: 'Brak nazwy' },
   'shoppingNew.missingNameMessage': {
     en: 'Please enter a list name.',
     pl: 'Wpisz nazwę listy.',
   },
-  'shoppingEdit.title': { en: 'Rename list', pl: 'Zmień nazwę listy' },
 
   // --- Settings (app/settings.tsx) ---
   'settings.title': { en: 'Settings', pl: 'Ustawienia' },
