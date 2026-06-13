@@ -23,7 +23,6 @@
       },
       "package": "com.damianmalecki.keeptaste",
       "versionCode": 3,
-      "targetSdkVersion": 35,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -48,7 +47,17 @@
       ],
       "expo-asset",
       "expo-font",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
