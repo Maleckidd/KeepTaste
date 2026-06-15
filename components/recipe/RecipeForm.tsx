@@ -96,11 +96,8 @@ export default function RecipeForm({
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(t('common.permissionRequired'), t('common.permissionPhotos'));
-      return;
-    }
+    // Uses the Android system photo picker / iOS PHPicker — no media-library
+    // permission needed, which is why READ_MEDIA_IMAGES is not declared.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
