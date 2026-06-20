@@ -194,19 +194,15 @@ export const dictionary = {
   'recipeForm.cook': { en: 'Cook (min)', pl: 'Gotow. (min)' },
   'recipeForm.servings': { en: 'Servings', pl: 'Porcje' },
   'recipeForm.ingredients': { en: 'Ingredients', pl: 'Składniki' },
-  'recipeForm.ingredientsHint': {
-    en: 'Use a double line break to separate sections. A dash (-) creates a bullet point.',
-    pl: 'Użyj podwójnego entera, aby oddzielić sekcje. Myślnik (-) tworzy punkt listy.',
+  'recipeForm.formatHelpLink': {
+    en: 'See formatting tips',
+    pl: 'Zobacz wskazówki formatowania',
   },
   'recipeForm.ingredientsPlaceholder': {
     en: '200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream',
     pl: '200g mąki\n100g masła\n- 3 jajka\n\n#Krem\n300ml śmietanki kremówki',
   },
   'recipeForm.instructions': { en: 'Instructions', pl: 'Przygotowanie' },
-  'recipeForm.instructionsHint': {
-    en: 'Supports Markdown: # heading, **bold**',
-    pl: 'Obsługuje Markdown: # nagłówek, **pogrubienie**',
-  },
   'recipeForm.instructionsPlaceholder': {
     en: '# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.',
     pl: '# Przygotuj ciasto\nWymieszaj mąkę z masłem...\n\n# Pieczenie\n**Piecz przez 45 minut** w 180°C.',
@@ -219,6 +215,31 @@ export const dictionary = {
   'recipeForm.notesPlaceholder': {
     en: 'Next time add more vanilla sugar...',
     pl: 'Następnym razem dodać więcej cukru waniliowego...',
+  },
+
+  // --- Formatting help sheet (components/ui/FormattingHelpSheet.tsx) ---
+  'formattingHelp.title': { en: 'Formatting tips', pl: 'Wskazówki formatowania' },
+  'formattingHelp.intro': {
+    en: 'Type these symbols and your text turns into nicely styled sections, headings and lists.',
+    pl: 'Wpisz te znaki, a tekst zamieni się w ładne sekcje, nagłówki i listy.',
+  },
+  'formattingHelp.colInput': { en: 'You type', pl: 'Wpiszesz' },
+  'formattingHelp.colResult': { en: 'You see', pl: 'Zobaczysz' },
+  'formattingHelp.headingInput': { en: '# Cream', pl: '# Krem' },
+  'formattingHelp.headingResult': { en: 'Cream', pl: 'Krem' },
+  'formattingHelp.headingDesc': {
+    en: 'A bigger, bold section title',
+    pl: 'Większy, pogrubiony tytuł sekcji',
+  },
+  'formattingHelp.boldInput': { en: '**butter**', pl: '**masło**' },
+  'formattingHelp.boldResult': { en: 'butter', pl: 'masło' },
+  'formattingHelp.boldDesc': { en: 'Bold text', pl: 'Pogrubiony tekst' },
+  'formattingHelp.bulletInput': { en: '- 3 eggs', pl: '- 3 jajka' },
+  'formattingHelp.bulletResult': { en: '3 eggs', pl: '3 jajka' },
+  'formattingHelp.bulletDesc': { en: 'A bullet-point item', pl: 'Punkt listy' },
+  'formattingHelp.sectionNote': {
+    en: 'Tip: leave an empty line between blocks to start a new section.',
+    pl: 'Wskazówka: zostaw pustą linię między blokami, aby zacząć nową sekcję.',
   },
 
   // --- Cookbook form (components/cookbook/CookbookForm.tsx) ---

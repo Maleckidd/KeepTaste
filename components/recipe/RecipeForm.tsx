@@ -16,6 +16,7 @@ import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ModalHeader from '@/components/ui/ModalHeader';
 import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
+import FormattingHelpSheet from '@/components/ui/FormattingHelpSheet';
 import {
   useTheme,
   ThemePalette,
@@ -44,10 +45,15 @@ function Field({
   label,
   children,
   hint,
+  linkText,
+  onLinkPress,
 }: {
   label: string;
   children: React.ReactNode;
   hint?: string;
+  /** Optional tappable link shown under the field (e.g. "See formatting tips"). */
+  linkText?: string;
+  onLinkPress?: () => void;
 }) {
   const c = useTheme();
   const fieldStyles = useMemo(() => makeFieldStyles(c), [c]);
@@ -56,12 +62,41 @@ function Field({
       <Text style={fieldStyles.label}>{label}</Text>
       {children}
       {hint ? <Text style={fieldStyles.hint}>{hint}</Text> : null}
+      {linkText && onLinkPress ? (
+        <Pressable
+          onPress={onLinkPress}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={({ pressed }) => [
+            fieldStyles.linkRow,
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Ionicons
+            name="help-circle-outline"
+            size={15}
+            color={c.primary}
+          />
+          <Text style={fieldStyles.link}>{linkText}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 const makeFieldStyles = (c: ThemePalette) => StyleSheet.create({
   container: { gap: Spacing.xs },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  link: {
+    fontSize: Typography.size.xs,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
+  },
   label: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
@@ -89,6 +124,7 @@ export default function RecipeForm({
   const initial = initialData ?? emptyRecipeFormData();
   const [form, setForm] = useState<RecipeFormData>(initial);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [formatHelpOpen, setFormatHelpOpen] = useState(false);
   // Inline validation instead of an Alert; cleared as soon as the user types.
   const [titleError, setTitleError] = useState(false);
 
@@ -254,7 +290,8 @@ export default function RecipeForm({
         {/* Ingredients */}
         <Field
           label={t('recipeForm.ingredients')}
-          hint={t('recipeForm.ingredientsHint')}
+          linkText={t('recipeForm.formatHelpLink')}
+          onLinkPress={() => setFormatHelpOpen(true)}
         >
           <Input
             placeholder={t('recipeForm.ingredientsPlaceholder')}
@@ -267,7 +304,8 @@ export default function RecipeForm({
         {/* Instructions */}
         <Field
           label={t('recipeForm.instructions')}
-          hint={t('recipeForm.instructionsHint')}
+          linkText={t('recipeForm.formatHelpLink')}
+          onLinkPress={() => setFormatHelpOpen(true)}
         >
           <Input
             style={styles.inputMultilineTall}
@@ -306,6 +344,11 @@ export default function RecipeForm({
         title={t('recipeForm.photoTitle')}
         actions={photoActions}
         onClose={() => setPhotoMenuOpen(false)}
+      />
+
+      <FormattingHelpSheet
+        visible={formatHelpOpen}
+        onClose={() => setFormatHelpOpen(false)}
       />
     </KeyboardAvoidingView>
   );

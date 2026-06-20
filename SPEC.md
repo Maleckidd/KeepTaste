@@ -288,9 +288,11 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 | Cook | TextInput numeric | NO | Minutes as a positive integer |
 | Servings | TextInput numeric | NO | Positive integer |
 | Photo | ImagePicker | NO | Gallery or camera, 4:3 aspect |
-| Ingredients | TextInput multiline | NO | Raw text, supports Markdown |
-| Instructions | TextInput multiline | NO | Raw text, supports Markdown |
+| Ingredients | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
+| Instructions | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Notes | TextInput multiline | NO | Exported together with the recipe (it's a cookbook, not a diary) |
+
+**Formatting help:** the average user doesn't know "Markdown". Under the Ingredients and Instructions fields a tappable text link ("See formatting tips", `recipeForm.formatHelpLink`, primary-colored) opens a bottom sheet (`components/ui/FormattingHelpSheet.tsx`, same overlay pattern as `ActionSheet`). The sheet is a plain-language "you type → you see" table (`# heading`, `**bold**`, `- bullet`) plus a note that a blank line starts a new section — never the word "Markdown" in the field UI.
 
 **Validation:**
 - The only required field: title. Missing title → inline error under the field, the form is not saved.
