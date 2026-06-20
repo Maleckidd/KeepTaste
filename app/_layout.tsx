@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { Platform, useColorScheme } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runMigrations } from '@/db/client';
-import { useTheme } from '@/constants/theme';
+import { useTheme, darkColors, lightColors } from '@/constants/theme';
 import { LanguageProvider, useT } from '@/i18n/LanguageProvider';
 import { SnackbarProvider } from '@/components/ui/SnackbarProvider';
 
@@ -74,6 +76,17 @@ function RootStack() {
 }
 
 export default function RootLayout() {
+  const scheme = useColorScheme();
+
+  useEffect(() => {
+    // Match the Android system navigation bar to the app background; otherwise
+    // it stays white in dark mode. No-op on iOS/web.
+    if (Platform.OS !== 'android') return;
+    const palette = scheme === 'dark' ? darkColors : lightColors;
+    NavigationBar.setBackgroundColorAsync(palette.background);
+    NavigationBar.setButtonStyleAsync(scheme === 'dark' ? 'light' : 'dark');
+  }, [scheme]);
+
   useEffect(() => {
     // Run database migrations on app startup (creates app_settings, used by
     // LanguageProvider). Provider tolerates the table appearing late.
