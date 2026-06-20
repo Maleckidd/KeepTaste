@@ -17,6 +17,8 @@ import {
   searchRecipes,
   deleteRecipe,
 } from '@/db/recipes';
+import { getSetting, setSetting } from '@/db/settings';
+import { lightTap } from '@/utils/haptics';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import { shareCookbookPdf } from '@/utils/cookbookPdf';
 import {
@@ -49,9 +51,11 @@ const CARD_IMAGE_HEIGHT = 150;
 function RecipeCard({
   recipe,
   onPress,
+  onLongPress,
 }: {
   recipe: Recipe;
   onPress: () => void;
+  onLongPress: () => void;
 }) {
   const c = useTheme();
   const t = useT();
@@ -62,6 +66,7 @@ function RecipeCard({
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
+      onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={recipe.title}
     >
@@ -134,6 +139,8 @@ export default function CookbookScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
   const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
+  const [recipeMenu, setRecipeMenu] = useState<Recipe | null>(null);
+  const [peekHint, setPeekHint] = useState(false);
   const showUndoDelete = useUndoDelete();
 
   const loadData = useCallback(async () => {
@@ -161,6 +168,22 @@ export default function CookbookScreen() {
   );
 
   useEffect(() => subscribePendingDeletes(loadData), [loadData]);
+
+  // Swipe actions are otherwise invisible: on the very first visit that shows
+  // any recipes, briefly reveal the first row's actions, then never again.
+  useEffect(() => {
+    if (!isLoaded || recipes.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      if (await getSetting('swipeHintSeen')) return;
+      if (cancelled) return;
+      setPeekHint(true);
+      await setSetting('swipeHintSeen', '1');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, recipes.length]);
 
   // Confirmation first (deliberate speed bump for recipes and cookbooks),
   // then the delete still goes through the undo snackbar before committing.
@@ -286,16 +309,21 @@ export default function CookbookScreen() {
         <FlatList
           data={recipes}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <SwipeableRow
               onEdit={() =>
                 router.push({ pathname: '/recipe/edit', params: { id: item.id } })
               }
               onDelete={() => handleDeleteRecipe(item)}
+              peek={peekHint && index === 0}
             >
               <RecipeCard
                 recipe={item}
                 onPress={() => router.push(`/recipe/${item.id}`)}
+                onLongPress={() => {
+                  lightTap();
+                  setRecipeMenu(item);
+                }}
               />
             </SwipeableRow>
           )}
@@ -327,6 +355,35 @@ export default function CookbookScreen() {
             onPress: handleDeleteCookbook,
           },
         ]}
+      />
+
+      {/* Long-press menu — the always-available alternative to the swipe
+          gesture for editing or deleting a recipe. */}
+      <ActionSheet
+        visible={recipeMenu !== null}
+        title={recipeMenu?.title}
+        onClose={() => setRecipeMenu(null)}
+        actions={
+          recipeMenu
+            ? [
+                {
+                  label: t('common.edit'),
+                  icon: 'create-outline',
+                  onPress: () =>
+                    router.push({
+                      pathname: '/recipe/edit',
+                      params: { id: recipeMenu.id },
+                    }),
+                },
+                {
+                  label: t('common.delete'),
+                  icon: 'trash-outline',
+                  destructive: true,
+                  onPress: () => handleDeleteRecipe(recipeMenu),
+                },
+              ]
+            : []
+        }
       />
     </View>
   );
@@ -365,7 +422,6 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     backgroundColor: c.surface,
     borderRadius: Radius.lg,
     overflow: 'hidden',
-    ...Shadow.md,
   },
   // Opaque pressed state — the card sits over the swipe-action panel, so it
   // must never go translucent or shrink (the panel would show through).
