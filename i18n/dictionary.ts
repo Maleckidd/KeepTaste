@@ -54,6 +54,8 @@ export const dictionary = {
   'a11y.addList': { en: 'New shopping list', pl: 'Nowa lista zakupów' },
   'a11y.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
   'a11y.shareRecipe': { en: 'Share recipe', pl: 'Udostępnij przepis' },
+  'a11y.increaseFont': { en: 'Increase text size', pl: 'Zwiększ rozmiar tekstu' },
+  'a11y.decreaseFont': { en: 'Decrease text size', pl: 'Zmniejsz rozmiar tekstu' },
   'a11y.shareCookbook': { en: 'Share cookbook', pl: 'Udostępnij książkę' },
   'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
   'a11y.recipePhoto': { en: 'Recipe photo', pl: 'Zdjęcie przepisu' },

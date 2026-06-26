@@ -7,6 +7,7 @@ import {
   Share,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ import {
   Spacing,
   Radius,
   Motion,
+  Touch,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
 import IconButton from '@/components/ui/IconButton';
@@ -48,6 +50,45 @@ function formatTime(
     : t('recipe.hours', { hours: h });
 }
 
+// In-recipe text zoom (cooking context): ephemeral by design — it lives in
+// component state, so leaving the recipe (unmount) resets it to 1×. Ionicons
+// has no clean "A+/A−" glyph, so these are text buttons rather than IconButton.
+const FONT_SCALE_MIN = 1;
+const FONT_SCALE_MAX = 1.8;
+const FONT_SCALE_STEP = 0.2;
+
+function FontScaleButton({
+  label,
+  accessibilityLabel,
+  onPress,
+  disabled,
+  styles,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+  disabled: boolean;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      hitSlop={4}
+      style={({ pressed }) => [
+        styles.fontButton,
+        disabled && styles.fontButtonDisabled,
+        pressed && !disabled && { opacity: 0.5 },
+      ]}
+    >
+      <Text style={styles.fontButtonLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export default function RecipeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -55,10 +96,22 @@ export default function RecipeScreen() {
   const t = useT();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const markdownStyles = useMemo(() => makeMarkdownStyles(c), [c]);
 
   // Cooking context: keep the screen on while a recipe is open.
   useKeepAwakeSafe();
+
+  // Ephemeral in-recipe text zoom (resets on exit — see FontScaleButton).
+  const [fontScale, setFontScale] = useState(FONT_SCALE_MIN);
+  const markdownStyles = useMemo(
+    () => makeMarkdownStyles(c, fontScale),
+    [c, fontScale]
+  );
+  const adjustFont = useCallback((dir: 1 | -1) => {
+    setFontScale((s) => {
+      const next = Math.round((s + dir * FONT_SCALE_STEP) * 100) / 100;
+      return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, next));
+    });
+  }, []);
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -131,6 +184,20 @@ export default function RecipeScreen() {
           onPress={() => router.back()}
         />
         <View style={styles.navActions}>
+          <FontScaleButton
+            label="A−"
+            accessibilityLabel={t('a11y.decreaseFont')}
+            onPress={() => adjustFont(-1)}
+            disabled={fontScale <= FONT_SCALE_MIN}
+            styles={styles}
+          />
+          <FontScaleButton
+            label="A+"
+            accessibilityLabel={t('a11y.increaseFont')}
+            onPress={() => adjustFont(1)}
+            disabled={fontScale >= FONT_SCALE_MAX}
+            styles={styles}
+          />
           <IconButton
             icon="share-outline"
             accessibilityLabel={t('a11y.shareRecipe')}
@@ -274,7 +341,17 @@ export default function RecipeScreen() {
                 <Ionicons name="document-text-outline" size={15} color={c.primary} />
                 <Text style={styles.notesTitle}>{t('recipe.notes')}</Text>
               </View>
-              <Text style={styles.notesText}>{recipe.notes}</Text>
+              <Text
+                style={[
+                  styles.notesText,
+                  {
+                    fontSize: Typography.size.reading * fontScale,
+                    lineHeight: Typography.size.reading * 1.5 * fontScale,
+                  },
+                ]}
+              >
+                {recipe.notes}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -284,57 +361,61 @@ export default function RecipeScreen() {
 }
 
 // Recipe content is read from a distance while cooking — base size 18pt
-// (Typography.size.reading) with generous line height.
-const makeMarkdownStyles = (c: ThemePalette) => ({
-  body: {
-    color: c.text,
-    fontSize: Typography.size.reading,
-    lineHeight: Typography.size.reading * 1.6,
-  },
-  heading1: {
-    fontSize: Typography.size.xl,
-    fontWeight: Typography.weight.bold,
-    color: c.text,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm,
-    lineHeight: Typography.size.xl * 1.3,
-  },
-  heading2: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.semibold,
-    color: c.text,
-    marginTop: Spacing.base,
-    marginBottom: Spacing.xs,
-    lineHeight: Typography.size.lg * 1.3,
-  },
-  strong: {
-    fontWeight: Typography.weight.bold,
-    color: c.text,
-  },
-  bullet_list: {
-    marginVertical: Spacing.xs,
-  },
-  ordered_list: {
-    marginVertical: Spacing.xs,
-  },
-  list_item: {
-    marginVertical: Spacing.xs,
-  },
-  // Step numbers stand out in the primary color.
-  ordered_list_icon: {
-    color: c.primary,
-    fontSize: Typography.size.reading,
-    fontWeight: Typography.weight.bold,
-    lineHeight: Typography.size.reading * 1.6,
-    marginRight: Spacing.sm,
-  },
-  bullet_list_icon: {
-    color: c.primary,
-    fontSize: Typography.size.reading,
-    lineHeight: Typography.size.reading * 1.6,
-    marginRight: Spacing.sm,
-  },
-});
+// (Typography.size.reading) with generous line height. `scale` is the in-recipe
+// text zoom (1× by default; the A−/A+ header buttons bump it up to 1.8×).
+const makeMarkdownStyles = (c: ThemePalette, scale: number) => {
+  const reading = Typography.size.reading * scale;
+  return {
+    body: {
+      color: c.text,
+      fontSize: reading,
+      lineHeight: reading * 1.6,
+    },
+    heading1: {
+      fontSize: Typography.size.xl * scale,
+      fontWeight: Typography.weight.bold,
+      color: c.text,
+      marginTop: Spacing.lg,
+      marginBottom: Spacing.sm,
+      lineHeight: Typography.size.xl * scale * 1.3,
+    },
+    heading2: {
+      fontSize: Typography.size.lg * scale,
+      fontWeight: Typography.weight.semibold,
+      color: c.text,
+      marginTop: Spacing.base,
+      marginBottom: Spacing.xs,
+      lineHeight: Typography.size.lg * scale * 1.3,
+    },
+    strong: {
+      fontWeight: Typography.weight.bold,
+      color: c.text,
+    },
+    bullet_list: {
+      marginVertical: Spacing.xs,
+    },
+    ordered_list: {
+      marginVertical: Spacing.xs,
+    },
+    list_item: {
+      marginVertical: Spacing.xs,
+    },
+    // Step numbers stand out in the primary color.
+    ordered_list_icon: {
+      color: c.primary,
+      fontSize: reading,
+      fontWeight: Typography.weight.bold,
+      lineHeight: reading * 1.6,
+      marginRight: Spacing.sm,
+    },
+    bullet_list_icon: {
+      color: c.primary,
+      fontSize: reading,
+      lineHeight: reading * 1.6,
+      marginRight: Spacing.sm,
+    },
+  };
+};
 
 const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
@@ -354,7 +435,23 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   navActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.xs,
+  },
+  fontButton: {
+    width: Touch.min,
+    height: Touch.min,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fontButtonDisabled: {
+    opacity: 0.3,
+  },
+  fontButtonLabel: {
+    fontSize: Typography.size.md,
+    fontWeight: Typography.weight.bold,
+    color: c.text,
   },
   scrollContent: {
     paddingBottom: Spacing.xxxl,
