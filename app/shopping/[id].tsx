@@ -7,7 +7,6 @@ import {
   TextInput,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,9 +31,10 @@ import {
   filterPendingDeletes,
   subscribePendingDeletes,
 } from '@/utils/pendingDelete';
-import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { useUndoDelete, useSnackbar } from '@/components/ui/SnackbarProvider';
 import { lightTap } from '@/utils/haptics';
 import { animateLayout } from '@/utils/motion';
+import { pluralPl } from '@/utils/i18n';
 import {
   useTheme,
   ThemePalette,
@@ -49,11 +49,20 @@ import Input from '@/components/ui/Input';
 import Fab from '@/components/ui/Fab';
 import ActionSheet from '@/components/ui/ActionSheet';
 import SwipeableRow from '@/components/ui/SwipeableRow';
+import PasteListSheet from '@/components/shopping/PasteListSheet';
 import type { ShoppingList, ShoppingItem } from '@/db/schema';
+import type { TranslationKey } from '@/i18n/dictionary';
 
 type Row =
   | { kind: 'item'; item: ShoppingItem }
   | { kind: 'header'; key: string };
+
+// Reuses §5.12's plural keys for the "added N products" snackbar.
+const addedKeys: Record<ReturnType<typeof pluralPl>, TranslationKey> = {
+  one: 'addToList.added.one',
+  few: 'addToList.added.few',
+  many: 'addToList.added.many',
+};
 
 export default function ShoppingListScreen() {
   const { id, rename } = useLocalSearchParams<{ id: string; rename?: string }>();
@@ -75,10 +84,12 @@ export default function ShoppingListScreen() {
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null);
   const [listMenuOpen, setListMenuOpen] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
   // Inline title rename (replaces the old "Rename list" modal).
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const showUndoDelete = useUndoDelete();
+  const { showSnackbar } = useSnackbar();
 
   const loadData = useCallback(async () => {
     const [l, data] = await Promise.all([
@@ -244,7 +255,7 @@ export default function ShoppingListScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       style={styles.container}
     >
       {/* Header with inline-renamable title */}
@@ -406,12 +417,35 @@ export default function ShoppingListScreen() {
             onPress: () => list && startRename(list.name),
           },
           {
+            label: t('shoppingList.pasteProducts'),
+            icon: 'clipboard-outline',
+            onPress: () => setPasteOpen(true),
+          },
+          {
             label: t('shopping.deleteList'),
             icon: 'trash-outline',
             destructive: true,
             onPress: handleDeleteList,
           },
         ]}
+      />
+
+      {/* Paste products into this list (§5.16) */}
+      <PasteListSheet
+        visible={pasteOpen}
+        listId={listId}
+        onClose={() => setPasteOpen(false)}
+        onAdded={(count) => {
+          // No animateLayout() here: it would catch the snackbar mounting in
+          // the same frame (see handleDeleteItem).
+          loadData();
+          showSnackbar({
+            message: t(addedKeys[pluralPl(count)], {
+              count,
+              name: list?.name ?? '',
+            }),
+          });
+        }}
       />
     </KeyboardAvoidingView>
   );

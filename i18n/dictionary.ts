@@ -339,6 +339,19 @@ export const dictionary = {
     pl: 'Dodaj produkt...',
   },
   'shoppingList.qtyPlaceholder': { en: 'Qty', pl: 'Ilość' },
+  'shoppingList.pasteProducts': { en: 'Paste products', pl: 'Wklej produkty' },
+
+  // --- Paste products into a shopping list (components/shopping/PasteListSheet.tsx, §5.16) ---
+  'pasteList.title': { en: 'Paste products', pl: 'Wklej produkty' },
+  'pasteList.placeholder': {
+    en: 'Paste products, one per line',
+    pl: 'Wklej produkty, każdy w nowej linii',
+  },
+  'pasteList.next': { en: 'Next', pl: 'Dalej' },
+  'pasteList.empty': {
+    en: 'No products found',
+    pl: 'Nie znaleziono produktów',
+  },
 
   // --- New / edit shopping list (app/shopping/new.tsx, edit.tsx) ---
   'shoppingNew.title': { en: 'New shopping list', pl: 'Nowa lista zakupów' },

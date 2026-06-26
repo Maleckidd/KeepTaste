@@ -105,6 +105,33 @@ describe('parseIngredients — bold markers', () => {
   });
 });
 
+// The same parser backs pasting a loose product list into a shopping list
+// (SPEC.md §5.16) — not just recipe ingredients. These cases pin the behavior
+// for real pasted text: mixed bullet styles, numbered notes, blank-line gaps.
+describe('parseIngredients — pasted shopping list (§5.16)', () => {
+  it('parses a loose paste with mixed markers and blank lines', () => {
+    const text = [
+      'mleko 2l',
+      '',
+      '- chleb',
+      '• masło',
+      '1. 6 jajek',
+      '2) ser żółty',
+    ].join('\n');
+    expect(parseIngredients(text)).toEqual([
+      'mleko 2l',
+      'chleb',
+      'masło',
+      '6 jajek',
+      'ser żółty',
+    ]);
+  });
+
+  it('keeps duplicates (no merging, §5.12/§5.16)', () => {
+    expect(parseIngredients('mleko\nmleko')).toEqual(['mleko', 'mleko']);
+  });
+});
+
 describe('parseIngredients — realistic input', () => {
   it('parses a sectioned ingredient list', () => {
     const text = [
