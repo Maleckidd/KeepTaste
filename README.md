@@ -6,6 +6,7 @@ no cloud, no ads. The escape hatch is Markdown export: your recipes are always
 readable outside the app, and previously exported files can be imported back.
 
 **Features:** cookbooks with covers, recipes with Markdown ingredients/instructions,
+single-recipe import (from a web link via Schema.org JSON-LD, or by pasting text),
 diacritics-safe search, Markdown export & import, shopping lists with an "in cart"
 flow, dark mode (follows the system), bilingual UI (English/Polish, selectable in
 Settings).
@@ -51,6 +52,7 @@ components/
     CookbookForm.tsx   ← shared cookbook form (new + edit)
   recipe/
     RecipeForm.tsx     ← shared recipe form (new + edit)
+    ImportSheet.tsx    ← single-recipe import sheet (from link / paste text)
 
 i18n/
   dictionary.ts        ← typed EN+PL dictionary of all UI strings
@@ -70,6 +72,8 @@ db/
 utils/
   markdown.ts          ← export of a whole cookbook to a .md file
   importMarkdown.ts    ← parser for previously exported .md files
+  recipeImport.ts      ← pure parsers: Recipe JSON-LD + pasted text → form fields
+  recipeImportFetch.ts ← native fetch of a recipe URL's HTML (browser headers)
   imageStorage.ts      ← persisting picked images + file cleanup
   i18n.ts              ← pure i18n logic (locale resolution, interpolation, PL plurals)
   cookbookForm.ts      ← cookbook form logic (normalize, dirty-check)
@@ -104,6 +108,32 @@ npx expo prebuild -p android
 cd android && ./gradlew assembleRelease
 # → android/app/build/outputs/apk/release/app-release.apk
 ```
+
+This path is fully offline and needs no EAS login, but the APK is signed with a local
+debug keystore — fine for sideloading onto your own device, but it can't update a build
+installed from Google Play (different signature).
+
+### Local APK via EAS (no cloud build quota)
+
+To build an APK on your machine using the EAS-managed signing key (the same one used for
+Play uploads), with the `--local` flag so it **does not consume the EAS Build quota**:
+
+```bash
+eas build --platform android --profile preview --local --output ./keeptaste.apk
+```
+
+The `preview` profile (`eas.json`) is `buildType: apk`, `distribution: internal` — an
+installable file for sideloading. For a Play Store bundle, swap in the `production`
+profile (`app-bundle` → `.aab`):
+
+```bash
+eas build --platform android --profile production --local --output ./keeptaste.aab
+```
+
+Requirements for `--local`: `eas-cli`, JDK 17, and the Android SDK (`ANDROID_HOME`). The
+first run may prompt to log in to fetch signing credentials (fetching credentials does not
+use the build quota). `versionCode` (in `app.json`) must be bumped before each Play upload;
+`targetSdkVersion` is set via the `expo-build-properties` plugin, not the `app.json` android block.
 
 ## Testing
 

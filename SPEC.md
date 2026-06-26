@@ -1,7 +1,7 @@
 # KeepTaste — Technical Specification (SDD)
 
 > Living document. Update it with every significant design decision.
-> Version: 1.5 | Date: 2026-06
+> Version: 1.8 | Date: 2026-06
 
 ---
 
@@ -72,6 +72,7 @@ components/
     CookbookForm.tsx     ← shared cookbook form (new + edit)
   recipe/
     RecipeForm.tsx       ← shared recipe form (new + edit)
+    ImportSheet.tsx      ← single-recipe import: link / paste-text mode picker (§5.15)
   ui/                    ← base components (§6): Button, IconButton, Input,
                            Card-level pieces, ScreenHeader, ModalHeader, Fab,
                            EmptyState, ActionSheet, SwipeableRow, SnackbarProvider
@@ -106,6 +107,8 @@ utils/
   search.ts              ← diacritics-safe title search
   shoppingList.ts        ← shopping list logic: partition, counts, input normalization
   ingredients.ts         ← pure parser: ingredients Markdown → shopping item candidates (§5.12)
+  recipeImport.ts        ← pure parsers: Recipe JSON-LD + pasted-text → RecipeFormData (§5.15)
+  recipeImportFetch.ts   ← native: fetch a recipe URL's HTML for parsing (§5.15)
   i18n.ts                ← pure i18n logic: preference/locale resolution, interpolation, PL plurals
 
 constants/
@@ -266,6 +269,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 
 **Navigation:**
 - Back button (arrow-back)
+- **Text zoom (A− / A+)** — two header buttons (left of Share) scale the recipe **content** read while cooking: ingredients, instructions, step numbers, in-content `#` headings and the Notes box. Title and metadata are unaffected. The scale runs 1×–1.8× in 0.2 steps; each button disables at its bound. The zoom is **ephemeral by design** — it lives in component state (no persistence, no `app_settings` key), so leaving the recipe resets it to 1× on the next open. Ionicons has no clean "A+/A−" glyph, so these are text buttons, not `IconButton`. This is a polish of the existing reading view, **not** the step-by-step cooking mode that stays out of scope (§7).
 - Share button (share-outline) → shares the recipe as plain text (§5.13)
 - "⋯" menu (ActionSheet, same pattern as the cookbook and shopping-list headers):
   - **Edit** → opens `/recipe/edit?id=X`
@@ -316,6 +320,8 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 **Trigger:** an "Export all data" button in the Settings screen (§5.7), in the "Your data" section → the whole library is written to a single `.md` file and shared via the system share sheet (`Sharing.shareAsync()`, `text/markdown`). This replaces the former per-cookbook Markdown export; cookbook headers now share a **PDF** instead (§5.14).
 
+> **Scope note:** the `.md` backup is the human-readable escape hatch (§1), but **not a complete copy** — it omits photos, shopping lists, timestamps, and the language preference. The complete, restore-fidelity backup (and online-backup options) is the `.zip` archive in **§5.17**, which embeds this same `.md` as its readable layer.
+
 **Format of the resulting backup `.md` file:** one file holds every cookbook as a `# Name` section in the per-cookbook body format below, in cookbook order, followed by an optional **uncategorized bucket** for recipes whose `cookbook_id` is `NULL`, under the reserved sentinel heading `# §Uncategorized`. The uncategorized section is omitted entirely when there are no loose recipes. The format is **English-only** (never localized). An empty library yields an empty file.
 
 ```markdown
@@ -359,7 +365,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 ```
 
 **Implementation details:**
-- Pure builders live in `utils/markdown.ts` (`recipeToMarkdown`, `cookbookBodyToMarkdown`, `formatTime`) and `utils/backupMarkdown.ts` (`buildBackupMarkdown`, `UNCATEGORIZED_HEADING`, `BackupSection`); the native gather + write + share wrapper is `utils/backupExport.ts` (`exportAllData`), fed by `db/recipes.ts` `getBackupSections()`.
+- Pure builders live in `utils/markdown.ts` (`recipeToMarkdown`, `cookbookBodyToMarkdown`, `formatTime`) and `utils/backupMarkdown.ts` (`buildBackupMarkdown`, `UNCATEGORIZED_HEADING`, `BackupSection`); the `recipes.md` produced by these is embedded as the readable layer of the `.zip` archive (§5.17), built and shared by `utils/backupArchiveFs.ts` (`exportBackupZip`), fed by `db/recipes.ts` `getBackupSections()`.
 - Within each section, recipes are sorted the same as in the list (descending by `updated_at`)
 - The metadata line (`**Prep:** ... | ...`): segments without a value are **omitted**; if a recipe has no metadata at all, the whole line is omitted
 - The "Notes" section appears in the file only if the `notes` field is not empty
@@ -570,6 +576,137 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 
 ---
 
+### 5.15 Importing a single recipe (link / paste text)
+
+A low-effort way to add **one** recipe from an external source by pre-filling the recipe form, instead of typing everything by hand. **Deterministic only — no AI, no network "smart parsing" service** — so the local-first, private philosophy (§1) is preserved: the only network call is a user-initiated `fetch` of a URL the user pasted, which goes straight to that site (no backend, nothing synced).
+
+This is distinct from the full-app Markdown **backup** import (§5.8), which restores a whole library from KeepTaste's own export format. §5.15 imports a single recipe from arbitrary external content into a form the user then reviews.
+
+**Scope:** two modes ship now — **From link** (T1) and **Paste text** (T2). **From a photo (OCR)** is a planned later phase (§8) — it needs an on-device OCR native module (ML Kit / Vision) and a development build, so it is deliberately out of this iteration. Importing video / transcripts (YouTube, Reels, TikTok video) and scraping raw HTML when no structured data exists stay **out of scope** (§7).
+
+**Entry point:** an **"Import"** affordance on the **new-recipe form** (`RecipeForm` in create mode only — never in edit mode), placed above the title field. Tapping it opens the **Import sheet** (a themed bottom sheet, same overlay pattern as `ActionSheet`/`FormattingHelpSheet`, §6) with a mode picker: **From link**, **Paste text** (and later **From photo**). The single recipe-creation entry point (FAB → new recipe) is unchanged; import lives inside it.
+
+**Result handling — review, never auto-save:** a successful parse closes the sheet and **fills the already-open new-recipe form** with the parsed fields. The user reviews and edits everything, then taps **Save** as usual (no silent writes). Import only populates the recipe **content** fields (title, prep, cook, servings, ingredients, instructions, notes); it does **not** change the cookbook context — a `cookbookId` passed into `/recipe/new` (when launched from inside a cookbook, §5.3) is preserved. Import does not pull a photo (see below); `imagePath` is left untouched.
+
+**Mode: From link (T1) — structured data only.**
+- The user pastes (or shares — see below) a recipe URL. The app does a native `fetch(url)` and parses **Schema.org `Recipe` JSON-LD** embedded in the page (`<script type="application/ld+json">`). The large majority of recipe blogs and portals (WordPress recipe plugins, etc.) emit this, which is exactly why it works without AI and strips ads / life-story prose by construction — we read the structured block, not the page prose.
+- **Mapping** (pure `parseRecipeJsonLd(html)` in `utils/recipeImport.ts`):
+  - Multiple `<script type="application/ld+json">` blocks and `@graph` arrays are scanned; the **first** object whose `@type` is (or includes) `Recipe` wins.
+  - `name` → title.
+  - `recipeIngredient[]` → ingredients, joined with `\n` (one per line, becomes the raw-text ingredients field, §5.4).
+  - `recipeInstructions` → instructions, joined with `\n`. Handles all three shapes: a plain string, `HowToStep[]` (use each `.text`), and `HowToSection[]` (flatten each section's `itemListElement` steps).
+  - `prepTime` / `cookTime` are ISO 8601 durations (`PT1H30M`) → total **minutes** (helper `parseIsoDuration`). `totalTime` is ignored (the form has no total field; total is derived as prep + cook).
+  - `recipeYield` → servings, parsed with the standard rule (integer ≥ 1 or `null`, §5.5 / `utils/numeric.ts`).
+  - **Source URL** → appended to the **notes** field as a localized `Source: <url>` line (no schema change — there is no `source_url` column; §4). If notes already has parsed content, the source line is appended after a blank line.
+  - **Photo is skipped in v1** — JSON-LD `image` is not downloaded; the user adds a photo manually if they want one.
+- **Anti-bot reality:** `fetchRecipeFromUrl` sends **browser-like headers** (a Chrome-on-Android `User-Agent`, `Accept`, `Accept-Language`) because React Native's default `okhttp` UA is rejected by many WAFs that otherwise serve the same JSON-LD (recipe sites keep it readable for SEO). This single cheap lever recovers most UA-filtered sites. Sites behind a **full JS challenge / CAPTCHA / paywall** (e.g. hard Cloudflare, NYT Cooking) still can't be read by an on-device fetch — that is accepted and handled by the paste-text fallback, **not** by headless browsers or a scraping proxy (both rejected: the former is impossible on device, the latter breaks no-backend and a datacenter IP is blocked *more* than the user's residential IP).
+- **No structured data found** (HTTP 200 but no `Recipe` JSON-LD — common on many blogs and all social media): a friendly message ("Couldn't read this page automatically — paste the recipe text instead") and the sheet **switches to Paste-text mode**, so the user is never left stranded.
+- **Error taxonomy** (`fetchRecipeFromUrl` returns a `reason`): a **`blocked`** result (any non-OK HTTP status — WAF refusal, paywall, 4xx/5xx) shows "This site blocks automatic import — paste the recipe text instead." and switches to Paste-text mode; a **`network`** result (offline, DNS, timeout/abort — no usable response at all) shows "Couldn't load that page. Check the link and your connection." Both leave the form untouched.
+
+**Mode: Paste text (T2) — real-world blog heuristic.**
+- The user pastes free text copied from a recipe blog / caption. A pure `parsePastedRecipe(text)` in `utils/recipeImport.ts` returns `{ title?, prepTime, cookTime, servings, ingredients, instructions, notes }`. It was tuned on real copied samples from popular PL blogs (which carry nutrition tables, author prose, UI buttons, image alt-text, late titles, and split name/amount lines). Deterministic, **conservative** (an unclassifiable line is kept, never dropped) with a graceful fallback. The passes:
+  - **Metadata** (PL + EN labels) — `Czas przygotowania/szykowania` · `Prep`/`Preparation time` → prep; `Czas gotowania/pieczenia/smażenia/duszenia` · `Cook`/`Cooking`/`Bake`/`Total` → cook (hours+minutes summed, "1 godzina" / "20 mins"); `Liczba/ilość porcji` · `Porcje` · `Dla N osób` · `Serves`/`Servings`/`Makes`/`Yield` · a standalone `N sztuki/porcji` yield right after `Składniki` → servings. Matched label lines are removed from the body.
+  - **Title** — first content line *unless* it is a section header, a metadata/`kcal` line, or starts with a number (then no title — e.g. a page that opens with the times block). A `Przepis … na:` marker takes the **next** line as the title (some portals print the dish name late, after the ingredients). A later line that merely repeats the title (a duplicated page heading) is dropped.
+  - **Sections** — ingredient headers (`Składniki`/`Ingredients`, and `Składniki na X` → kept as a `# X` group heading); step headers (`Przygotowanie` / `Sposób przygotowania` / `Wykonanie` / `Instructions` / `Method` / …); **and**, when no step header exists, the **start of a step list** — the first item `1.`/`1)` (only `1`, so a stray `2./3.` nav list can't misfire) or a labeled `Krok N` / `Step N` — begins the instructions (the lines before it are the ingredient list). Trailing tip sections (`Wskazówki` / `Rady/porady` / `Porada` / `Uwagi` / `Tip(s)`) route to the **notes** field. Within ingredients, a long (>80-char) prose line not starting with a quantity is treated as the (header-less) start of the method.
+  - **Intro drop** — when an ingredients header exists, everything between the title and it (tagline, breadcrumb, author intro) is dropped.
+  - **Noise** — a conservative denylist removes UI chrome (`Udostępnij/Zapisz/Drukuj przepis`, `Skomentuj`, `Dodaj do ulubionych/notatkę/komentarz`, `Kopiuj`, `Ukryj/Pokaż zdjęcia`, `Komentarze`, `Video`, `Ilość lajków…`), nutrition lines (`kcal`, `Węglowodany`, `Białko`, `Tłuszcze`, `Dieta:`, `Nutrition…`), and rating lines (`Średnia 4.8 / 5 …`, `Oceń!`).
+  - **Quantity merge** — a quantity-only line (`250 g`, `1 sztuka`) is merged onto the preceding ingredient name (`ryż do sushi – 250 g`) for portals that print name and amount on separate lines.
+  - **Fallback (bounded downside):** with no recognized structure the whole body goes to **instructions** — identical to a no-heuristic dump, so the heuristic can only *improve* the split.
+- **Documented limitation:** without a step header *or* numbered steps (rare), method paragraphs can't be cleanly separated from a long ingredient/prose block; and **image alt-text** interleaved with steps is indistinguishable from instructions without AI — both are accepted, not faked. Positioned as **"paste any text"** — an honest light-assist the user reviews, not magic.
+
+**Implementation notes:**
+- All parsing is **pure logic in `utils/recipeImport.ts`** (`parseRecipeJsonLd`, `parsePastedRecipe`, `parseIsoDuration`) → unit-tested in `__tests__/` via the TDD pipeline (tester → coder). The only native part is a thin `fetch` wrapper, `utils/recipeImportFetch.ts` (`fetchRecipeFromUrl`), consistent with the pure-builder + native-wrapper split used by export/PDF (§5.6/§5.14).
+- The sheet (`components/recipe/ImportSheet.tsx`) maps a parse result onto a partial `RecipeFormData` and hands it back to the open `RecipeForm`.
+- **Platforms:** `fetch` of an arbitrary recipe site works on native only. On the web test build it will typically fail CORS — link import is **not** expected to work there (web is a test environment only, §2); the pure parsers are still exercised by unit tests.
+- **i18n:** all new strings (Import affordance, sheet title, mode labels, URL/paste placeholders, the "couldn't read this page" message, network/error messages, the `Source:` prefix) get EN + PL entries in `i18n/dictionary.ts` (§5.11). The `Source:` prefix is localized to the UI language (it lands in user-facing notes, not the English-only backup format).
+
+**Optional later convenience (not required for v1):** an Android **share target** so the user can share a link from the browser directly into KeepTaste, landing on the new-recipe form with From-link import pre-run. Deferred — needs native intent-filter config; the in-app "Import → From link" path covers the same need first.
+
+---
+
+### 5.16 Pasting products into a shopping list
+
+A fast way to fill an existing shopping list from text the user already has (a note, a message, a recipe copied from elsewhere): paste the whole block, review the parsed products, add the ones they want. Same philosophy as §5.12 — line-based, deterministic, no AI — and it **reuses §5.12's machinery wholesale**: the `parseIngredients(text)` parser (`utils/ingredients.ts`) and the `createShoppingItems(listId, names)` bulk insert (`db/shoppingLists.ts`). No new parser, DB helper, schema, or migration.
+
+**Scope:** paste targets the **currently open list only** — there is no list-picker and no "create a new list from a paste" path (unlike §5.12's recipe bridge, which must choose a destination). To start a fresh list the user creates it first (§5.10), then pastes into it.
+
+**Entry point:** a **"Paste products"** item (`clipboard-outline`) in the "⋯" header menu of the list detail view (§5.10), between "Rename" and "Delete list". It opens the `PasteListSheet`.
+
+**`PasteListSheet` (`components/shopping/PasteListSheet.tsx`):** a bottom sheet modeled on `ImportSheet` (§5.15) — overlay (no native `<Modal>`), `translateY` animation, keyboard-height lift, hardware-back handling — with two steps:
+1. **Paste** — a multiline input (placeholder "Paste products, one per line") and a "Next" button (disabled while empty). On Next: `parseIngredients(text)`. Zero candidates → inline "No products found", stay on step 1.
+2. **Review** — the candidates as a checklist, **all checked by default** (same row markup and "Select all / none" toggle as §5.12); a confirm button "Add N" with the live checked count and Polish plurals, disabled at 0 checked.
+
+**On confirm:** `createShoppingItems(listId, selectedNames)` — products added **unchecked**, `quantity = NULL`, list `updated_at` touched once; quantities embedded in a line stay in the name (§5.12 parsing rules). **Duplicates are allowed** — no merging with existing items (consistent with §5.8/§5.12). The sheet closes; the list reloads and a snackbar confirms the add (reusing §5.12's `added.*` strings).
+
+**i18n:** new `pasteList.*` strings (sheet title, placeholder, "Next", empty message) and a `shoppingList.pasteProducts` menu label get EN+PL entries (§5.11); the checklist, select-all toggle, and confirmation reuse the existing `addToList.*` strings.
+
+**Testing:** `parseIngredients` is pure → its existing `__tests__/` coverage is extended with loose-paste cases (numbered lines, bullets, blank lines between items, `#` headings skipped); the sheet UI is verified by running the app.
+
+---
+
+### 5.17 Complete backup archive (.zip) and online backup
+
+**Why:** the Markdown backup (§5.6) is the human-readable escape hatch, but it is **not a complete copy** — it omits photos (`image_path` / `cover_image_path`), shopping lists, timestamps (`created_at` / `updated_at`), and the language preference. For an app whose entire value proposition is "your data, your device" (§1), a reinstall or lost phone today loses photos and lists even if the user did export. §5.17 closes that gap with a **complete archive** and makes "backup to the user's own cloud" possible **without a backend, accounts, or any provider integration** — the app never touches Google/Dropbox; it only writes a file the user (or their cloud app) moves.
+
+This is **not cloud sync** (§7) — there is no automatic two-way reconciliation, no server, no merge logic. It is a one-way snapshot the user owns.
+
+#### 5.17.1 Archive format (the foundation)
+
+A single `keeptaste-backup.zip` containing:
+
+```
+backup.json   ← machine format, full fidelity (the source of truth for restore)
+recipes.md    ← the §5.6 Markdown (kept verbatim — the readable escape hatch)
+images/       ← every referenced photo, copied from documentDirectory
+```
+
+- `backup.json` carries `schemaVersion` (see 5.17.4), all cookbooks (incl. `cover_image_path`), all recipes (incl. `created_at` / `updated_at` / `image_path`), all `shopping_lists` + `shopping_items`, and `app_settings`. Photo fields store the **relative** `images/<file>` path, not the device URI.
+- `recipes.md` stays English-only and byte-identical to the §5.6 output, so the readability/round-trip promise (§1) is untouched even if `backup.json` is never opened by a human.
+- **Restore prefers `backup.json`**; a `.zip` with no JSON (or a plain legacy `.md`, §5.8) falls back to the Markdown path. A `.md` import remains supported forever (backward compatibility).
+
+**Restore semantics (replace vs add).** Driven by the user stories: the word "restore" means "my data becomes the backup," yet the dominant case — disaster recovery into a fresh install — has an **empty** database where replace and append are identical. So:
+- **Empty database → silent clean restore.** No prompt; the archive is simply restored 1:1.
+- **Non-empty database → a confirm dialog with two choices:**
+  - **Replace all** *(recommended, default)* — wipe via `deleteAllData()` (it already returns stored image paths for cleanup, then delete those files) and `restoreFullBackup` → a faithful 1:1 copy. Covers "test my backup" and "undo a mess," which append would turn into a full-library duplicate.
+  - **Add to library** — the existing append behavior (duplicates allowed, §5.8 semantics) for the merge / combine-two-devices case.
+  - Cancel.
+- **Before a Replace, write a silent safety `.zip` to `cacheDirectory`** (best-effort, reusing the export builder) so a mis-tap is recoverable.
+- **The legacy `.md` import stays append-only** — it cannot be a faithful 1:1 restore anyway (it omits photos, lists, timestamps), so it does not offer Replace.
+
+**ZIP library:** `jszip` (pure JS — works in Expo Go, **no dev/custom build**). The native `react-native-zip-archive` is deliberately avoided (would force a custom build). Known limit: jszip holds image bytes in memory (base64) during pack/unpack — very large photo libraries risk OOM; acceptable for the MVP, revisit with streaming if it bites.
+
+**New/changed code:**
+- *Pure (unit-tested, TDD pipeline per CLAUDE.md):* `utils/backupArchive.ts` — `buildBackupJson(data): string` and `parseBackupJson(text): BackupData` (validates `schemaVersion`). Tests in `__tests__/backupArchive.test.ts`.
+- *Data layer:* `db/recipes.ts` `getFullBackupData()` (gathers everything `getBackupSections` omits); `db/import.ts` `restoreFullBackup(data)`. Restore must **preserve timestamps**, so add `createRecipeRaw` / `createCookbookRaw` that accept explicit `created_at` / `updated_at` / image paths (the existing `createRecipe` overwrites both with `now`).
+- *Native I/O:* `utils/backupArchiveFs.ts` — `exportBackupZip(dialogTitle)` (gather → build JSON + MD → read `images/` → jszip → write to `cacheDirectory` → `Sharing.shareAsync(uri, { mimeType: 'application/zip' })`) and `importBackupZip(uri)` (unzip → `parseBackupJson` → restore photos into `documentDirectory` with fresh `generateImageFilename` names, remapping old→new paths → `restoreFullBackup`).
+- *UI:* `app/settings.tsx` — `handleExportAll` calls `exportBackupZip`; `handleImport` detects `.zip` vs `.md` and routes accordingly. New EN+PL strings in `i18n/dictionary.ts`.
+
+#### 5.17.2 Level 0 — share to Drive (free once 5.17.1 ships)
+
+`exportBackupZip` already hands the file to the system share sheet, where **"Save to Drive" / "Upload to Drive"** (and Dropbox, email, etc.) appear as targets on Android. No extra export code. Settings gains a one-line hint that the share sheet is how you send a backup to the cloud. This covers "online backup" for most users with **zero** OAuth, accounts, or provider integration.
+
+#### 5.17.3 Level 1 — automatic export to a chosen folder (SAF)
+
+A "set and forget" option: the app writes a dated archive to a folder the user picks once; if that folder is synced by a cloud app, the backup goes online automatically. The app still knows nothing about any network.
+
+- **Mechanism:** `expo-file-system` `StorageAccessFramework` (works in Expo Go on Android). `requestDirectoryPermissionsAsync` once → persisted URI → `createFileAsync` writes `keeptaste-backup-YYYY-MM-DD.zip` (keep the N most recent, rotate older).
+- **New `app_settings` keys** (the table already exists — no `ALTER`): `backup_folder_uri`, `backup_last_export_at` (ISO), `backup_auto_enabled` (`'0'`/`'1'`). Getters/setters in `db/settings.ts` (mirror the `language` pattern).
+- **Pure decision (unit-tested):** `utils/backupAuto.ts` `shouldAutoBackup(lastIso, nowIso, intervalDays): boolean`.
+- **Trigger:** in `app/_layout.tsx` (alongside migrations), on start/focus, best-effort and silent (like the photo-cleanup): if enabled, a folder is set, and `shouldAutoBackup` is true → `writeBackupToFolder`, then stamp `backup_last_export_at`. Never blocks startup.
+- **UI:** a new "Automatic backup" Settings section — pick folder, on/off toggle, "Last backup: …" line, and a note that a folder synced by **Dropbox/Nextcloud/Drive-desktop** is the reliable choice (plain Google Drive on Android exposes a DocumentsProvider, not a normally synced local folder, so for Drive the share sheet of Level 0 is more dependable).
+
+**Deliberately out of scope:** direct **Google Drive / Dropbox API** integration (OAuth, account sign-in, app folders). It is the most work, requires a dev build + Google app verification, and breaks "no accounts" (§7) for little gain over the share sheet. See §7.
+
+#### 5.17.4 Schema versioning (prerequisite for safe restore)
+
+Restoring an archive made on a different schema version is a corruption vector, and the current migration mechanism (`CREATE TABLE IF NOT EXISTS`, §4) has no version tracking. Before restore ships, introduce **`PRAGMA user_version`** in `db/client.ts` with an explicit migration ladder (v1→v2→…), and stamp `schemaVersion` into `backup.json`. Importing an archive from a **newer** schema surfaces a clear message instead of silently mis-restoring. This is cheap now and removes the §9 "migrations don't handle schema changes" risk for every future feature, not just backup.
+
+#### 5.17.5 Build order
+
+`5.17.1 archive` + `5.17.4 versioning` (in parallel) → `5.17.2 Level 0` (free) → `5.17.3 Level 1`. The archive is the bulk of the work; the levels are thin wrappers over it.
+
+---
+
 ## 6. Design system
 
 All tokens live in `constants/theme.ts`. Components do not use hardcoded color, size, or shadow values.
@@ -623,7 +760,7 @@ Shared presentational components live in `components/ui/`: `ScreenHeader` (custo
 Interaction rules:
 - `Pressable` with a visible pressed state everywhere (no bare `TouchableOpacity`); touch targets ≥ 44pt, shopping-list rows ≥ 56pt (`Touch` tokens in `theme.ts`).
 - Safe areas via `react-native-safe-area-context` only (the deprecated RN `SafeAreaView` is not used).
-- The recipe view keeps the screen awake (`expo-keep-awake`) and renders ingredients/steps at ≥ 18pt (`Typography.size.reading`).
+- The recipe view keeps the screen awake (`expo-keep-awake`) and renders ingredients/steps at ≥ 18pt (`Typography.size.reading`); header **A− / A+** buttons let the cook bump that base size up to 1.8× for the session (ephemeral, resets on exit — §5.4).
 - Checking off a shopping item gives light haptic feedback (`utils/haptics.ts`) and animates via `LayoutAnimation` (`utils/motion.ts`), which is suppressed when the system reduce-motion setting is on.
 - Images render through `expo-image` (fade-in transition, cover-fit); cookbook tiles get a bottom gradient scrim (`expo-linear-gradient`) so the white name stays readable on any photo.
 - Animation durations come from `Motion` in `theme.ts` (150–250ms).
@@ -644,12 +781,15 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 
 | Feature | Reason for omission |
 |---|---|
-| Cloud sync | Complexity, infrastructure costs, privacy concerns |
+| Cloud sync (two-way reconciliation, server, merge) | Complexity, infrastructure costs, privacy concerns. **Note:** the one-way `.zip` backup to the user's own cloud folder (§5.17) is *not* sync — the app writes a file, never reconciles or talks to a server |
+| Direct Google Drive / Dropbox API integration (OAuth, account sign-in, app folders) | Most work, needs a dev build + provider app verification, and breaks "no accounts" — for little gain over the system share sheet (§5.17.2). Online backup is achieved via the share sheet (Level 0) or a user-chosen synced folder (Level 1, SAF) |
 | User accounts | Same as above — the app is deliberately private and local |
 | Tags (recipe labels + filtering) | Removed from the MVP — title search is enough to start; may return in the future (see §8) |
 | Ingredient scaling (servings multiplier) | Ingredients are text, not structured data — parsing would be brittle |
-| Cooking mode (step-by-step active screen) | Complexity, beyond MVP |
-| Importing recipes from a URL | Page-parsing complexity, beyond MVP |
+| Cooking mode (step-by-step active screen) | Complexity, beyond MVP. The *reading-view* affordances a cook actually needs — keep-awake and in-recipe text zoom (A−/A+) — already ship on the recipe view (§5.4/§6); only the dedicated one-step-at-a-time screen stays out |
+| AI / network "smart parsing" for recipe import | Breaks the local-first, no-backend philosophy (§1); per-call cost. Single-recipe import stays deterministic (§5.15) |
+| Scraping raw HTML when a page has no structured data | Brittle, garbage-prone. Link import (§5.15) reads Schema.org `Recipe` JSON-LD only; otherwise it falls back to paste-text |
+| Importing recipes from video / transcripts (YouTube, Reels, TikTok video) | Needs transcription + AI; out of scope. Captions can be pasted as text (§5.15) |
 | Sharing recipes between users | Requires a backend |
 | Drag & drop step reordering | Steps live in one text field, not separate records |
 | Notifications / timers | Out of scope |
@@ -669,6 +809,11 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **Correct numeric field parsing** — the current pattern `value ? Number(value) : null` saves `NaN` for text; implement the rule from §5.5 (integer ≥ 1 or `null`)
 - [x] **Diacritics-safe search** — replace SQL `LIKE` with JS-side `toLowerCase()` filtering (§5.1)
 - [ ] **Add ingredients to a shopping list** — the recipe→shopping bridge per §5.12: line-based ingredient parser (`utils/ingredients.ts`), picker modal (`app/recipe/add-to-list.tsx`), bulk insert `createShoppingItems` in `db/shoppingLists.ts`, "Add to shopping list" button in the recipe view, EN+PL strings
+- [x] **Complete backup archive (.zip) — foundation** — §5.17.1: `utils/backupArchive.ts` (`buildBackupJson` / `parseBackupJson`, unit-tested), `db/backup.ts` (`getFullBackupData()`, `isDatabaseEmpty()`, timestamp-preserving + id-remapping `restoreFullBackup()`, unit-tested), native `utils/backupArchiveFs.ts` (`exportBackupZip` / `loadBackupZip` / `commitBackupRestore`) via `jszip`, Settings export/import wired to detect `.zip` vs `.md`, EN+PL strings. Embeds the §5.6 `.md` as the readable layer; restore prefers JSON. **Restore semantics:** silent 1:1 into an empty DB; into a non-empty DB a "Replace all (recommended) / Add to library" confirm, with a silent safety `.zip` to cache before a Replace; legacy `.md` stays append-only
+- [x] **DB schema versioning** — §5.17.4: `PRAGMA user_version` + a migration ladder in `db/client.ts`; stamp `schemaVersion` in `backup.json`; restore from a newer version surfaces a clear message. Prerequisite for safe restore; removes the §9 migration risk
+- [x] **Online backup — Level 0 (share sheet)** — §5.17.2: once the archive ships this is ~free; add a Settings hint that the share sheet sends the backup to Drive/Dropbox. EN+PL string
+- [x] **Online backup — Level 1 (SAF auto-export)** — §5.17.3: `StorageAccessFramework` folder pick, new `app_settings` keys (`backup_folder_uri`, `backup_last_export_at`, `backup_auto_enabled`) + `db/settings.ts` accessors, pure `utils/backupAuto.ts` `shouldAutoBackup` (unit-tested), best-effort trigger in `app/_layout.tsx`, "Automatic backup" Settings section with the synced-folder note. **Second approved exception to the no-extra-settings rule (§7), after language (§5.11)**
+- [x] **Single-recipe import (link / paste text)** — §5.15: pure parsers in `utils/recipeImport.ts` (`parseRecipeJsonLd`, `parsePastedRecipe`, `parseIsoDuration`) with unit tests, native fetch wrapper `utils/recipeImportFetch.ts`, `components/recipe/ImportSheet.tsx`, an "Import" affordance on the new-recipe form (create mode only) that pre-fills `RecipeFormData` (review-then-save; source URL → notes; photo skipped in v1), EN+PL strings. From-photo OCR and an Android share target are later phases
 
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)
@@ -688,7 +833,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 URIs returned by `expo-image-picker` may point to the system's temporary directory. If the system clears the cache, photos in the app will disappear. Mitigated: on save the file is copied to `documentDirectory` and cleaned up on replace/remove/delete (`utils/imageStorage.ts`, §5.5/§8). Images saved before this change still point at cache URIs and are re-persisted the next time the recipe/cookbook is saved.
 
 **Database migrations:**
-The current mechanism (`CREATE TABLE IF NOT EXISTS`) does not handle schema changes to existing tables. Any future column change requires a manual `ALTER TABLE` or a data migration in `client.ts`.
+The current mechanism (`CREATE TABLE IF NOT EXISTS`) does not handle schema changes to existing tables. Any future column change requires a manual `ALTER TABLE` or a data migration in `client.ts`. **Being addressed** by `PRAGMA user_version` + a migration ladder (§5.17.4), introduced as a prerequisite for safe backup restore.
 
-**No backup:**
-The user can lose data when reinstalling the app or formatting the device. The only protection mechanism is Markdown export. Communicating this in onboarding — medium-priority TODO (§8).
+**No / incomplete backup:**
+The user can lose data when reinstalling the app or formatting the device. The Markdown export (§5.6) is the only protection today and is **incomplete** — it omits photos, shopping lists, and timestamps. **Being addressed** by the complete `.zip` archive and online-backup options (§5.17): a full-fidelity snapshot, share-sheet upload to the user's cloud (Level 0), and optional automatic export to a synced folder (Level 1). Communicating the local-only nature in onboarding stays relevant regardless.

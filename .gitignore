@@ -35,7 +35,10 @@ yarn-error.*
 # agent/E2E test artifacts
 .playwright-mcp/
 
-# Build artifacts (regenerable, not source)
-keeptaste.apk          # local EAS APK output (eas build --local)
-eas-build.log          # transient EAS build log
-assets/store/keeptaste-demo.zip   # generated demo backup — rebuild with scripts/build-demo-backup.ts
+# Build artifacts (regenerable, not source — see scripts/README.md)
+# local EAS APK output (eas build --local)
+keeptaste.apk
+# transient EAS build log
+eas-build.log
+# generated demo backup — rebuild with scripts/build-demo-backup.ts
+assets/store/keeptaste-demo.zip

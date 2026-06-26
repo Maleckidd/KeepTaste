@@ -24,7 +24,7 @@ implementation. Every test case below exercises at least one of those gaps.
 
 ### Out of scope of this plan
 - Web-only behavior (the web build is a test environment, not a product platform — SPEC §2).
-- Features not implemented yet: animations, tags (SPEC §7/§8). Dark mode (SPEC §6) and Markdown import (§5.8) are implemented and covered below (DM and MI cases).
+- Features not implemented yet: animations, tags (SPEC §7/§8). Dark mode (SPEC §6), Markdown import (§5.8), and single-recipe import (§5.15) are implemented and covered below (DM, MI, and RI cases).
 - Performance/load testing — the app is local-only and single-user; not a current risk.
 
 ---
@@ -290,6 +290,41 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 **MI-06 · P2 · Imported recipes have no photos**
 1. After MI-01, open imported R1.
 - Expected: gray placeholder instead of a photo (export does not carry images — known format property, not a bug); everything else intact.
+
+### RI — Single-recipe import (SPEC §5.15)
+
+> Distinct from MI (whole-library Markdown backup). The pure parsers are unit-tested
+> (`__tests__/recipeImport.test.ts`); these cases cover the native sheet, `fetch`, and keyboard.
+
+**RI-01 · P0 · Import affordance only when creating**
+1. Open a recipe for **edit** (recipe view → ⋯ → Edit).
+- Expected: **no** "Import from a link or text" affordance on the form.
+2. Create a **new** recipe (FAB / "+").
+- Expected: the "Import" affordance appears above the title; tapping it opens the Import sheet (modes "From link" / "Paste text", default "From link").
+
+**RI-02 · P0 · Import from a link (JSON-LD)**
+1. From-link mode, paste a recipe URL from a mainstream blog (e.g. AniaGotuje, Kwestia Smaku, BBC Good Food) → tap Import.
+- Expected: the sheet closes and the new-recipe form is pre-filled — title, ingredients, instructions, and any prep/cook/servings the page exposes; a localized "Source: <url>" line is appended to Notes. No photo is pulled. Nothing is saved yet (RI-06).
+
+**RI-03 · P1 · Link with no structured data / blocked site**
+1. Paste a URL of a page with no Recipe JSON-LD (e.g. a social post), or a site that refuses the request → Import.
+- Expected: an inline message ("couldn't read this page…" or "this site blocks automatic import…") **and** the sheet switches to Paste-text mode; the form is untouched.
+
+**RI-04 · P1 · Link with no network**
+1. Enable airplane mode, paste any URL → Import.
+- Expected: inline "Couldn't load that page. Check the link and your connection."; the form is untouched; no crash.
+
+**RI-05 · P0 · Paste text parsing**
+1. Paste-text mode → paste a recipe copied from a blog (title line, a "Składniki/Ingredients" list, numbered or "Krok N" steps, and a trailing "Wskazówki/Tip" block) → Import.
+- Expected: the form pre-fills — first line as title, ingredients vs. steps split correctly, prep/cook/servings filled if the text had labeled times, and the tip block lands in **Notes**; UI chrome / nutrition lines are dropped. Chaotic captions with no structure fall back to everything in instructions (no crash).
+
+**RI-06 · P0 · Review-then-save & cookbook context**
+1. Launch import from inside a specific cookbook, import a recipe, edit a field, then Save.
+- Expected: import only pre-fills (never auto-saves); the saved recipe lands in the cookbook it was created from; abandoning the form before Save creates nothing.
+
+**RI-07 · P1 · Keyboard does not cover the sheet**
+1. Open the Import sheet and tap the URL field (and the paste field).
+- Expected: the sheet lifts above the on-screen keyboard — the input and the Import button stay visible and tappable, not hidden behind the keyboard.
 
 ### SL — Shopping lists (SPEC §5.10)
 
