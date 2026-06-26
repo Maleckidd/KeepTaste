@@ -1,6 +1,6 @@
 // Pure Markdown body builders (SPEC.md §5.6). No native imports — these stay
 // testable in ts-jest. The native full-app backup write+share lives in
-// utils/backupExport.ts; the multi-cookbook layout in utils/backupMarkdown.ts.
+// utils/backupArchiveFs.ts; the multi-cookbook layout in utils/backupMarkdown.ts.
 import type { Recipe } from '../db/schema';
 
 export function formatTime(minutes: number | null | undefined): string {

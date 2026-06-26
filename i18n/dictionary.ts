@@ -334,30 +334,84 @@ export const dictionary = {
     pl: 'Odinstalowanie aplikacji usuwa wszystkie Twoje przepisy.',
   },
   'settings.noticeExport': {
-    en: 'Exporting all data to a Markdown file is the only way to back up your recipes.',
-    pl: 'Eksport wszystkich danych do pliku Markdown to jedyny sposób na kopię zapasową przepisów.',
+    en: 'Exporting a backup is the only way to protect your recipes — save it somewhere off this device.',
+    pl: 'Eksport kopii zapasowej to jedyny sposób, by zabezpieczyć przepisy — zapisz ją poza tym urządzeniem.',
   },
   'settings.exportAll': {
     en: 'Export all data',
     pl: 'Eksportuj wszystkie dane',
   },
   'settings.exportAllHint': {
-    en: 'Saves every cookbook and recipe to a single Markdown backup file you can share or store.',
-    pl: 'Zapisuje wszystkie książki kucharskie i przepisy do jednego pliku kopii zapasowej Markdown, który możesz udostępnić lub przechować.',
+    en: 'Saves a complete backup — every recipe, photo and shopping list — to one .zip file. Use the share sheet to save it to Google Drive, Dropbox or email.',
+    pl: 'Zapisuje pełną kopię zapasową — wszystkie przepisy, zdjęcia i listy zakupów — do jednego pliku .zip. Użyj arkusza udostępniania, aby zapisać go na Dysku Google, w Dropboksie lub wysłać mailem.',
   },
   'settings.exportAllDialogTitle': {
-    en: 'Export all data',
-    pl: 'Eksportuj wszystkie dane',
+    en: 'Back up all data',
+    pl: 'Kopia zapasowa danych',
   },
   'settings.exportFailedTitle': { en: 'Export failed', pl: 'Eksport nieudany' },
   'settings.exportFailedMessage': {
     en: 'Could not export your data.',
     pl: 'Nie udało się wyeksportować danych.',
   },
-  'settings.import': { en: 'Import from Markdown', pl: 'Importuj z Markdown' },
+  'settings.import': { en: 'Restore backup', pl: 'Przywróć kopię zapasową' },
   'settings.importHint': {
-    en: 'Restores cookbooks and recipes from a previously exported Markdown backup.',
-    pl: 'Przywraca książki kucharskie i przepisy z wcześniej wyeksportowanej kopii zapasowej Markdown.',
+    en: 'Restores from a .zip backup (recipes, photos and lists), or a legacy Markdown export.',
+    pl: 'Przywraca z kopii .zip (przepisy, zdjęcia i listy) lub starszego eksportu Markdown.',
+  },
+  'settings.restoreChooseTitle': { en: 'Restore backup', pl: 'Przywróć kopię' },
+  'settings.restoreChooseMessage': {
+    en: 'This backup has {recipes} recipes. Your library already has data — replace everything with the backup, or add the backup to it?',
+    pl: 'Ta kopia zawiera przepisy: {recipes}. Twoja biblioteka już zawiera dane — zastąpić wszystko kopią czy dodać kopię do istniejących danych?',
+  },
+  'settings.restoreReplace': { en: 'Replace all', pl: 'Zastąp wszystko' },
+  'settings.restoreAdd': { en: 'Add to library', pl: 'Dodaj do biblioteki' },
+  'settings.restoreReplacedTitle': { en: 'Backup restored', pl: 'Kopia przywrócona' },
+  'settings.restoreReplacedMessage': {
+    en: 'Your library now matches the backup.',
+    pl: 'Twoja biblioteka odpowiada teraz kopii zapasowej.',
+  },
+  'settings.restoreAddedTitle': { en: 'Backup imported', pl: 'Kopia zaimportowana' },
+  'settings.restoreAddedMessage': {
+    en: 'The backup was added to your library.',
+    pl: 'Kopia została dodana do Twojej biblioteki.',
+  },
+  'settings.importFailedZip': {
+    en: 'This file is not a valid KeepTaste backup.',
+    pl: 'Ten plik nie jest prawidłową kopią zapasową KeepTaste.',
+  },
+  'settings.autoBackup': { en: 'Automatic backup', pl: 'Automatyczna kopia' },
+  'settings.autoBackupEnable': {
+    en: 'Back up automatically',
+    pl: 'Twórz kopię automatycznie',
+  },
+  'settings.autoBackupChooseFolder': {
+    en: 'Choose folder',
+    pl: 'Wybierz folder',
+  },
+  'settings.autoBackupChangeFolder': {
+    en: 'Change folder',
+    pl: 'Zmień folder',
+  },
+  'settings.autoBackupFolderSet': {
+    en: 'Backup folder selected',
+    pl: 'Wybrano folder kopii',
+  },
+  'settings.autoBackupNoFolder': {
+    en: 'No folder selected yet',
+    pl: 'Nie wybrano jeszcze folderu',
+  },
+  'settings.autoBackupLast': {
+    en: 'Last backup: {date}',
+    pl: 'Ostatnia kopia: {date}',
+  },
+  'settings.autoBackupNever': {
+    en: 'Last backup: never',
+    pl: 'Ostatnia kopia: nigdy',
+  },
+  'settings.autoBackupNote': {
+    en: 'A daily backup is written to this folder. Point it at a folder synced by Dropbox, Nextcloud or Drive for desktop to keep an off-device copy. For Google Drive on the phone, use the share sheet above instead.',
+    pl: 'Codzienna kopia jest zapisywana do tego folderu. Wskaż folder synchronizowany przez Dropbox, Nextcloud lub Dysk Google na komputerze, aby mieć kopię poza urządzeniem. Dla Dysku Google na telefonie użyj arkusza udostępniania powyżej.',
   },
   'settings.dangerZone': { en: 'Danger zone', pl: 'Strefa zagrożenia' },
   'settings.deleteAll': { en: 'Delete all data', pl: 'Usuń wszystkie dane' },

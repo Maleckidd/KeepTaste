@@ -6,6 +6,8 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  Platform,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +18,21 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { deleteAllData } from '@/db/recipes';
+import { isDatabaseEmpty } from '@/db/backup';
 import { importBackup } from '@/db/import';
 import {
   parseBackupMarkdown,
   type BackupSection,
 } from '@/utils/importMarkdown';
-import { exportAllData } from '@/utils/backupExport';
+import {
+  exportBackupZip,
+  loadBackupZip,
+  commitBackupRestore,
+  writeBackupToFolder,
+  BACKUP_KEYS,
+  type LoadedBackup,
+} from '@/utils/backupArchiveFs';
+import { getSetting, setSetting } from '@/db/settings';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import {
   useTheme,
@@ -41,6 +52,58 @@ export default function SettingsScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
   const [languageMenuOpen, setLanguageMenuOpen] = React.useState(false);
+
+  // Automatic backup (§5.17.3) — Android only (Storage Access Framework).
+  const supportsAutoBackup = Platform.OS === 'android';
+  const [autoEnabled, setAutoEnabled] = React.useState(false);
+  const [folderUri, setFolderUri] = React.useState<string | null>(null);
+  const [lastBackupAt, setLastBackupAt] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!supportsAutoBackup) return;
+    (async () => {
+      setAutoEnabled((await getSetting(BACKUP_KEYS.autoEnabled)) === '1');
+      setFolderUri(await getSetting(BACKUP_KEYS.folderUri));
+      setLastBackupAt(await getSetting(BACKUP_KEYS.lastExportAt));
+    })();
+  }, [supportsAutoBackup]);
+
+  const pickBackupFolder = async () => {
+    const perm =
+      await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!perm.granted) return;
+    await setSetting(BACKUP_KEYS.folderUri, perm.directoryUri);
+    await setSetting(BACKUP_KEYS.autoEnabled, '1');
+    setFolderUri(perm.directoryUri);
+    setAutoEnabled(true);
+    // Write a first backup immediately so the user sees it works.
+    try {
+      const now = new Date().toISOString();
+      await writeBackupToFolder(perm.directoryUri);
+      await setSetting(BACKUP_KEYS.lastExportAt, now);
+      setLastBackupAt(now);
+    } catch {
+      Alert.alert(
+        t('settings.exportFailedTitle'),
+        t('settings.exportFailedMessage')
+      );
+    }
+  };
+
+  const toggleAutoBackup = async (value: boolean) => {
+    if (value && !folderUri) {
+      await pickBackupFolder();
+      return;
+    }
+    await setSetting(BACKUP_KEYS.autoEnabled, value ? '1' : '0');
+    setAutoEnabled(value);
+  };
+
+  const lastBackupLabel = lastBackupAt
+    ? t('settings.autoBackupLast', {
+        date: new Date(lastBackupAt).toLocaleDateString(),
+      })
+    : t('settings.autoBackupNever');
 
   const languageSubtitle =
     preference === 'en'
@@ -113,7 +176,7 @@ export default function SettingsScreen() {
 
   const handleExportAll = async () => {
     try {
-      await exportAllData(t('settings.exportAllDialogTitle'));
+      await exportBackupZip(t('settings.exportAllDialogTitle'));
     } catch {
       Alert.alert(
         t('settings.exportFailedTitle'),
@@ -122,19 +185,76 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleImport = async () => {
-    const picked = await DocumentPicker.getDocumentAsync({
-      type: ['text/markdown', 'text/plain'],
-      copyToCacheDirectory: true,
-    });
+  const runRestore = async (
+    loaded: LoadedBackup,
+    mode: 'replace' | 'add'
+  ) => {
+    try {
+      await commitBackupRestore(loaded, mode);
+      Alert.alert(
+        mode === 'replace'
+          ? t('settings.restoreReplacedTitle')
+          : t('settings.restoreAddedTitle'),
+        mode === 'replace'
+          ? t('settings.restoreReplacedMessage')
+          : t('settings.restoreAddedMessage')
+      );
+      router.back();
+    } catch {
+      Alert.alert(
+        t('settings.importFailedTitle'),
+        t('settings.importFailedSaving')
+      );
+    }
+  };
 
-    if (picked.canceled) return;
-    const asset = picked.assets[0];
-    if (!asset) return;
+  // .zip path — the complete backup (§5.17). Into an empty library it restores
+  // silently 1:1; into a populated one it asks Replace vs Add.
+  const handleImportZip = async (uri: string) => {
+    const result = await loadBackupZip(uri);
+    if (!result.ok) {
+      Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedZip'));
+      return;
+    }
+    const { loaded } = result;
 
+    // A zip that fell back to recipes.md (no backup.json) carries no photos or
+    // timestamps, so a Replace would lose fidelity — keep it append-only (§5.17).
+    if (loaded.fromMarkdown) {
+      await runRestore(loaded, 'add');
+      return;
+    }
+
+    if (await isDatabaseEmpty()) {
+      await runRestore(loaded, 'replace');
+      return;
+    }
+
+    Alert.alert(
+      t('settings.restoreChooseTitle'),
+      t('settings.restoreChooseMessage', {
+        recipes: loaded.content.recipes.length,
+      }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.restoreAdd'),
+          onPress: () => runRestore(loaded, 'add'),
+        },
+        {
+          text: t('settings.restoreReplace'),
+          style: 'destructive',
+          onPress: () => runRestore(loaded, 'replace'),
+        },
+      ]
+    );
+  };
+
+  // Legacy .md path — append-only (it can't be a faithful 1:1 restore).
+  const handleImportMarkdown = async (uri: string) => {
     let content: string;
     try {
-      content = await FileSystem.readAsStringAsync(asset.uri);
+      content = await FileSystem.readAsStringAsync(uri);
     } catch {
       Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedRead'));
       return;
@@ -165,6 +285,34 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const handleImport = async () => {
+    const picked = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/octet-stream',
+        'text/markdown',
+        'text/plain',
+      ],
+      copyToCacheDirectory: true,
+    });
+
+    if (picked.canceled) return;
+    const asset = picked.assets[0];
+    if (!asset) return;
+
+    const isZip =
+      asset.name?.toLowerCase().endsWith('.zip') ||
+      asset.mimeType === 'application/zip' ||
+      asset.mimeType === 'application/x-zip-compressed';
+
+    if (isZip) {
+      await handleImportZip(asset.uri);
+    } else {
+      await handleImportMarkdown(asset.uri);
+    }
   };
 
   const handleDeleteAll = () => {
@@ -265,6 +413,45 @@ export default function SettingsScreen() {
           style={styles.actionButton}
         />
         <Text style={styles.importHint}>{t('settings.importHint')}</Text>
+
+        {/* Automatic backup (Android / SAF) */}
+        {supportsAutoBackup && (
+          <>
+            <Text style={styles.sectionLabel}>{t('settings.autoBackup')}</Text>
+            <View style={styles.card}>
+              <View style={styles.autoRow}>
+                <Text style={styles.autoLabel}>
+                  {t('settings.autoBackupEnable')}
+                </Text>
+                <Switch value={autoEnabled} onValueChange={toggleAutoBackup} />
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.autoRow,
+                  pressed && { opacity: 0.6 },
+                ]}
+                onPress={pickBackupFolder}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.autoBackupChooseFolder')}
+              >
+                <View style={styles.autoTextWrap}>
+                  <Text style={styles.autoValue}>
+                    {folderUri
+                      ? t('settings.autoBackupFolderSet')
+                      : t('settings.autoBackupNoFolder')}
+                  </Text>
+                  <Text style={styles.autoSub}>{lastBackupLabel}</Text>
+                </View>
+                <Text style={styles.autoAction}>
+                  {folderUri
+                    ? t('settings.autoBackupChangeFolder')
+                    : t('settings.autoBackupChooseFolder')}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.importHint}>{t('settings.autoBackupNote')}</Text>
+          </>
+        )}
 
         {/* Delete all data */}
         <Text style={styles.sectionLabel}>{t('settings.dangerZone')}</Text>
@@ -388,5 +575,34 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.sm,
     lineHeight: Typography.size.sm * 1.4,
+  },
+  autoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  autoLabel: {
+    flex: 1,
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.text,
+  },
+  autoTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  autoValue: {
+    fontSize: Typography.size.base,
+    color: c.text,
+  },
+  autoSub: {
+    fontSize: Typography.size.sm,
+    color: c.textMuted,
+  },
+  autoAction: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
   },
 });
