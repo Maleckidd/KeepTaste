@@ -58,6 +58,7 @@ export const dictionary = {
   'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
   'a11y.recipePhoto': { en: 'Recipe photo', pl: 'Zdjęcie przepisu' },
   'a11y.changePhoto': { en: 'Add or change photo', pl: 'Dodaj lub zmień zdjęcie' },
+  'a11y.import': { en: 'Import recipe', pl: 'Importuj przepis' },
 
   // --- Tabs ---
   'tabs.recipes': { en: 'Recipes', pl: 'Przepisy' },
@@ -216,6 +217,37 @@ export const dictionary = {
     en: 'Next time add more vanilla sugar...',
     pl: 'Następnym razem dodać więcej cukru waniliowego...',
   },
+  'recipeForm.importAction': {
+    en: 'Import from a link or text',
+    pl: 'Importuj z linku lub tekstu',
+  },
+
+  // --- Single-recipe import sheet (components/recipe/ImportSheet.tsx) ---
+  'import.title': { en: 'Import recipe', pl: 'Importuj przepis' },
+  'import.modeLink': { en: 'From link', pl: 'Z linku' },
+  'import.modePaste': { en: 'Paste text', pl: 'Wklej tekst' },
+  'import.urlPlaceholder': {
+    en: 'Paste a recipe URL',
+    pl: 'Wklej adres URL przepisu',
+  },
+  'import.pastePlaceholder': {
+    en: 'Paste the recipe text',
+    pl: 'Wklej tekst przepisu',
+  },
+  'import.fetchButton': { en: 'Import', pl: 'Importuj' },
+  'import.noStructuredData': {
+    en: "Couldn't read this page automatically — paste the recipe text instead.",
+    pl: 'Nie udało się odczytać tej strony automatycznie — wklej tekst przepisu.',
+  },
+  'import.networkError': {
+    en: "Couldn't load that page. Check the link and your connection.",
+    pl: 'Nie udało się wczytać strony. Sprawdź link i połączenie.',
+  },
+  'import.blocked': {
+    en: 'This site blocks automatic import — paste the recipe text instead.',
+    pl: 'Ta strona blokuje automatyczny import — wklej tekst przepisu.',
+  },
+  'import.sourcePrefix': { en: 'Source: {url}', pl: 'Źródło: {url}' },
 
   // --- Formatting help sheet (components/ui/FormattingHelpSheet.tsx) ---
   'formattingHelp.title': { en: 'Formatting tips', pl: 'Wskazówki formatowania' },

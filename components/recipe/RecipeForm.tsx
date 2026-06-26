@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -17,6 +16,7 @@ import Button from '@/components/ui/Button';
 import ModalHeader from '@/components/ui/ModalHeader';
 import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import FormattingHelpSheet from '@/components/ui/FormattingHelpSheet';
+import ImportSheet from '@/components/recipe/ImportSheet';
 import {
   useTheme,
   ThemePalette,
@@ -24,6 +24,7 @@ import {
   Spacing,
   Radius,
   Shadow,
+  Touch,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
 import {
@@ -39,6 +40,8 @@ type Props = {
   onSave: (data: RecipeFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  /** Shows the "Import from a link or text" affordance (create mode only). */
+  enableImport?: boolean;
 };
 
 function Field({
@@ -117,6 +120,7 @@ export default function RecipeForm({
   onSave,
   onCancel,
   isLoading,
+  enableImport,
 }: Props) {
   const c = useTheme();
   const t = useT();
@@ -125,11 +129,18 @@ export default function RecipeForm({
   const [form, setForm] = useState<RecipeFormData>(initial);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [formatHelpOpen, setFormatHelpOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   // Inline validation instead of an Alert; cleared as soon as the user types.
   const [titleError, setTitleError] = useState(false);
 
   const set = (key: keyof RecipeFormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  // Import only sets content fields (never imagePath — the partial excludes it).
+  const applyImport = (partial: Partial<RecipeFormData>) => {
+    setForm((prev) => ({ ...prev, ...partial }));
+    setImportOpen(false);
+  };
 
   const handlePickImage = async () => {
     // Uses the Android system photo picker / iOS PHPicker — no media-library
@@ -197,7 +208,7 @@ export default function RecipeForm({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       style={{ flex: 1 }}
     >
       <ModalHeader title={title} onClose={handleCancel} />
@@ -207,6 +218,22 @@ export default function RecipeForm({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Import affordance (create mode only) */}
+        {enableImport ? (
+          <Pressable
+            onPress={() => setImportOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.import')}
+            style={({ pressed }) => [
+              styles.importButton,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Ionicons name="download-outline" size={18} color={c.primary} />
+            <Text style={styles.importLabel}>{t('recipeForm.importAction')}</Text>
+          </Pressable>
+        ) : null}
+
         {/* Title + photo */}
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
@@ -350,6 +377,14 @@ export default function RecipeForm({
         visible={formatHelpOpen}
         onClose={() => setFormatHelpOpen(false)}
       />
+
+      {enableImport ? (
+        <ImportSheet
+          visible={importOpen}
+          onClose={() => setImportOpen(false)}
+          onResult={applyImport}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -400,5 +435,21 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     fontSize: Typography.size.sm,
     color: c.error,
     marginTop: Spacing.xs,
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    minHeight: Touch.min,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surfaceAlt,
+  },
+  importLabel: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
   },
 });

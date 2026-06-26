@@ -47,6 +47,7 @@ export default function NewRecipeScreen() {
         onSave={handleSave}
         onCancel={() => router.back()}
         isLoading={isLoading}
+        enableImport
       />
     </SafeAreaView>
   );
