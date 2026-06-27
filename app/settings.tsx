@@ -89,22 +89,26 @@ export default function SettingsScreen() {
     const perm =
       await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!perm.granted) return;
-    await setSetting(BACKUP_KEYS.folderUri, perm.directoryUri);
-    await setSetting(BACKUP_KEYS.autoEnabled, '1');
-    setFolderUri(perm.directoryUri);
-    setAutoEnabled(true);
-    // Write a first backup immediately so the user sees it works.
+    // Verify the folder is actually writable before persisting anything. Some
+    // providers (notably Google Drive on Android) grant the picker but then
+    // reject file writes; we must not leave auto-backup "enabled" pointing at a
+    // folder that silently fails on every launch.
+    const now = new Date().toISOString();
     try {
-      const now = new Date().toISOString();
       await writeBackupToFolder(perm.directoryUri);
-      await setSetting(BACKUP_KEYS.lastExportAt, now);
-      setLastBackupAt(now);
     } catch {
       Alert.alert(
         t('settings.exportFailedTitle'),
         t('settings.exportFailedMessage')
       );
+      return;
     }
+    await setSetting(BACKUP_KEYS.folderUri, perm.directoryUri);
+    await setSetting(BACKUP_KEYS.autoEnabled, '1');
+    await setSetting(BACKUP_KEYS.lastExportAt, now);
+    setFolderUri(perm.directoryUri);
+    setAutoEnabled(true);
+    setLastBackupAt(now);
   };
 
   const toggleAutoBackup = async (value: boolean) => {
