@@ -477,6 +477,18 @@ export const dictionary = {
     en: 'Last backup: never',
     pl: 'Ostatnia kopia: nigdy',
   },
+  'settings.autoBackupKeep': {
+    en: 'Backups to keep',
+    pl: 'Liczba kopii',
+  },
+  'settings.autoBackupKeepValue': {
+    en: '{count} most recent',
+    pl: '{count} najnowszych',
+  },
+  'settings.autoBackupKeepTitle': {
+    en: 'How many backups to keep?',
+    pl: 'Ile kopii przechowywać?',
+  },
   'settings.autoBackupNote': {
     en: 'A daily backup is written to this folder. Point it at a folder synced by Dropbox, Nextcloud or Drive for desktop to keep an off-device copy. For Google Drive on the phone, use the share sheet above instead.',
     pl: 'Codzienna kopia jest zapisywana do tego folderu. Wskaż folder synchronizowany przez Dropbox, Nextcloud lub Dysk Google na komputerze, aby mieć kopię poza urządzeniem. Dla Dysku Google na telefonie użyj arkusza udostępniania powyżej.',

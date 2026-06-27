@@ -34,6 +34,10 @@ import {
   BACKUP_KEYS,
   type LoadedBackup,
 } from '@/utils/backupArchiveFs';
+import {
+  parseKeepCount,
+  AUTO_BACKUP_KEEP_OPTIONS,
+} from '@/utils/backupAuto';
 import { getSetting, setSetting } from '@/db/settings';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import {
@@ -63,6 +67,8 @@ export default function SettingsScreen() {
   const [autoEnabled, setAutoEnabled] = React.useState(false);
   const [folderUri, setFolderUri] = React.useState<string | null>(null);
   const [lastBackupAt, setLastBackupAt] = React.useState<string | null>(null);
+  const [keepCount, setKeepCount] = React.useState(() => parseKeepCount(null));
+  const [keepMenuOpen, setKeepMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!supportsAutoBackup) return;
@@ -70,8 +76,14 @@ export default function SettingsScreen() {
       setAutoEnabled((await getSetting(BACKUP_KEYS.autoEnabled)) === '1');
       setFolderUri(await getSetting(BACKUP_KEYS.folderUri));
       setLastBackupAt(await getSetting(BACKUP_KEYS.lastExportAt));
+      setKeepCount(parseKeepCount(await getSetting(BACKUP_KEYS.keep)));
     })();
   }, [supportsAutoBackup]);
+
+  const chooseKeepCount = async (value: number) => {
+    await setSetting(BACKUP_KEYS.keep, String(value));
+    setKeepCount(value);
+  };
 
   const pickBackupFolder = async () => {
     const perm =
@@ -479,6 +491,24 @@ export default function SettingsScreen() {
                     : t('settings.autoBackupChooseFolder')}
                 </Text>
               </Pressable>
+              {folderUri && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.autoRow,
+                    pressed && { opacity: 0.6 },
+                  ]}
+                  onPress={() => setKeepMenuOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('settings.autoBackupKeep')}
+                >
+                  <Text style={styles.autoLabel}>
+                    {t('settings.autoBackupKeep')}
+                  </Text>
+                  <Text style={styles.autoAction}>
+                    {t('settings.autoBackupKeepValue', { count: keepCount })}
+                  </Text>
+                </Pressable>
+              )}
             </View>
             <Text style={styles.importHint}>{t('settings.autoBackupNote')}</Text>
           </>
@@ -516,6 +546,17 @@ export default function SettingsScreen() {
             onPress: () => setPreference('pl'),
           },
         ]}
+      />
+
+      <ActionSheet
+        visible={keepMenuOpen}
+        title={t('settings.autoBackupKeepTitle')}
+        onClose={() => setKeepMenuOpen(false)}
+        actions={AUTO_BACKUP_KEEP_OPTIONS.map((value) => ({
+          label: t('settings.autoBackupKeepValue', { count: value }),
+          icon: 'albums-outline',
+          onPress: () => chooseKeepCount(value),
+        }))}
       />
 
       <Modal visible={busyMessage !== null} transparent animationType="fade">

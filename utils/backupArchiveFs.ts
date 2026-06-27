@@ -14,7 +14,12 @@ import { getBackupSections, deleteAllData } from '../db/recipes';
 import { getSetting, setSetting } from '../db/settings';
 import { buildBackupJson, parseBackupJson, type BackupContent } from './backupArchive';
 import { buildBackupMarkdown } from './backupMarkdown';
-import { shouldAutoBackup } from './backupAuto';
+import {
+  shouldAutoBackup,
+  backupsToPrune,
+  parseKeepCount,
+  AUTO_BACKUP_KEEP_DEFAULT,
+} from './backupAuto';
 import { parseBackupMarkdown } from './importMarkdown';
 import type { BackupSection } from './importMarkdown';
 import {
@@ -258,6 +263,7 @@ export const BACKUP_KEYS = {
   folderUri: 'backup_folder_uri',
   lastExportAt: 'backup_last_export_at',
   autoEnabled: 'backup_auto_enabled',
+  keep: 'backup_keep',
 } as const;
 
 /** How often the automatic backup runs, in days. */
@@ -271,9 +277,34 @@ function datedBackupName(nowIso: string): string {
  * Writes the archive into a SAF directory the user granted. The folder is
  * persisted across launches; if a sync app (Dropbox/Nextcloud/Drive-desktop)
  * watches it, the backup reaches the cloud with no network code here.
+ *
+ * Before writing, it prunes the folder (SPEC.md §5.17.3 "keep the N most recent,
+ * rotate older"): any existing same-day archive is removed so the new write
+ * replaces it instead of becoming "... (1).zip", and archives beyond the
+ * user-chosen retention count (backup_keep) are deleted so backups don't fill
+ * the disk indefinitely.
  */
 export async function writeBackupToFolder(folderUri: string): Promise<void> {
   const nowIso = new Date().toISOString();
+  const keep = parseKeepCount(
+    await getSetting(BACKUP_KEYS.keep),
+    AUTO_BACKUP_KEEP_DEFAULT
+  );
+
+  try {
+    const existing =
+      await FileSystem.StorageAccessFramework.readDirectoryAsync(folderUri);
+    for (const uri of backupsToPrune(existing, nowIso.slice(0, 10), keep)) {
+      try {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+      } catch {
+        // a single stubborn file must not abort the backup
+      }
+    }
+  } catch {
+    // some providers don't support listing; never let pruning block the write
+  }
+
   const b64 = await buildArchiveBase64();
   const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
     folderUri,

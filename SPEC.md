@@ -689,9 +689,10 @@ images/       ← every referenced photo, copied from documentDirectory
 
 A "set and forget" option: the app writes a dated archive to a folder the user picks once; if that folder is synced by a cloud app, the backup goes online automatically. The app still knows nothing about any network.
 
-- **Mechanism:** `expo-file-system` `StorageAccessFramework` (works in Expo Go on Android). `requestDirectoryPermissionsAsync` once → persisted URI → `createFileAsync` writes `keeptaste-backup-YYYY-MM-DD.zip` (keep the N most recent, rotate older).
-- **New `app_settings` keys** (the table already exists — no `ALTER`): `backup_folder_uri`, `backup_last_export_at` (ISO), `backup_auto_enabled` (`'0'`/`'1'`). Getters/setters in `db/settings.ts` (mirror the `language` pattern).
-- **Pure decision (unit-tested):** `utils/backupAuto.ts` `shouldAutoBackup(lastIso, nowIso, intervalDays): boolean`.
+- **Mechanism:** `expo-file-system` `StorageAccessFramework` (works in Expo Go on Android). `requestDirectoryPermissionsAsync` once → persisted URI → `createFileAsync` writes `keeptaste-backup-YYYY-MM-DD.zip`. Before each write, `writeBackupToFolder` lists the folder and prunes (`backupsToPrune`): any existing same-day archive is deleted so the new write replaces it (rather than SAF's `... (1).zip` dedupe), and archives beyond the chosen retention count are removed so backups don't fill the disk.
+- **New `app_settings` keys** (the table already exists — no `ALTER`): `backup_folder_uri`, `backup_last_export_at` (ISO), `backup_auto_enabled` (`'0'`/`'1'`), `backup_keep` (retention count; default 1 — one rolling file). Getters/setters in `db/settings.ts` (mirror the `language` pattern).
+- **Pure decisions (unit-tested):** `utils/backupAuto.ts` `shouldAutoBackup(lastIso, nowIso, intervalDays): boolean`, `parseKeepCount(raw, fallback)`, and `backupsToPrune(uris, todayDate, keep): string[]`.
+- **Retention UI:** the "Automatic backup" Settings section offers a "Backups to keep" picker (`AUTO_BACKUP_KEEP_OPTIONS` = 1/3/7/14/30) once a folder is set.
 - **Trigger:** in `app/_layout.tsx` (alongside migrations), on start/focus, best-effort and silent (like the photo-cleanup): if enabled, a folder is set, and `shouldAutoBackup` is true → `writeBackupToFolder`, then stamp `backup_last_export_at`. Never blocks startup.
 - **UI:** a new "Automatic backup" Settings section — pick folder, on/off toggle, "Last backup: …" line, and a note that a folder synced by **Dropbox/Nextcloud/Drive-desktop** is the reliable choice (plain Google Drive on Android exposes a DocumentsProvider, not a normally synced local folder, so for Drive the share sheet of Level 0 is more dependable).
 
