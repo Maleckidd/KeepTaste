@@ -506,7 +506,7 @@ CREATE INDEX idx_shopping_items_list_id ON shopping_items(list_id);
 
 `ON DELETE CASCADE` (not SET NULL like recipes): a shopping item has no meaning outside its list.
 
-**Out of scope for the first iteration:** ~~linking products to recipes/ingredients~~ (now specified — see §5.12), sharing lists, quantities as structured numbers/units, reordering by drag & drop, Markdown export of lists.
+**Out of scope for the first iteration:** ~~linking products to recipes/ingredients~~ (now specified — see §5.12), ~~sharing lists~~ (now specified — see §5.18), quantities as structured numbers/units, reordering by drag & drop, Markdown export of lists.
 
 ### 5.11 Language selection
 
@@ -704,6 +704,24 @@ Restoring an archive made on a different schema version is a corruption vector, 
 #### 5.17.5 Build order
 
 `5.17.1 archive` + `5.17.4 versioning` (in parallel) → `5.17.2 Level 0` (free) → `5.17.3 Level 1`. The archive is the bulk of the work; the levels are thin wrappers over it.
+
+---
+
+### 5.18 Sharing a shopping list as text
+
+**Why:** the app is local-only with no sync (§1/§7), so two people can't see the same list. The common scenario — one person writes the list at home, the other does the shopping — has no path today. §5.18 closes that gap the same way recipes share (§5.13): ready-to-send plain text over whatever messenger the users already have. No backend, no accounts.
+
+**The round-trip is the point.** The shared text is built so the recipient can paste it straight back into a list via **"Paste products"** (§5.16): the format is line-based bullets that `parseIngredients` (§5.16/§5.12) strips on re-paste. Sender shares → recipient pastes → both have the list. One-way, manual, user-owned — not sync.
+
+**Entry point:** a **"Share list"** item (`share-outline`) in the "⋯" header menu of the list detail view, between "Paste products" and "Delete list" (`app/shopping/[id].tsx`).
+
+**Content (`utils/shoppingListShareText.ts`, pure, unit-tested):** `buildShoppingListShareText(listName, items)` returns the list name, a blank line, then one `- {name}` bullet per item (`- {name} ({quantity})` when a quantity is set). **Only active items** are included — products already in the cart are omitted so the recipient starts from a clean list. A list with no active items shares just its name. No "—" placeholders, consistent with the rest of the app. Shared via React Native `Share.share` (like §5.13), localized dialog title (`shopping.shareDialogTitle`).
+
+**Scope / fidelity:** lossy and deliberately so — on re-paste a quantity stays embedded in the item name (the `quantity` column isn't repopulated), matching §5.10/§5.12, which never parse quantities. The share is **not** the backup path (that's the `.md`/`.zip`, §5.6/§5.17) and is **not importable** as structured data.
+
+**i18n:** `shopping.shareList` (menu label) and `shopping.shareDialogTitle` get EN+PL entries (§5.11).
+
+**Testing:** the builder is pure → covered in `__tests__/shoppingListShareText.test.ts` (name + bullets, quantity in parens, checked items omitted, empty list, and a round-trip assertion through `parseIngredients`); the menu action is verified by running the app.
 
 ---
 

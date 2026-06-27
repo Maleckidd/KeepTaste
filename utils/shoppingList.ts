@@ -62,6 +62,73 @@ export function progressCounts(counts: {
   return { checkedCount: counts.checkedCount, totalCount: counts.totalCount };
 }
 
+/**
+ * Normalized names (trim + toLowerCase, plain — no diacritic folding) that occur
+ * 2+ times across the ENTIRE items array (active + in-cart together). Ignores
+ * `checked`; counts names over the whole list. Returns lowercased keys. A name
+ * being in this set is what keeps a lone remaining unchecked copy under a header.
+ */
+export function groupedNames<T extends { name: string }>(items: T[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const key = item.name.trim().toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const result = new Set<string>();
+  for (const [key, n] of counts) if (n >= 2) result.add(key);
+  return result;
+}
+
+export type ActiveRow<T> =
+  | { kind: 'groupHeader'; name: string; count: number; childIds: number[] }
+  // isRepeat = rendered as a group child (indented/dimmed under the header).
+  | { kind: 'item'; item: T; isRepeat: boolean };
+
+/**
+ * Builds the ordered ACTIVE-section render rows. `grouped` is the whole-list
+ * grouped-name set from groupedNames(). For a name in `grouped`, at the slot of
+ * its first occurrence emits one groupHeader (name = first copy's original
+ * casing, count = number of active copies, childIds = their ids in render order)
+ * followed by its child item rows — ALL flagged isRepeat (every child is
+ * indented under the header, not just the 2nd+). Names NOT in `grouped` emit a
+ * single plain item row (isRepeat false). Order preserved at first occurrence;
+ * relative order within a group preserved. Does not mutate input.
+ */
+export function buildActiveRows<T extends { id: number; name: string }>(
+  active: T[],
+  grouped: Set<string>
+): ActiveRow<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const item of active) {
+    const key = item.name.trim().toLowerCase();
+    const g = groups.get(key);
+    if (g) g.push(item);
+    else groups.set(key, [item]);
+  }
+  const rows: ActiveRow<T>[] = [];
+  const seen = new Set<string>();
+  for (const item of active) {
+    const key = item.name.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const members = groups.get(key)!;
+    if (grouped.has(key)) {
+      rows.push({
+        kind: 'groupHeader',
+        name: members[0].name,
+        count: members.length,
+        childIds: members.map((m) => m.id),
+      });
+      members.forEach((m) =>
+        rows.push({ kind: 'item', item: m, isRepeat: true })
+      );
+    } else {
+      members.forEach((m) => rows.push({ kind: 'item', item: m, isRepeat: false }));
+    }
+  }
+  return rows;
+}
+
 /** Aggregates per-list totals and checked counts. Lists with no items are absent. */
 export function countItems(
   items: { listId: number; checked: number }[]

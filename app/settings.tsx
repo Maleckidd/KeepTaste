@@ -8,6 +8,8 @@ import {
   Alert,
   Platform,
   Switch,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +54,9 @@ export default function SettingsScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
   const [languageMenuOpen, setLanguageMenuOpen] = React.useState(false);
+  // Non-null while a restore/import is reading or writing — shows a blocking
+  // spinner so the user knows the (sometimes slow) file load is in progress.
+  const [busyMessage, setBusyMessage] = React.useState<string | null>(null);
 
   // Automatic backup (§5.17.3) — Android only (Storage Access Framework).
   const supportsAutoBackup = Platform.OS === 'android';
@@ -159,6 +164,7 @@ export default function SettingsScreen() {
     });
 
   const runImport = async (sections: BackupSection[]) => {
+    setBusyMessage(t('settings.restoreSaving'));
     try {
       const { cookbooks, recipes } = await importBackup(sections);
       Alert.alert(
@@ -171,10 +177,13 @@ export default function SettingsScreen() {
         t('settings.importFailedTitle'),
         t('settings.importFailedSaving')
       );
+    } finally {
+      setBusyMessage(null);
     }
   };
 
   const handleExportAll = async () => {
+    setBusyMessage(t('settings.exportPreparing'));
     try {
       await exportBackupZip(t('settings.exportAllDialogTitle'));
     } catch {
@@ -182,6 +191,8 @@ export default function SettingsScreen() {
         t('settings.exportFailedTitle'),
         t('settings.exportFailedMessage')
       );
+    } finally {
+      setBusyMessage(null);
     }
   };
 
@@ -189,6 +200,7 @@ export default function SettingsScreen() {
     loaded: LoadedBackup,
     mode: 'replace' | 'add'
   ) => {
+    setBusyMessage(t('settings.restoreSaving'));
     try {
       await commitBackupRestore(loaded, mode);
       Alert.alert(
@@ -205,14 +217,27 @@ export default function SettingsScreen() {
         t('settings.importFailedTitle'),
         t('settings.importFailedSaving')
       );
+    } finally {
+      setBusyMessage(null);
     }
   };
 
   // .zip path — the complete backup (§5.17). Into an empty library it restores
   // silently 1:1; into a populated one it asks Replace vs Add.
   const handleImportZip = async (uri: string) => {
-    const result = await loadBackupZip(uri);
+    // Reading + unzipping can take a moment for large backups — show the spinner
+    // until we either restore (runRestore keeps it up) or fall back to an Alert.
+    setBusyMessage(t('settings.restoreLoading'));
+    let result: Awaited<ReturnType<typeof loadBackupZip>>;
+    try {
+      result = await loadBackupZip(uri);
+    } catch {
+      setBusyMessage(null);
+      Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedZip'));
+      return;
+    }
     if (!result.ok) {
+      setBusyMessage(null);
       Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedZip'));
       return;
     }
@@ -230,6 +255,8 @@ export default function SettingsScreen() {
       return;
     }
 
+    // Need a decision from the user — drop the spinner while the Alert is up.
+    setBusyMessage(null);
     Alert.alert(
       t('settings.restoreChooseTitle'),
       t('settings.restoreChooseMessage', {
@@ -252,15 +279,19 @@ export default function SettingsScreen() {
 
   // Legacy .md path — append-only (it can't be a faithful 1:1 restore).
   const handleImportMarkdown = async (uri: string) => {
+    setBusyMessage(t('settings.restoreLoading'));
     let content: string;
     try {
       content = await FileSystem.readAsStringAsync(uri);
     } catch {
+      setBusyMessage(null);
       Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedRead'));
       return;
     }
 
     const result = parseBackupMarkdown(content);
+    // Parsing is done — the next step is a confirmation Alert, so hide the spinner.
+    setBusyMessage(null);
     if (!result.ok) {
       Alert.alert(t('settings.importFailedTitle'), result.error);
       return;
@@ -486,6 +517,15 @@ export default function SettingsScreen() {
           },
         ]}
       />
+
+      <Modal visible={busyMessage !== null} transparent animationType="fade">
+        <View style={styles.busyOverlay}>
+          <View style={styles.busyCard}>
+            <ActivityIndicator size="large" color={c.primary} />
+            <Text style={styles.busyText}>{busyMessage}</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -494,6 +534,27 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.background,
+  },
+  busyOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  busyCard: {
+    backgroundColor: c.surface,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.xxl,
+    alignItems: 'center',
+    gap: Spacing.base,
+    minWidth: 200,
+  },
+  busyText: {
+    fontSize: Typography.size.base,
+    color: c.text,
+    textAlign: 'center',
   },
   content: {
     paddingHorizontal: Spacing.base,
