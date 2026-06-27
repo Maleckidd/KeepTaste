@@ -15,11 +15,11 @@ import { getSetting, setSetting } from '../db/settings';
 import { buildBackupJson, parseBackupJson, type BackupContent } from './backupArchive';
 import { buildBackupMarkdown } from './backupMarkdown';
 import {
-  shouldAutoBackup,
   backupsToPrune,
   parseKeepCount,
   AUTO_BACKUP_KEEP_DEFAULT,
 } from './backupAuto';
+import { withAutoBackupSuppressed } from './backupTrigger';
 import { parseBackupMarkdown } from './importMarkdown';
 import type { BackupSection } from './importMarkdown';
 import {
@@ -230,30 +230,34 @@ export async function commitBackupRestore(
   loaded: LoadedBackup,
   mode: 'replace' | 'add'
 ): Promise<void> {
-  if (mode === 'replace') {
-    try {
-      await writeSafetyBackup();
-    } catch {
-      // best-effort; a failed safety snapshot must not block the restore
+  // Suppress per-change scheduling so the whole restore fires exactly one
+  // backup at the end, reflecting the restored data (SPEC.md §5.17.3).
+  await withAutoBackupSuppressed(async () => {
+    if (mode === 'replace') {
+      try {
+        await writeSafetyBackup();
+      } catch {
+        // best-effort; a failed safety snapshot must not block the restore
+      }
+      const paths = await deleteAllData();
+      await Promise.all(paths.map(deleteStoredImage));
     }
-    const paths = await deleteAllData();
-    await Promise.all(paths.map(deleteStoredImage));
-  }
 
-  const docDir = FileSystem.documentDirectory;
-  const cache = new Map<string, string>();
-  for (const cb of loaded.content.cookbooks) {
-    cb.coverImagePath = docDir
-      ? await restoreImage(cb.coverImagePath, loaded.zip, docDir, cache)
-      : null;
-  }
-  for (const r of loaded.content.recipes) {
-    r.imagePath = docDir
-      ? await restoreImage(r.imagePath, loaded.zip, docDir, cache)
-      : null;
-  }
+    const docDir = FileSystem.documentDirectory;
+    const cache = new Map<string, string>();
+    for (const cb of loaded.content.cookbooks) {
+      cb.coverImagePath = docDir
+        ? await restoreImage(cb.coverImagePath, loaded.zip, docDir, cache)
+        : null;
+    }
+    for (const r of loaded.content.recipes) {
+      r.imagePath = docDir
+        ? await restoreImage(r.imagePath, loaded.zip, docDir, cache)
+        : null;
+    }
 
-  await restoreFullBackup(loaded.content);
+    await restoreFullBackup(loaded.content);
+  });
 }
 
 // --- Level 1: automatic export to a user-chosen folder (SPEC.md §5.17.3) ---
@@ -265,9 +269,6 @@ export const BACKUP_KEYS = {
   autoEnabled: 'backup_auto_enabled',
   keep: 'backup_keep',
 } as const;
-
-/** How often the automatic backup runs, in days. */
-export const AUTO_BACKUP_INTERVAL_DAYS = 1;
 
 function datedBackupName(nowIso: string): string {
   return `keeptaste-backup-${nowIso.slice(0, 10)}`;
@@ -291,20 +292,18 @@ export async function writeBackupToFolder(folderUri: string): Promise<void> {
     AUTO_BACKUP_KEEP_DEFAULT
   );
 
+  // Identify which old archives to prune, but don't delete yet — we want
+  // the old backup to survive if the new write fails (write-then-prune).
+  let toPrune: string[] = [];
   try {
     const existing =
       await FileSystem.StorageAccessFramework.readDirectoryAsync(folderUri);
-    for (const uri of backupsToPrune(existing, nowIso.slice(0, 10), keep)) {
-      try {
-        await FileSystem.deleteAsync(uri, { idempotent: true });
-      } catch {
-        // a single stubborn file must not abort the backup
-      }
-    }
+    toPrune = backupsToPrune(existing, nowIso.slice(0, 10), keep);
   } catch {
-    // some providers don't support listing; never let pruning block the write
+    // some providers don't support listing; skip pruning, never block the write
   }
 
+  // Write the new archive first. If this throws, toPrune is never touched.
   const b64 = await buildArchiveBase64();
   const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
     folderUri,
@@ -312,21 +311,28 @@ export async function writeBackupToFolder(folderUri: string): Promise<void> {
     'application/zip'
   );
   await FileSystem.writeAsStringAsync(fileUri, b64, B64);
+
+  // New file is safely on disk — now prune the surplus old archives.
+  for (const uri of toPrune) {
+    try {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    } catch {
+      // a single stubborn file must not undo an otherwise successful backup
+    }
+  }
 }
 
 /**
- * Runs an automatic backup if enabled, a folder is set, and the interval has
- * elapsed. Best-effort and silent — wrapped so it never disrupts startup.
- * Returns true when a backup was actually written.
+ * Runs an automatic backup if enabled and a folder is set. Best-effort and
+ * silent — invoked (debounced) by backupTrigger whenever data changes, so it
+ * never blocks a db call. Returns true when a backup was actually written.
  */
-export async function runAutoBackupIfDue(): Promise<boolean> {
+export async function runAutoBackupNow(): Promise<boolean> {
   try {
     if ((await getSetting(BACKUP_KEYS.autoEnabled)) !== '1') return false;
     const folder = await getSetting(BACKUP_KEYS.folderUri);
     if (!folder) return false;
-    const last = await getSetting(BACKUP_KEYS.lastExportAt);
     const nowIso = new Date().toISOString();
-    if (!shouldAutoBackup(last, nowIso, AUTO_BACKUP_INTERVAL_DAYS)) return false;
     await writeBackupToFolder(folder);
     await setSetting(BACKUP_KEYS.lastExportAt, nowIso);
     return true;

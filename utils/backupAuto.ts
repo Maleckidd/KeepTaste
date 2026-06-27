@@ -1,27 +1,11 @@
-// Pure cadence decision for the optional automatic backup (SPEC.md §5.17.3).
-// No native imports — testable in plain ts-jest.
-
-/**
- * True when an automatic backup is due: there has never been one, the last one
- * is unparseable, or at least `intervalDays` have passed since it.
- */
-export function shouldAutoBackup(
-  lastIso: string | null,
-  nowIso: string,
-  intervalDays: number
-): boolean {
-  if (!lastIso) return true;
-  const last = Date.parse(lastIso);
-  if (Number.isNaN(last)) return true;
-  const now = Date.parse(nowIso);
-  return now - last >= intervalDays * 86_400_000;
-}
+// Pure retention/naming helpers for the optional automatic backup
+// (SPEC.md §5.17.3). No native imports — testable in plain ts-jest.
 
 /** How many dated archives to retain by default; older ones are pruned. */
-export const AUTO_BACKUP_KEEP_DEFAULT = 1;
+export const AUTO_BACKUP_KEEP_DEFAULT = 2;
 
 /** Selectable retention counts offered in Settings. */
-export const AUTO_BACKUP_KEEP_OPTIONS = [1, 3, 7, 14, 30] as const;
+export const AUTO_BACKUP_KEEP_OPTIONS = [1, 2, 3, 7, 14, 30] as const;
 
 /**
  * Parses the stored retention count, falling back to `fallback` for missing or

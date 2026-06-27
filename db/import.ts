@@ -1,5 +1,6 @@
 import { createCookbook } from './cookbooks';
 import { createRecipe } from './recipes';
+import { withAutoBackupSuppressed } from '../utils/backupTrigger';
 import type { ImportedRecipe, BackupSection } from '../utils/importMarkdown';
 
 /**
@@ -11,22 +12,25 @@ export async function importCookbook(data: {
   cookbookName: string;
   recipes: ImportedRecipe[];
 }): Promise<{ cookbookId: number; recipeCount: number }> {
-  const cookbookId = await createCookbook({ name: data.cookbookName });
+  // One backup at the end, not one per created recipe (SPEC.md §5.17.3).
+  return withAutoBackupSuppressed(async () => {
+    const cookbookId = await createCookbook({ name: data.cookbookName });
 
-  for (const recipe of data.recipes) {
-    await createRecipe({
-      cookbookId,
-      title: recipe.title,
-      prepTime: recipe.prepTime,
-      cookTime: recipe.cookTime,
-      servings: recipe.servings,
-      ingredients: recipe.ingredients,
-      instructions: recipe.instructions,
-      notes: recipe.notes,
-    });
-  }
+    for (const recipe of data.recipes) {
+      await createRecipe({
+        cookbookId,
+        title: recipe.title,
+        prepTime: recipe.prepTime,
+        cookTime: recipe.cookTime,
+        servings: recipe.servings,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        notes: recipe.notes,
+      });
+    }
 
-  return { cookbookId, recipeCount: data.recipes.length };
+    return { cookbookId, recipeCount: data.recipes.length };
+  });
 }
 
 /**
@@ -38,30 +42,33 @@ export async function importCookbook(data: {
 export async function importBackup(
   sections: BackupSection[]
 ): Promise<{ cookbooks: number; recipes: number }> {
-  let cookbookCount = 0;
-  let recipeCount = 0;
+  // One backup at the end, not one per created recipe/cookbook (SPEC.md §5.17.3).
+  return withAutoBackupSuppressed(async () => {
+    let cookbookCount = 0;
+    let recipeCount = 0;
 
-  for (const section of sections) {
-    let cookbookId: number | null = null;
-    if (section.cookbookName !== null) {
-      cookbookId = await createCookbook({ name: section.cookbookName });
-      cookbookCount += 1;
+    for (const section of sections) {
+      let cookbookId: number | null = null;
+      if (section.cookbookName !== null) {
+        cookbookId = await createCookbook({ name: section.cookbookName });
+        cookbookCount += 1;
+      }
+
+      for (const recipe of section.recipes) {
+        await createRecipe({
+          cookbookId,
+          title: recipe.title,
+          prepTime: recipe.prepTime,
+          cookTime: recipe.cookTime,
+          servings: recipe.servings,
+          ingredients: recipe.ingredients,
+          instructions: recipe.instructions,
+          notes: recipe.notes,
+        });
+        recipeCount += 1;
+      }
     }
 
-    for (const recipe of section.recipes) {
-      await createRecipe({
-        cookbookId,
-        title: recipe.title,
-        prepTime: recipe.prepTime,
-        cookTime: recipe.cookTime,
-        servings: recipe.servings,
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
-        notes: recipe.notes,
-      });
-      recipeCount += 1;
-    }
-  }
-
-  return { cookbooks: cookbookCount, recipes: recipeCount };
+    return { cookbooks: cookbookCount, recipes: recipeCount };
+  });
 }

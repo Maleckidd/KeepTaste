@@ -5,7 +5,6 @@ import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runMigrations } from '@/db/client';
-import { runAutoBackupIfDue } from '@/utils/backupArchiveFs';
 import { useTheme, darkColors, lightColors } from '@/constants/theme';
 import { LanguageProvider, useT } from '@/i18n/LanguageProvider';
 import { SnackbarProvider } from '@/components/ui/SnackbarProvider';
@@ -96,8 +95,6 @@ export default function RootLayout() {
     } catch (e) {
       console.error('Database migration error:', e);
     }
-    // Optional automatic backup (§5.17.3) — best-effort, silent, never blocks.
-    void runAutoBackupIfDue();
   }, []);
 
   return (
