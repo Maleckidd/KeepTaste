@@ -58,6 +58,10 @@ export const dictionary = {
   'a11y.decreaseFont': { en: 'Decrease text size', pl: 'Zmniejsz rozmiar tekstu' },
   'a11y.shareCookbook': { en: 'Share cookbook', pl: 'Udostępnij książkę' },
   'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
+  'a11y.checkAllInGroup': {
+    en: 'Add all {count} {name} to cart',
+    pl: 'Dodaj wszystkie {count} {name} do koszyka',
+  },
   'a11y.recipePhoto': { en: 'Recipe photo', pl: 'Zdjęcie przepisu' },
   'a11y.changePhoto': { en: 'Add or change photo', pl: 'Dodaj lub zmień zdjęcie' },
   'a11y.import': { en: 'Import recipe', pl: 'Importuj przepis' },
@@ -304,6 +308,11 @@ export const dictionary = {
   },
   'shopping.emptyAction': { en: 'Create a list', pl: 'Stwórz listę' },
   'shopping.rename': { en: 'Rename', pl: 'Zmień nazwę' },
+  'shopping.shareList': { en: 'Share list', pl: 'Udostępnij listę' },
+  'shopping.shareDialogTitle': {
+    en: 'Shopping list',
+    pl: 'Lista zakupów',
+  },
   'shopping.deleteList': { en: 'Delete list', pl: 'Usuń listę' },
 
   // --- Delete confirmations (recipes & cookbooks get a speed bump on top of
@@ -396,6 +405,10 @@ export const dictionary = {
     en: 'Back up all data',
     pl: 'Kopia zapasowa danych',
   },
+  'settings.exportPreparing': {
+    en: 'Preparing backup…',
+    pl: 'Przygotowywanie kopii…',
+  },
   'settings.exportFailedTitle': { en: 'Export failed', pl: 'Eksport nieudany' },
   'settings.exportFailedMessage': {
     en: 'Could not export your data.',
@@ -405,6 +418,14 @@ export const dictionary = {
   'settings.importHint': {
     en: 'Restores from a .zip backup (recipes, photos and lists), or a legacy Markdown export.',
     pl: 'Przywraca z kopii .zip (przepisy, zdjęcia i listy) lub starszego eksportu Markdown.',
+  },
+  'settings.restoreLoading': {
+    en: 'Reading backup…',
+    pl: 'Wczytywanie kopii…',
+  },
+  'settings.restoreSaving': {
+    en: 'Restoring your library…',
+    pl: 'Przywracanie biblioteki…',
   },
   'settings.restoreChooseTitle': { en: 'Restore backup', pl: 'Przywróć kopię' },
   'settings.restoreChooseMessage': {

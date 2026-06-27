@@ -7,6 +7,7 @@ import {
   TextInput,
   StyleSheet,
   KeyboardAvoidingView,
+  Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,8 @@ import {
   partitionItems,
   normalizeItemInput,
   validateItemName,
+  groupedNames,
+  buildActiveRows,
 } from '@/utils/shoppingList';
 import {
   pendingDeleteKey,
@@ -33,7 +36,6 @@ import {
 } from '@/utils/pendingDelete';
 import { useUndoDelete, useSnackbar } from '@/components/ui/SnackbarProvider';
 import { lightTap } from '@/utils/haptics';
-import { animateLayout } from '@/utils/motion';
 import { pluralPl } from '@/utils/i18n';
 import {
   useTheme,
@@ -50,11 +52,13 @@ import Fab from '@/components/ui/Fab';
 import ActionSheet from '@/components/ui/ActionSheet';
 import SwipeableRow from '@/components/ui/SwipeableRow';
 import PasteListSheet from '@/components/shopping/PasteListSheet';
+import { buildShoppingListShareText } from '@/utils/shoppingListShareText';
 import type { ShoppingList, ShoppingItem } from '@/db/schema';
 import type { TranslationKey } from '@/i18n/dictionary';
 
 type Row =
-  | { kind: 'item'; item: ShoppingItem }
+  | { kind: 'item'; item: ShoppingItem; isRepeat: boolean }
+  | { kind: 'groupHeader'; name: string; count: number; childIds: number[] }
   | { kind: 'header'; key: string };
 
 // Reuses §5.12's plural keys for the "added N products" snackbar.
@@ -129,11 +133,20 @@ export default function ShoppingListScreen() {
     loadData();
   };
 
+  // No animateLayout() on toggle: a toggle can now add/remove a group-header
+  // row (a structural list change), and LayoutAnimation reparents cells in the
+  // virtualized list on Android — crashing with "child already has a parent"
+  // (and IndexOutOfBounds in subview clipping) when Reanimated is present.
   const handleToggle = async (item: ShoppingItem) => {
     lightTap();
     await setItemChecked(item.id, !item.checked);
-    // Animate the row sliding between the active and "in cart" sections.
-    animateLayout();
+    loadData();
+  };
+
+  // Tapping a group header checks all its remaining active children at once.
+  const handleToggleGroup = async (childIds: number[]) => {
+    lightTap();
+    await Promise.all(childIds.map((id) => setItemChecked(id, true)));
     loadData();
   };
 
@@ -157,6 +170,18 @@ export default function ShoppingListScreen() {
     router.back();
   };
 
+  const handleShareList = async () => {
+    if (!list) return;
+    try {
+      await Share.share({
+        message: buildShoppingListShareText(list.name, items),
+        title: t('shopping.shareDialogTitle'),
+      });
+    } catch {
+      // User dismissed or share unavailable — nothing to recover.
+    }
+  };
+
   const handleItemLongPress = (item: ShoppingItem) => {
     lightTap();
     setMenuItem(item);
@@ -174,7 +199,9 @@ export default function ShoppingListScreen() {
       setQuantity('');
       nameInputRef.current?.focus();
     }
-    animateLayout();
+    // No animateLayout(): adding a 2nd copy of a name makes a group header
+    // appear — a structural list change LayoutAnimation crashes on (see
+    // handleToggle).
     loadData();
   };
 
@@ -202,16 +229,59 @@ export default function ShoppingListScreen() {
   };
 
   const { active, inCart } = partitionItems(items);
+  // Cluster same-name products under a virtual header so multiples are managed
+  // together. A "group" is a name appearing >=2x across the whole list, so a
+  // lone remaining unchecked copy still shows its header. Purely presentational
+  // — items stay separate rows in the DB; nothing is merged. In-cart stays flat.
+  const grouped = groupedNames(items);
+  const activeRows = buildActiveRows(active, grouped);
 
   const rows: Row[] = [
-    ...active.map((item) => ({ kind: 'item' as const, item })),
+    ...activeRows.map((r) =>
+      r.kind === 'groupHeader'
+        ? {
+            kind: 'groupHeader' as const,
+            name: r.name,
+            count: r.count,
+            childIds: r.childIds,
+          }
+        : { kind: 'item' as const, item: r.item, isRepeat: r.isRepeat }
+    ),
     ...(inCart.length > 0
       ? [{ kind: 'header' as const, key: 'in-cart' }]
       : []),
-    ...inCart.map((item) => ({ kind: 'item' as const, item })),
+    ...inCart.map((item) => ({ kind: 'item' as const, item, isRepeat: false })),
   ];
 
-  const renderItem = (item: ShoppingItem) => {
+  const renderGroupHeader = (row: {
+    name: string;
+    count: number;
+    childIds: number[];
+  }) => (
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      onPress={() => handleToggleGroup(row.childIds)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: false }}
+      accessibilityLabel={t('a11y.checkAllInGroup', {
+        name: row.name,
+        count: row.count,
+      })}
+    >
+      <View style={styles.rowBody}>
+        <Text
+          style={[styles.itemName, styles.groupHeaderName]}
+          numberOfLines={2}
+        >
+          {row.name}
+        </Text>
+        <Text style={styles.groupHeaderCount}>{`(${row.count})`}</Text>
+      </View>
+      <Ionicons name="ellipse-outline" size={28} color={c.textMuted} />
+    </Pressable>
+  );
+
+  const renderItem = (item: ShoppingItem, isRepeat: boolean) => {
     const isChecked = !!item.checked;
     return (
       <SwipeableRow
@@ -219,7 +289,11 @@ export default function ShoppingListScreen() {
         onDelete={() => handleDeleteItem(item)}
       >
         <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          style={({ pressed }) => [
+            styles.row,
+            isRepeat && styles.rowRepeat,
+            pressed && styles.rowPressed,
+          ]}
           onPress={() => handleToggle(item)}
           onLongPress={() => handleItemLongPress(item)}
           accessibilityRole="checkbox"
@@ -228,9 +302,13 @@ export default function ShoppingListScreen() {
             item.quantity ? `${item.name}, ${item.quantity}` : item.name
           }
         >
-          <View style={styles.rowBody}>
+          <View style={[styles.rowBody, isRepeat && styles.rowBodyRepeat]}>
             <Text
-              style={[styles.itemName, isChecked && styles.itemNameChecked]}
+              style={[
+                styles.itemName,
+                isRepeat && styles.itemNameRepeat,
+                isChecked && styles.itemNameChecked,
+              ]}
               numberOfLines={2}
             >
               {item.name}
@@ -310,15 +388,21 @@ export default function ShoppingListScreen() {
         <FlatList
           data={rows}
           keyExtractor={(row) =>
-            row.kind === 'header' ? row.key : `item-${row.item.id}`
+            row.kind === 'header'
+              ? 'section-in-cart'
+              : row.kind === 'groupHeader'
+              ? `group-${row.name.trim().toLowerCase()}`
+              : `item-${row.item.id}`
           }
           renderItem={({ item: row }) =>
             row.kind === 'header' ? (
               <Text style={styles.sectionHeader} accessibilityRole="header">
                 {t('shoppingList.inCartHeader')}
               </Text>
+            ) : row.kind === 'groupHeader' ? (
+              renderGroupHeader(row)
             ) : (
-              renderItem(row.item)
+              renderItem(row.item, row.isRepeat)
             )
           }
           contentContainerStyle={[
@@ -328,6 +412,12 @@ export default function ShoppingListScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          // Android's default subview clipping crashes (IndexOutOfBounds in
+          // updateSubviewClipStatus) when animateLayout() runs while rows are
+          // structurally added/removed — e.g. a group header appearing or
+          // "check all" moving several rows at once. The list is short, so
+          // disabling clipping is free and removes the buggy native path.
+          removeClippedSubviews={false}
         />
       )}
 
@@ -422,6 +512,11 @@ export default function ShoppingListScreen() {
             onPress: () => setPasteOpen(true),
           },
           {
+            label: t('shopping.shareList'),
+            icon: 'share-outline',
+            onPress: handleShareList,
+          },
+          {
             label: t('shopping.deleteList'),
             icon: 'trash-outline',
             destructive: true,
@@ -499,16 +594,35 @@ const makeStyles = (c: ThemePalette) =>
     rowPressed: {
       backgroundColor: c.surfaceAlt,
     },
+    // A repeat of the product above: subtly recessed (tinted bg) and indented
+    // so it reads as belonging to the row above without a count badge.
+    rowRepeat: {
+      backgroundColor: c.surfaceAlt,
+    },
     rowBody: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: Spacing.sm,
     },
+    rowBodyRepeat: {
+      paddingLeft: Spacing.lg,
+    },
     itemName: {
       fontSize: Typography.size.md,
       color: c.text,
       flexShrink: 1,
+    },
+    itemNameRepeat: {
+      fontSize: Typography.size.sm,
+      color: c.textSecondary,
+    },
+    groupHeaderName: {
+      fontWeight: Typography.weight.semibold,
+    },
+    groupHeaderCount: {
+      fontSize: Typography.size.sm,
+      color: c.textMuted,
     },
     itemNameChecked: {
       color: c.textMuted,
