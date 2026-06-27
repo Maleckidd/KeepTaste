@@ -498,8 +498,8 @@ export const dictionary = {
     pl: 'Ile kopii przechowywać?',
   },
   'settings.autoBackupNote': {
-    en: 'A daily backup is written to this folder. Point it at a folder synced by Dropbox, Nextcloud or Drive for desktop to keep an off-device copy. For Google Drive on the phone, use the share sheet above instead.',
-    pl: 'Codzienna kopia jest zapisywana do tego folderu. Wskaż folder synchronizowany przez Dropbox, Nextcloud lub Dysk Google na komputerze, aby mieć kopię poza urządzeniem. Dla Dysku Google na telefonie użyj arkusza udostępniania powyżej.',
+    en: 'A backup is written after each change. Point the folder at a sync app (Dropbox, Nextcloud or Drive for desktop) to keep an off-device copy. For Google Drive on the phone, use the share sheet above instead.',
+    pl: 'Kopia jest zapisywana po każdej zmianie. Wskaż folder synchronizowany przez Dropbox, Nextcloud lub Dysk Google na komputerze, aby mieć kopię poza urządzeniem. Dla Dysku Google na telefonie użyj arkusza udostępniania powyżej.',
   },
   'settings.dangerZone': { en: 'Danger zone', pl: 'Strefa zagrożenia' },
   'settings.deleteAll': { en: 'Delete all data', pl: 'Usuń wszystkie dane' },

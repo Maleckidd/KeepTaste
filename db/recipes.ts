@@ -10,6 +10,7 @@ import {
 } from './schema';
 import { filterRecipesByTitle } from '../utils/search';
 import { getCookbooks } from './cookbooks';
+import { scheduleAutoBackup } from '../utils/backupTrigger';
 import type { BackupSection } from '../utils/backupMarkdown';
 
 // --- Recipes ---
@@ -66,6 +67,7 @@ export async function createRecipe(data: NewRecipe): Promise<number> {
     .insert(recipes)
     .values({ ...data, createdAt: now, updatedAt: now })
     .returning({ id: recipes.id });
+  scheduleAutoBackup();
   return result[0].id;
 }
 
@@ -77,10 +79,12 @@ export async function updateRecipe(
     .update(recipes)
     .set({ ...data, updatedAt: new Date().toISOString() })
     .where(eq(recipes.id, id));
+  scheduleAutoBackup();
 }
 
 export async function deleteRecipe(id: number): Promise<void> {
   await db.delete(recipes).where(eq(recipes.id, id));
+  scheduleAutoBackup();
 }
 
 /**
