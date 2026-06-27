@@ -414,6 +414,14 @@ export const dictionary = {
     en: 'Could not export your data.',
     pl: 'Nie udało się wyeksportować danych.',
   },
+  'settings.backupFolderUnwritableTitle': {
+    en: "Folder can't be used",
+    pl: 'Nie można użyć tego folderu',
+  },
+  'settings.backupFolderUnwritableMessage': {
+    en: "This folder can't be written to. Google Drive on the phone isn't supported for automatic backup — pick a Dropbox or Nextcloud folder instead, or use “Export all data” above to save to Drive manually.",
+    pl: 'Do tego folderu nie da się zapisywać. Google Drive na telefonie nie jest obsługiwany przy kopii automatycznej — wskaż folder Dropbox lub Nextcloud, albo użyj „Eksportuj wszystkie dane” powyżej, aby zapisać na Dysku ręcznie.',
+  },
   'settings.import': { en: 'Restore backup', pl: 'Przywróć kopię zapasową' },
   'settings.importHint': {
     en: 'Restores from a .zip backup (recipes, photos and lists), or a legacy Markdown export.',

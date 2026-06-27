@@ -94,14 +94,17 @@ export default function SettingsScreen() {
     // reject file writes; we must not leave auto-backup "enabled" pointing at a
     // folder that silently fails on every launch.
     const now = new Date().toISOString();
+    setBusyMessage(t('settings.exportPreparing'));
     try {
       await writeBackupToFolder(perm.directoryUri);
     } catch {
       Alert.alert(
-        t('settings.exportFailedTitle'),
-        t('settings.exportFailedMessage')
+        t('settings.backupFolderUnwritableTitle'),
+        t('settings.backupFolderUnwritableMessage')
       );
       return;
+    } finally {
+      setBusyMessage(null);
     }
     await setSetting(BACKUP_KEYS.folderUri, perm.directoryUri);
     await setSetting(BACKUP_KEYS.autoEnabled, '1');
