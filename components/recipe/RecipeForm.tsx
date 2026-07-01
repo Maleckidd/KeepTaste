@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import { downscaleForStorage } from '@/utils/imageDownscale';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ModalHeader from '@/components/ui/ModalHeader';
@@ -152,7 +153,8 @@ export default function RecipeForm({
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      set('imagePath', result.assets[0].uri);
+      const a = result.assets[0];
+      set('imagePath', await downscaleForStorage(a.uri, a.width, a.height));
     }
   };
 
@@ -168,7 +170,8 @@ export default function RecipeForm({
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      set('imagePath', result.assets[0].uri);
+      const a = result.assets[0];
+      set('imagePath', await downscaleForStorage(a.uri, a.width, a.height));
     }
   };
 

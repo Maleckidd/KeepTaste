@@ -1,4 +1,9 @@
-import { lightColors, darkColors } from '../constants/theme';
+import {
+  lightColors,
+  darkColors,
+  parseThemePreference,
+  resolveScheme,
+} from '../constants/theme';
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
@@ -90,6 +95,40 @@ describe('theme palettes', () => {
 
     it('cookbookColors are shared (deep-equal) between palettes', () => {
       expect(lightColors.cookbookColors).toEqual(darkColors.cookbookColors);
+    });
+  });
+});
+
+describe('theme preference', () => {
+  describe('parseThemePreference', () => {
+    it('accepts the explicit schemes', () => {
+      expect(parseThemePreference('light')).toBe('light');
+      expect(parseThemePreference('dark')).toBe('dark');
+    });
+
+    it('falls back to system for null/unknown/legacy values', () => {
+      expect(parseThemePreference(null)).toBe('system');
+      expect(parseThemePreference('system')).toBe('system');
+      expect(parseThemePreference('')).toBe('system');
+      expect(parseThemePreference('LIGHT')).toBe('system');
+      expect(parseThemePreference('sepia')).toBe('system');
+    });
+  });
+
+  describe('resolveScheme', () => {
+    it('forces the chosen scheme regardless of the OS setting', () => {
+      expect(resolveScheme('light', 'dark')).toBe('light');
+      expect(resolveScheme('dark', 'light')).toBe('dark');
+    });
+
+    it('follows the OS scheme when preference is system', () => {
+      expect(resolveScheme('system', 'dark')).toBe('dark');
+      expect(resolveScheme('system', 'light')).toBe('light');
+    });
+
+    it('defaults to light when the OS scheme is unavailable', () => {
+      expect(resolveScheme('system', null)).toBe('light');
+      expect(resolveScheme('system', undefined)).toBe('light');
     });
   });
 });

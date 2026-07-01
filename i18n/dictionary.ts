@@ -411,8 +411,8 @@ export const dictionary = {
   },
   'settings.exportFailedTitle': { en: 'Export failed', pl: 'Eksport nieudany' },
   'settings.exportFailedMessage': {
-    en: 'Could not export your data.',
-    pl: 'Nie udało się wyeksportować danych.',
+    en: 'Could not export your data. If your library is very large (many photos), it may be too big to back up on this device at once.',
+    pl: 'Nie udało się wyeksportować danych. Jeśli Twoja biblioteka jest bardzo duża (dużo zdjęć), może być zbyt duża, aby utworzyć kopię na tym urządzeniu naraz.',
   },
   'settings.backupFolderUnwritableTitle': {
     en: "Folder can't be used",
@@ -421,6 +421,10 @@ export const dictionary = {
   'settings.backupFolderUnwritableMessage': {
     en: "This folder can't be written to. Google Drive on the phone isn't supported for automatic backup — pick a Dropbox or Nextcloud folder instead, or use “Export all data” above to save to Drive manually.",
     pl: 'Do tego folderu nie da się zapisywać. Google Drive na telefonie nie jest obsługiwany przy kopii automatycznej — wskaż folder Dropbox lub Nextcloud, albo użyj „Eksportuj wszystkie dane” powyżej, aby zapisać na Dysku ręcznie.',
+  },
+  'settings.backupWriteFailedMessage': {
+    en: "Couldn't write a backup to this folder. The folder may be read-only, or your library may be too large to back up on this device at once. Try another folder, or reduce the number of photos.",
+    pl: 'Nie udało się zapisać kopii w tym folderze. Folder może być tylko do odczytu lub Twoja biblioteka jest zbyt duża, aby utworzyć kopię na tym urządzeniu naraz. Spróbuj innego folderu lub zmniejsz liczbę zdjęć.',
   },
   'settings.import': { en: 'Restore backup', pl: 'Przywróć kopię zapasową' },
   'settings.importHint': {
@@ -456,6 +460,10 @@ export const dictionary = {
     en: 'This file is not a valid KeepTaste backup.',
     pl: 'Ten plik nie jest prawidłową kopią zapasową KeepTaste.',
   },
+  'settings.importFailedUnrecognized': {
+    en: "This zip doesn't contain a KeepTaste backup (no backup.json or recipes.md).",
+    pl: 'To archiwum zip nie zawiera kopii zapasowej KeepTaste (brak backup.json lub recipes.md).',
+  },
   'settings.autoBackup': { en: 'Automatic backup', pl: 'Automatyczna kopia' },
   'settings.autoBackupEnable': {
     en: 'Back up automatically',
@@ -485,6 +493,10 @@ export const dictionary = {
     en: 'Last backup: never',
     pl: 'Ostatnia kopia: nigdy',
   },
+  'backup.saving': {
+    en: 'Saving backup…',
+    pl: 'Zapisuję kopię…',
+  },
   'settings.autoBackupKeep': {
     en: 'Backups to keep',
     pl: 'Liczba kopii',
@@ -512,6 +524,13 @@ export const dictionary = {
   'settings.languageEnglish': { en: 'English', pl: 'English' },
   'settings.languagePolish': { en: 'Polski', pl: 'Polski' },
   'settings.chooseLanguage': { en: 'Choose language', pl: 'Wybierz język' },
+
+  'settings.appearance': { en: 'Appearance', pl: 'Wygląd' },
+  'settings.theme': { en: 'Theme', pl: 'Motyw' },
+  'settings.chooseTheme': { en: 'Choose theme', pl: 'Wybierz motyw' },
+  'settings.themeSystem': { en: 'System', pl: 'Systemowy' },
+  'settings.themeLight': { en: 'Light', pl: 'Jasny' },
+  'settings.themeDark': { en: 'Dark', pl: 'Ciemny' },
 
   // Settings: import confirmation / results
   'settings.importCompleteTitle': {

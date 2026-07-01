@@ -10,14 +10,17 @@ KeepTaste — a local-only, offline recipe manager in React Native + Expo (SDK 5
 
 ```bash
 npm install          # install deps
-npx expo start       # dev server (scan QR in Expo Go)
+npx expo start       # dev server (scan QR in Expo Go — non-backup work)
 npm run android      # Android emulator/device
 npm run web          # web build — agent/E2E test environment ONLY, not a product platform
 npx tsc --noEmit     # type check (strict mode)
 npm test             # jest (ts-jest, logic-only tests in __tests__/)
+eas build --profile development   # custom dev client (required for backup flows)
 ```
 
-The web build runs on an in-memory sql.js database (`db/client.web.ts`) that resets on reload; use it for browser-driven smoke tests of flows (form → save → list). Native behavior (file system, sharing, image picker) must still be verified in Expo Go. Web-only bugs outside test flows are out of scope (SPEC.md §2).
+The web build runs on an in-memory sql.js database (`db/client.web.ts`) that resets on reload; use it for browser-driven smoke tests of flows (form → save → list). Native behavior (file system, sharing, image picker) must still be verified on-device. Web-only bugs outside test flows are out of scope (SPEC.md §2).
+
+**Backup work needs a custom dev client, not Expo Go.** The `.zip` backup uses `react-native-zip-archive` (native module, SPEC.md §5.17.1) which does not exist in the Expo Go runtime — any flow that touches export/restore/auto-backup must run on an EAS `development` build (`eas build --profile development`). Expo Go stays fine for all non-backup work. Bump `versionCode` (via `expo-build-properties`) on each upload.
 
 There is no lint script. Unit tests cover **pure logic only** (`db/` query helpers, `utils/`); UI/native-module behavior is verified by running the app (Expo Go, or the web build for browser-driven smoke tests), not by component tests.
 

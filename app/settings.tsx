@@ -36,12 +36,14 @@ import {
 } from '@/utils/backupArchiveFs';
 import {
   parseKeepCount,
+  isGoogleDriveFolderUri,
   AUTO_BACKUP_KEEP_OPTIONS,
 } from '@/utils/backupAuto';
 import { getSetting, setSetting } from '@/db/settings';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import {
   useTheme,
+  useThemePreference,
   ThemePalette,
   Typography,
   Spacing,
@@ -55,9 +57,12 @@ export default function SettingsScreen() {
   const c = useTheme();
   const t = useT();
   const { preference, setPreference } = useLanguage();
+  const { preference: themePreference, setPreference: setThemePreference } =
+    useThemePreference();
   const styles = useMemo(() => makeStyles(c), [c]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
   const [languageMenuOpen, setLanguageMenuOpen] = React.useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
   // Non-null while a restore/import is reading or writing — shows a blocking
   // spinner so the user knows the (sometimes slow) file load is in progress.
   const [busyMessage, setBusyMessage] = React.useState<string | null>(null);
@@ -89,10 +94,21 @@ export default function SettingsScreen() {
     const perm =
       await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!perm.granted) return;
-    // Verify the folder is actually writable before persisting anything. Some
-    // providers (notably Google Drive on Android) grant the picker but then
-    // reject file writes; we must not leave auto-backup "enabled" pointing at a
-    // folder that silently fails on every launch.
+    // Google Drive grants the picker but rejects every file write. Detect it up
+    // front so we don't burn a (potentially huge, OOM-prone) archive build just
+    // to fail, and so the user gets the accurate Drive message.
+    if (isGoogleDriveFolderUri(perm.directoryUri)) {
+      Alert.alert(
+        t('settings.backupFolderUnwritableTitle'),
+        t('settings.backupFolderUnwritableMessage')
+      );
+      return;
+    }
+    // Verify the folder is actually writable before persisting anything; we must
+    // not leave auto-backup "enabled" pointing at a folder that silently fails
+    // on every launch. A failure here on an on-device folder is usually the
+    // library being too large to hold as one base64 blob, not the folder —
+    // hence the size-aware message rather than the Drive one.
     const now = new Date().toISOString();
     setBusyMessage(t('settings.exportPreparing'));
     try {
@@ -100,7 +116,7 @@ export default function SettingsScreen() {
     } catch {
       Alert.alert(
         t('settings.backupFolderUnwritableTitle'),
-        t('settings.backupFolderUnwritableMessage')
+        t('settings.backupWriteFailedMessage')
       );
       return;
     } finally {
@@ -125,7 +141,14 @@ export default function SettingsScreen() {
 
   const lastBackupLabel = lastBackupAt
     ? t('settings.autoBackupLast', {
-        date: new Date(lastBackupAt).toLocaleDateString(),
+        date: (() => {
+          const d = new Date(lastBackupAt);
+          const time = d.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          return `${d.toLocaleDateString()} ${time}`;
+        })(),
       })
     : t('settings.autoBackupNever');
 
@@ -135,6 +158,20 @@ export default function SettingsScreen() {
       : preference === 'pl'
         ? t('settings.languagePolish')
         : t('settings.languageSystem');
+
+  const themeSubtitle =
+    themePreference === 'light'
+      ? t('settings.themeLight')
+      : themePreference === 'dark'
+        ? t('settings.themeDark')
+        : t('settings.themeSystem');
+
+  const themeIcon =
+    themePreference === 'light'
+      ? 'sunny-outline'
+      : themePreference === 'dark'
+        ? 'moon-outline'
+        : 'contrast-outline';
 
   const performDelete = async () => {
     const paths = await deleteAllData();
@@ -257,7 +294,19 @@ export default function SettingsScreen() {
     }
     if (!result.ok) {
       setBusyMessage(null);
-      Alert.alert(t('settings.importFailedTitle'), t('settings.importFailedZip'));
+      // Surface the specific reason instead of one catch-all message. The
+      // structural codes get localized strings; parser verdicts (newer-version,
+      // corrupted, invalid JSON) are already human-readable, so pass them
+      // through like handleImportMarkdown does.
+      const message =
+        result.error === 'read'
+          ? t('settings.importFailedRead')
+          : result.error === 'notzip'
+            ? t('settings.importFailedZip')
+            : result.error === 'unrecognized'
+              ? t('settings.importFailedUnrecognized')
+              : result.error;
+      Alert.alert(t('settings.importFailedTitle'), message);
       return;
     }
     const { loaded } = result;
@@ -415,6 +464,25 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
         </Pressable>
 
+        {/* Appearance / theme */}
+        <Text style={styles.sectionLabel}>{t('settings.appearance')}</Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.languageRow,
+            pressed && { backgroundColor: c.surfaceAlt },
+          ]}
+          onPress={() => setThemeMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('settings.theme')}: ${themeSubtitle}`}
+        >
+          <Ionicons name={themeIcon} size={18} color={c.textSecondary} />
+          <View style={styles.languageTextWrap}>
+            <Text style={styles.languageLabel}>{t('settings.theme')}</Text>
+            <Text style={styles.languageValue}>{themeSubtitle}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+        </Pressable>
+
         {/* Your data notice */}
         <Text style={styles.sectionLabel}>{t('settings.yourData')}</Text>
         <View style={styles.card}>
@@ -551,6 +619,29 @@ export default function SettingsScreen() {
             label: t('settings.languagePolish'),
             icon: 'language-outline',
             onPress: () => setPreference('pl'),
+          },
+        ]}
+      />
+
+      <ActionSheet
+        visible={themeMenuOpen}
+        title={t('settings.chooseTheme')}
+        onClose={() => setThemeMenuOpen(false)}
+        actions={[
+          {
+            label: t('settings.themeSystem'),
+            icon: 'contrast-outline',
+            onPress: () => setThemePreference('system'),
+          },
+          {
+            label: t('settings.themeLight'),
+            icon: 'sunny-outline',
+            onPress: () => setThemePreference('light'),
+          },
+          {
+            label: t('settings.themeDark'),
+            icon: 'moon-outline',
+            onPress: () => setThemePreference('dark'),
           },
         ]}
       />
