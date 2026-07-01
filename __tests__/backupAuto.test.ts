@@ -2,8 +2,33 @@
 import {
   backupDisplayName,
   backupsToPrune,
+  isGoogleDriveFolderUri,
+  isMirrorStale,
   parseKeepCount,
 } from '../utils/backupAuto';
+
+describe('isGoogleDriveFolderUri', () => {
+  it('detects a Google Drive SAF tree URI', () => {
+    expect(
+      isGoogleDriveFolderUri(
+        'content://com.google.android.apps.docs.storage/tree/abc%3A123'
+      )
+    ).toBe(true);
+  });
+
+  it('treats on-device storage and other providers as writable', () => {
+    expect(
+      isGoogleDriveFolderUri(
+        'content://com.android.externalstorage.documents/tree/primary%3ABackups'
+      )
+    ).toBe(false);
+    expect(
+      isGoogleDriveFolderUri(
+        'content://com.dropbox.product.android.dbapp.document_provider/tree/x'
+      )
+    ).toBe(false);
+  });
+});
 
 describe('parseKeepCount', () => {
   it('returns the fallback for a missing value', () => {
@@ -18,6 +43,32 @@ describe('parseKeepCount', () => {
     expect(parseKeepCount('garbage', 7)).toBe(7);
     expect(parseKeepCount('0', 7)).toBe(7);
     expect(parseKeepCount('-3', 7)).toBe(7);
+  });
+});
+
+describe('isMirrorStale', () => {
+  it('is not stale when there is no data', () => {
+    expect(isMirrorStale(null, null)).toBe(false);
+    expect(isMirrorStale(null, '2026-06-29T10:00:00.000Z')).toBe(false);
+  });
+
+  it('is stale when data exists but was never exported', () => {
+    expect(isMirrorStale('2026-06-29T10:00:00.000Z', null)).toBe(true);
+  });
+
+  it('is stale when a change is newer than the last export', () => {
+    expect(
+      isMirrorStale('2026-06-29T10:05:00.000Z', '2026-06-29T10:00:00.000Z')
+    ).toBe(true);
+  });
+
+  it('is not stale when the last export is at or after the newest change', () => {
+    expect(
+      isMirrorStale('2026-06-29T10:00:00.000Z', '2026-06-29T10:00:00.000Z')
+    ).toBe(false);
+    expect(
+      isMirrorStale('2026-06-29T10:00:00.000Z', '2026-06-29T10:05:00.000Z')
+    ).toBe(false);
   });
 });
 
@@ -77,6 +128,15 @@ describe('backupsToPrune', () => {
     expect(backupsToPrune(uris, '2026-06-27', 2).sort()).toEqual(
       [f('2026-06-25'), f('2026-06-27')].sort()
     );
+  });
+
+  it('treats time-suffixed names (HH-MM) as same-day and chronological', () => {
+    // Filenames now carry a -HH-MM time stamp; the date is still the prune key.
+    const uris = [f('2026-06-25-08-15'), f('2026-06-27-09-00')];
+    // keep=7 → only the same-day archive is replaced.
+    expect(backupsToPrune(uris, '2026-06-27', 7)).toEqual([
+      f('2026-06-27-09-00'),
+    ]);
   });
 
   it('ignores files that are not our archives', () => {

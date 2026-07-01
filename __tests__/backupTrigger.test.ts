@@ -1,11 +1,13 @@
-// Debounced, change-driven automatic backup trigger (SPEC.md §5.17.3).
+// Change-driven automatic backup trigger (SPEC.md §5.17.3).
 // Pure scheduling/suppression logic; the actual native write (runAutoBackupNow)
-// is mocked so no expo-file-system is pulled in.
+// is mocked so no expo-file-system is pulled in. The model is dirty-flag +
+// explicit flushAutoBackup() (fired on app background) — there is no foreground
+// timer, so scheduleAutoBackup() never runs the build on its own.
 jest.mock('../utils/backupArchiveFs');
 
 import {
-  AUTO_BACKUP_DEBOUNCE_MS,
   scheduleAutoBackup,
+  flushAutoBackup,
   withAutoBackupSuppressed,
   __resetAutoBackupTrigger,
 } from '../utils/backupTrigger';
@@ -16,57 +18,29 @@ const mockRun = runAutoBackupNow as jest.MockedFunction<
 >;
 
 beforeEach(() => {
-  jest.useFakeTimers();
   mockRun.mockReset();
   mockRun.mockResolvedValue(true);
 });
 
 afterEach(() => {
   __resetAutoBackupTrigger();
-  jest.clearAllTimers();
-  jest.useRealTimers();
-});
-
-describe('AUTO_BACKUP_DEBOUNCE_MS', () => {
-  it('is a positive number around 2.5s', () => {
-    expect(typeof AUTO_BACKUP_DEBOUNCE_MS).toBe('number');
-    expect(AUTO_BACKUP_DEBOUNCE_MS).toBeGreaterThan(0);
-  });
 });
 
 describe('scheduleAutoBackup', () => {
-  it('fires runAutoBackupNow exactly once after the debounce', () => {
+  it('does not run the heavy build on its own — only marks dirty', async () => {
     scheduleAutoBackup();
-    // Not yet — before the debounce elapses.
-    jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS - 1);
+    // No timer: nothing fires until an explicit flush (app background).
     expect(mockRun).not.toHaveBeenCalled();
 
-    jest.advanceTimersByTime(1);
+    await flushAutoBackup();
     expect(mockRun).toHaveBeenCalledTimes(1);
   });
 
-  it('collapses several calls within the window into one backup', () => {
+  it('collapses several changes into one flush', async () => {
     scheduleAutoBackup();
     scheduleAutoBackup();
     scheduleAutoBackup();
-    jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS);
-    expect(mockRun).toHaveBeenCalledTimes(1);
-  });
-
-  it('resets the timer on each call (trailing debounce)', () => {
-    const half = Math.floor(AUTO_BACKUP_DEBOUNCE_MS / 2);
-    scheduleAutoBackup();
-    jest.advanceTimersByTime(half);
-    expect(mockRun).not.toHaveBeenCalled();
-
-    // Re-arm before it fires; total elapsed now exceeds one debounce span
-    // but is < a full debounce since this latest call.
-    scheduleAutoBackup();
-    jest.advanceTimersByTime(half);
-    expect(mockRun).not.toHaveBeenCalled();
-
-    // Let the remainder of the second window pass.
-    jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS - half);
+    await flushAutoBackup();
     expect(mockRun).toHaveBeenCalledTimes(1);
   });
 
@@ -75,24 +49,85 @@ describe('scheduleAutoBackup', () => {
   });
 });
 
+describe('flushAutoBackup', () => {
+  it('runs the pending backup when something changed', async () => {
+    scheduleAutoBackup();
+    await flushAutoBackup();
+    expect(mockRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('no-ops when nothing changed since the last flush', async () => {
+    // Background with no edits → nothing to do.
+    await flushAutoBackup();
+    expect(mockRun).not.toHaveBeenCalled();
+
+    scheduleAutoBackup();
+    await flushAutoBackup();
+    expect(mockRun).toHaveBeenCalledTimes(1);
+
+    // Backgrounding again without new edits does nothing.
+    await flushAutoBackup();
+    expect(mockRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('dedupes concurrent flushes into a single in-flight run', async () => {
+    let resolveRun: (v: boolean) => void;
+    mockRun.mockReturnValue(
+      new Promise<boolean>((r) => {
+        resolveRun = r;
+      })
+    );
+
+    scheduleAutoBackup();
+    const a = flushAutoBackup();
+    const b = flushAutoBackup(); // e.g. two AppState 'background' emissions
+    expect(mockRun).toHaveBeenCalledTimes(1);
+
+    resolveRun!(true);
+    await Promise.all([a, b]);
+    expect(mockRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('a change during a flush is mirrored by the next flush', async () => {
+    let resolveRun: (v: boolean) => void;
+    mockRun.mockReturnValueOnce(
+      new Promise<boolean>((r) => {
+        resolveRun = r;
+      })
+    );
+
+    scheduleAutoBackup();
+    const first = flushAutoBackup();
+    // Edit lands while the build is in flight → dirty again.
+    scheduleAutoBackup();
+    resolveRun!(true);
+    await first;
+    expect(mockRun).toHaveBeenCalledTimes(1);
+
+    // Next background flush picks up the mid-flight change.
+    await flushAutoBackup();
+    expect(mockRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('never throws even if the underlying write rejects', async () => {
+    mockRun.mockRejectedValue(new Error('disk full'));
+    scheduleAutoBackup();
+    await expect(flushAutoBackup()).resolves.toBeUndefined();
+  });
+});
+
 describe('withAutoBackupSuppressed', () => {
-  it('makes scheduleAutoBackup a no-op while suppressed', async () => {
-    let resolveInner: () => void;
-    const gate = new Promise<void>((r) => {
-      resolveInner = r;
-    });
-
-    const p = withAutoBackupSuppressed(async () => {
+  it('makes scheduleAutoBackup + flush a no-op while suppressed', async () => {
+    await withAutoBackupSuppressed(async () => {
       scheduleAutoBackup();
-      // While suppressed, no timer should be armed.
-      jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS * 2);
+      // e.g. the app backgrounds mid-restore — must not run now.
+      await flushAutoBackup();
       expect(mockRun).not.toHaveBeenCalled();
-      await gate;
-      return 'ok';
     });
 
-    resolveInner!();
-    await expect(p).resolves.toBe('ok');
+    // Outermost exit re-arms; the next background flush fires the single backup.
+    await flushAutoBackup();
+    expect(mockRun).toHaveBeenCalledTimes(1);
   });
 
   it('schedules exactly one backup after a bulk op that scheduled N times', async () => {
@@ -103,7 +138,7 @@ describe('withAutoBackupSuppressed', () => {
     });
     expect(mockRun).not.toHaveBeenCalled();
 
-    jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS);
+    await flushAutoBackup();
     expect(mockRun).toHaveBeenCalledTimes(1);
   });
 
@@ -120,13 +155,13 @@ describe('withAutoBackupSuppressed', () => {
         scheduleAutoBackup();
         scheduleAutoBackup();
       });
-      // Inner exit must NOT have armed a timer yet (still suppressed).
-      jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS);
+      // Inner exit must NOT have armed anything yet (still suppressed).
+      await flushAutoBackup();
       expect(mockRun).not.toHaveBeenCalled();
       scheduleAutoBackup();
     });
 
-    jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS);
+    await flushAutoBackup();
     expect(mockRun).toHaveBeenCalledTimes(1);
   });
 
@@ -138,9 +173,8 @@ describe('withAutoBackupSuppressed', () => {
       })
     ).rejects.toThrow('boom');
 
-    // Depth must be restored: scheduling now works normally again.
-    scheduleAutoBackup();
-    jest.advanceTimersByTime(AUTO_BACKUP_DEBOUNCE_MS);
+    // Depth restored and the suppressed request re-armed: a flush now works.
+    await flushAutoBackup();
     expect(mockRun).toHaveBeenCalledTimes(1);
   });
 });

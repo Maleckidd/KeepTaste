@@ -1,4 +1,4 @@
-import { eq, isNull, desc } from 'drizzle-orm';
+import { eq, isNull, desc, sql } from 'drizzle-orm';
 import { db } from './client';
 import {
   recipes,
@@ -39,6 +39,25 @@ export async function getRecipeById(id: number): Promise<Recipe | undefined> {
 export async function searchRecipes(query: string): Promise<Recipe[]> {
   const all = await getAllRecipes();
   return filterRecipesByTitle(all, query);
+}
+
+/**
+ * Newest data-change timestamp across recipes and cookbooks (ISO 8601), or null
+ * when the library is empty. recipes.updated_at covers recipe creates and edits
+ * (it equals created_at on insert), cookbooks.created_at covers cookbook adds.
+ * Used by the launch-time staleness check (utils/backupAuto.ts isMirrorStale) to
+ * re-arm an auto-backup the in-memory dirty flag lost to a crash (SPEC.md §5.17.3).
+ */
+export async function getLatestDataChangeAt(): Promise<string | null> {
+  const [r] = await db
+    .select({ m: sql<string | null>`max(${recipes.updatedAt})` })
+    .from(recipes);
+  const [c] = await db
+    .select({ m: sql<string | null>`max(${cookbooks.createdAt})` })
+    .from(cookbooks);
+  const candidates = [r?.m, c?.m].filter((v): v is string => v != null);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a > b ? a : b));
 }
 
 /**

@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { useColorScheme } from 'react-native';
 
 // Cookbook tile colors (rotating) — shared across both palettes.
@@ -50,8 +51,53 @@ export const darkColors = {
 
 export type ThemePalette = typeof lightColors;
 
+/** Effective light/dark scheme actually applied to the UI. */
+export type ColorScheme = 'light' | 'dark';
+
+/** User choice: follow the OS ('system') or force a scheme. */
+export type ThemePreference = 'system' | 'light' | 'dark';
+
+export type ThemeContextValue = {
+  scheme: ColorScheme;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
+};
+
+// Provided by ThemeProvider (constants/ThemeProvider.tsx). When absent (e.g.
+// in isolated tests), useTheme falls back to the live OS color scheme.
+export const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+/** Coerces a stored value into a valid preference, defaulting to 'system'. */
+export function parseThemePreference(value: string | null): ThemePreference {
+  return value === 'light' || value === 'dark' ? value : 'system';
+}
+
+/** Resolves the preference + OS scheme into the scheme to actually apply. */
+export function resolveScheme(
+  preference: ThemePreference,
+  systemScheme: ColorScheme | null | undefined
+): ColorScheme {
+  if (preference === 'light' || preference === 'dark') return preference;
+  return systemScheme === 'dark' ? 'dark' : 'light';
+}
+
+/** Returns the active color palette, honoring the user's theme preference. */
 export function useTheme(): ThemePalette {
-  return useColorScheme() === 'dark' ? darkColors : lightColors;
+  const ctx = useContext(ThemeContext);
+  // Hooks must run unconditionally, so always read the OS scheme; it's only
+  // used as the fallback when there's no provider above us.
+  const systemScheme = useColorScheme();
+  const scheme = ctx ? ctx.scheme : systemScheme === 'dark' ? 'dark' : 'light';
+  return scheme === 'dark' ? darkColors : lightColors;
+}
+
+/** Returns the resolved scheme, the raw preference, and a setter. */
+export function useThemePreference(): ThemeContextValue {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) {
+    throw new Error('useThemePreference must be used within a ThemeProvider');
+  }
+  return ctx;
 }
 
 export const Typography = {
