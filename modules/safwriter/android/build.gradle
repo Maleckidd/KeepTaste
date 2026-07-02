@@ -1,0 +1,26 @@
+apply plugin: 'com.android.library'
+
+group = 'expo.modules.safwriter'
+version = '0.1.0'
+
+// SDK 52 (expo-modules-core 2.2.3) wires local modules through this legacy
+// helper, not the newer `plugins { id 'expo-module-gradle-plugin' }` DSL that
+// create-expo-module@57 scaffolds. Mirrors the installed expo-* modules'
+// build.gradle so the module links into this app's existing android/ project.
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()
+useExpoPublishing()
+
+android {
+  namespace "expo.modules.safwriter"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}

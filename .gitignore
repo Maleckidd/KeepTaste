@@ -7,9 +7,12 @@ dist/
 web-build/
 expo-env.d.ts
 
-# native builds
-ios/
-android/
+# native builds — root-level prebuild output only; anchored so the pattern
+# does NOT swallow local expo modules' native code (modules/*/android)
+/ios/
+/android/
+# gradle build output inside local expo modules
+modules/*/android/build/
 *.ipa
 *.apk
 *.aab
