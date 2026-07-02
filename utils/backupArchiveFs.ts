@@ -447,8 +447,9 @@ export async function runAutoBackupNow(): Promise<boolean> {
  * backupTrigger is in-memory, so a kill before a flush completes (typically a
  * crash — a normal leave backgrounds first and flushes) loses it. Called once at
  * startup: if auto-backup is on and the newest data change is newer than the
- * last successful export, it re-arms a backup (which then flushes on the safety
- * timer or the next time the app backgrounds). Best-effort and silent.
+ * last successful export, it re-arms a backup via scheduleAutoBackup (which then
+ * flushes ~5s later on the debounce, or on the next background). Best-effort and
+ * silent.
  */
 export async function maybeBackupOnLaunch(): Promise<void> {
   try {
