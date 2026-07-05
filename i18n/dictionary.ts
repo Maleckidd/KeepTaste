@@ -127,6 +127,10 @@ export const dictionary = {
   },
   'cookbook.minutes': { en: '{count} min', pl: '{count} min' },
   'cookbook.servings': { en: '{count} servings', pl: '{count} porcji' },
+  'cookbook.toTryChip': {
+    en: 'To try ({count})',
+    pl: 'Do wypróbowania ({count})',
+  },
 
   // --- Recipe view (app/recipe/[id].tsx) ---
   'recipe.prep': { en: 'Prep', pl: 'Przygotowanie' },
@@ -147,6 +151,14 @@ export const dictionary = {
   'recipe.shareDialogTitle': {
     en: 'Share recipe',
     pl: 'Udostępnij przepis',
+  },
+
+  // To-try status (§5.19) — shared badge/section label, view action + snackbar.
+  'toTry.badge': { en: 'To try', pl: 'Do wypróbowania' },
+  'recipe.triedIt': { en: 'Tried it ✓', pl: 'Wypróbowane ✓' },
+  'recipe.markedTried': {
+    en: 'Marked as tried',
+    pl: 'Oznaczono jako wypróbowane',
   },
 
   // --- Add ingredients to a shopping list (app/recipe/add-to-list.tsx, §5.12) ---
@@ -213,6 +225,10 @@ export const dictionary = {
   'recipeForm.instructionsPlaceholder': {
     en: '# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.',
     pl: '# Przygotuj ciasto\nWymieszaj mąkę z masłem...\n\n# Pieczenie\n**Piecz przez 45 minut** w 180°C.',
+  },
+  'recipeForm.toTryLabel': {
+    en: 'Mark as "to try"',
+    pl: 'Oznacz „do wypróbowania”',
   },
   'recipeForm.notes': { en: 'Private notes', pl: 'Prywatne notatki' },
   'recipeForm.notesHint': {

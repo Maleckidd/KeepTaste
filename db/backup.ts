@@ -80,6 +80,7 @@ export async function restoreFullBackup(content: BackupContent): Promise<void> {
       ingredients: r.ingredients,
       instructions: r.instructions,
       notes: r.notes,
+      toTry: r.toTry ?? 0, // older archives (schemaVersion 1) predate the column
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     });

@@ -78,6 +78,7 @@ async function main(): Promise<void> {
         ingredients: r.ingredients,
         instructions: r.instructions,
         notes: r.notes,
+        toTry: r.toTry ? 1 : 0,
         createdAt: ts,
         updatedAt: ts,
       });

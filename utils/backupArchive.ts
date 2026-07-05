@@ -16,7 +16,7 @@ import type {
  * changes incompatibly; a backup whose version is greater than this is from a
  * newer app and is rejected rather than mis-restored (§5.17.4).
  */
-export const BACKUP_SCHEMA_VERSION = 1;
+export const BACKUP_SCHEMA_VERSION = 2;
 
 export type BackupContent = {
   cookbooks: Cookbook[];

@@ -6,6 +6,7 @@ import {
   UNCATEGORIZED_HEADING,
   type BackupSection,
 } from '../utils/backupMarkdown';
+import { recipeToMarkdown } from '../utils/markdown';
 
 function recipe(over: Partial<any> = {}): any {
   return {
@@ -78,5 +79,61 @@ describe('buildBackupMarkdown', () => {
       { cookbookName: 'X', recipes: [recipe()] },
     ]);
     expect(md).not.toMatch(/Tags/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §5.19 to-try status line. recipeToMarkdown must emit `**Status:** to try`
+// only when recipe.toTry is truthy — directly below the metadata line when
+// metadata exists, and in the metadata line's place when there is none. A
+// tried recipe (toTry 0 / undefined) emits no Status line.
+// ---------------------------------------------------------------------------
+describe('recipeToMarkdown — to-try Status line (§5.19)', () => {
+  it('emits "**Status:** to try" for a to-try recipe with metadata, right below the meta line', () => {
+    const md = recipeToMarkdown(recipe({ toTry: 1 }));
+    expect(md).toContain('**Status:** to try');
+
+    // The meta line carries the Prep/Cook/Servings tokens; the Status line must
+    // sit on the line directly after it (blank lines are collapsed away).
+    const lines = md
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    const metaIdx = lines.findIndex((l) => l.includes('**Servings:**'));
+    const statusIdx = lines.findIndex((l) => l === '**Status:** to try');
+    expect(metaIdx).toBeGreaterThanOrEqual(0);
+    expect(statusIdx).toBe(metaIdx + 1);
+  });
+
+  it('emits the Status line in the meta line\'s place when the recipe has no metadata', () => {
+    const md = recipeToMarkdown(
+      recipe({ toTry: 1, prepTime: null, cookTime: null, servings: null }),
+    );
+    expect(md).toContain('**Status:** to try');
+    expect(md).not.toContain('**Prep:**');
+    expect(md).not.toContain('**Cook:**');
+    expect(md).not.toContain('**Servings:**');
+
+    // Status line comes before the first section (ingredients) and after the title.
+    const lines = md
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    const titleIdx = lines.findIndex((l) => l.startsWith('## '));
+    const statusIdx = lines.findIndex((l) => l === '**Status:** to try');
+    const ingIdx = lines.findIndex((l) => l === '### Ingredients');
+    expect(statusIdx).toBeGreaterThan(titleIdx);
+    expect(statusIdx).toBeLessThan(ingIdx);
+  });
+
+  it('emits no Status line for a tried recipe (toTry 0)', () => {
+    const md = recipeToMarkdown(recipe({ toTry: 0 }));
+    expect(md).not.toContain('Status');
+    expect(md).not.toContain('to try');
+  });
+
+  it('emits no Status line when toTry is absent (undefined → falsy)', () => {
+    const md = recipeToMarkdown(recipe());
+    expect(md).not.toContain('Status');
   });
 });

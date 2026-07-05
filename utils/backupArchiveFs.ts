@@ -208,6 +208,7 @@ function sectionsToContent(sections: BackupSection[]): BackupContent {
         ingredients: r.ingredients,
         instructions: r.instructions,
         notes: r.notes,
+        toTry: r.toTry ? 1 : 0,
         createdAt: now,
         updatedAt: now,
       });

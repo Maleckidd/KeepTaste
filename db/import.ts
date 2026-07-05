@@ -26,6 +26,7 @@ export async function importCookbook(data: {
         ingredients: recipe.ingredients,
         instructions: recipe.instructions,
         notes: recipe.notes,
+        toTry: recipe.toTry ? 1 : 0,
       });
     }
 
@@ -64,6 +65,7 @@ export async function importBackup(
           ingredients: recipe.ingredients,
           instructions: recipe.instructions,
           notes: recipe.notes,
+          toTry: recipe.toTry ? 1 : 0,
         });
         recipeCount += 1;
       }

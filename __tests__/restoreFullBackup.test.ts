@@ -51,8 +51,8 @@ const content: BackupContent = {
     { id: 9, name: 'B', coverImagePath: 'x', createdAt: '2026-01-02T00:00:00.000Z' },
   ],
   recipes: [
-    { id: 100, cookbookId: 9, title: 'In B', prepTime: 10, cookTime: null, servings: 2, imagePath: null, ingredients: 'i', instructions: 'n', notes: null, createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-02-02T00:00:00.000Z' },
-    { id: 101, cookbookId: null, title: 'Loose', prepTime: null, cookTime: null, servings: null, imagePath: null, ingredients: '', instructions: '', notes: null, createdAt: '2026-02-03T00:00:00.000Z', updatedAt: '2026-02-03T00:00:00.000Z' },
+    { id: 100, cookbookId: 9, title: 'In B', prepTime: 10, cookTime: null, servings: 2, imagePath: null, ingredients: 'i', instructions: 'n', notes: null, toTry: 0, createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-02-02T00:00:00.000Z' },
+    { id: 101, cookbookId: null, title: 'Loose', prepTime: null, cookTime: null, servings: null, imagePath: null, ingredients: '', instructions: '', notes: null, toTry: 0, createdAt: '2026-02-03T00:00:00.000Z', updatedAt: '2026-02-03T00:00:00.000Z' },
   ],
   shoppingLists: [
     { id: 50, name: 'L', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-03-02T00:00:00.000Z' },

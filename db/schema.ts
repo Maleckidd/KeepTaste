@@ -20,6 +20,7 @@ export const recipes = sqliteTable('recipes', {
   ingredients: text('ingredients').notNull().default(''),
   instructions: text('instructions').notNull().default(''),
   notes: text('notes').default(''),
+  toTry: integer('to_try').notNull().default(0),
   createdAt: text('created_at').notNull().default(new Date().toISOString()),
   updatedAt: text('updated_at').notNull().default(new Date().toISOString()),
 });

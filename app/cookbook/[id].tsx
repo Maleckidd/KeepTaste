@@ -27,6 +27,7 @@ import {
   subscribePendingDeletes,
 } from '@/utils/pendingDelete';
 import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { partitionToTry, countToTry } from '@/utils/toTry';
 import {
   useTheme,
   ThemePalette,
@@ -47,6 +48,14 @@ import SwipeableRow from '@/components/ui/SwipeableRow';
 import type { Recipe, Cookbook } from '@/db/schema';
 
 const CARD_IMAGE_HEIGHT = 150;
+
+// The recipe list can carry a single "To try" section header between the normal
+// and to-try partitions (§5.19). A stable non-numeric key keeps it from ever
+// colliding with a recipe id in keyExtractor.
+const TO_TRY_HEADER_KEY = 'header:to-try';
+type ListItem =
+  | { kind: 'recipe'; recipe: Recipe }
+  | { kind: 'header' };
 
 function RecipeCard({
   recipe,
@@ -84,9 +93,20 @@ function RecipeCard({
         </View>
       )}
       <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {recipe.title}
-        </Text>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {recipe.title}
+          </Text>
+          {recipe.toTry ? (
+            <Ionicons
+              name="flask-outline"
+              size={16}
+              color={c.textMuted}
+              style={styles.cardToTryIcon}
+              accessibilityLabel={t('toTry.badge')}
+            />
+          ) : null}
+        </View>
         {totalTime > 0 || recipe.servings ? (
           <View style={styles.cardMeta}>
             {totalTime > 0 ? (
@@ -141,6 +161,10 @@ export default function CookbookScreen() {
   const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
   const [recipeMenu, setRecipeMenu] = useState<Recipe | null>(null);
   const [peekHint, setPeekHint] = useState(false);
+  // §5.19 filter chip: session-only, "All recipes" view only. Count is over the
+  // whole library, independent of the query.
+  const [toTryOnly, setToTryOnly] = useState(false);
+  const [toTryTotal, setToTryTotal] = useState(0);
   const showUndoDelete = useUndoDelete();
 
   const loadData = useCallback(async () => {
@@ -148,7 +172,15 @@ export default function CookbookScreen() {
       const data = searchQuery
         ? await searchRecipes(searchQuery)
         : await getAllRecipes();
-      setRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
+      const visible = filterPendingDeletes(data, 'recipe', (r) => r.id);
+      setRecipes(toTryOnly ? visible.filter((r) => r.toTry) : visible);
+      // Chip count is derived from the full set, independent of the query.
+      const all = searchQuery
+        ? await getAllRecipes()
+        : data;
+      setToTryTotal(
+        countToTry(filterPendingDeletes(all, 'recipe', (r) => r.id))
+      );
     } else {
       const cbId = Number(id);
       const [cb, data] = await Promise.all([
@@ -159,7 +191,7 @@ export default function CookbookScreen() {
       setRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
     }
     setIsLoaded(true);
-  }, [id, isAll, searchQuery]);
+  }, [id, isAll, searchQuery, toTryOnly]);
 
   useFocusEffect(
     useCallback(() => {
@@ -252,6 +284,25 @@ export default function CookbookScreen() {
 
   const headerTitle = isAll ? t('home.allRecipes') : cookbook?.name ?? '';
 
+  // Build the flat list: normal recipes, then the "To try" section header (only
+  // when non-empty), then the to-try recipes. When the chip is active the list
+  // is already to-try-only, so partitioning is a no-op — render it plain.
+  const listItems: ListItem[] = useMemo(() => {
+    if (toTryOnly) {
+      return recipes.map((recipe) => ({ kind: 'recipe' as const, recipe }));
+    }
+    const { normal, toTry } = partitionToTry(recipes);
+    const items: ListItem[] = normal.map((recipe) => ({
+      kind: 'recipe' as const,
+      recipe,
+    }));
+    if (toTry.length > 0) {
+      items.push({ kind: 'header' });
+      for (const recipe of toTry) items.push({ kind: 'recipe' as const, recipe });
+    }
+    return items;
+  }, [recipes, toTryOnly]);
+
   return (
     <View style={styles.container}>
       <ScreenHeader title={headerTitle} back>
@@ -288,6 +339,33 @@ export default function CookbookScreen() {
         </View>
       ) : null}
 
+      {/* To-try filter chip (§5.19) — All view only, hidden when nothing is
+          marked. Session-only, AND-combined with the search query. */}
+      {isAll && toTryTotal > 0 ? (
+        <View style={styles.chipRow}>
+          <Pressable
+            onPress={() => setToTryOnly((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: toTryOnly }}
+            style={[styles.chip, toTryOnly ? styles.chipActive : styles.chipInactive]}
+          >
+            <Ionicons
+              name="flask-outline"
+              size={14}
+              color={toTryOnly ? c.onPrimary : c.text}
+            />
+            <Text
+              style={[
+                styles.chipText,
+                { color: toTryOnly ? c.onPrimary : c.text },
+              ]}
+            >
+              {t('cookbook.toTryChip', { count: toTryTotal })}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {/* Recipe list */}
       {!isLoaded ? (
         <View style={styles.list}>
@@ -307,26 +385,38 @@ export default function CookbookScreen() {
         )
       ) : (
         <FlatList
-          data={recipes}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item, index }) => (
-            <SwipeableRow
-              onEdit={() =>
-                router.push({ pathname: '/recipe/edit', params: { id: item.id } })
-              }
-              onDelete={() => handleDeleteRecipe(item)}
-              peek={peekHint && index === 0}
-            >
-              <RecipeCard
-                recipe={item}
-                onPress={() => router.push(`/recipe/${item.id}`)}
-                onLongPress={() => {
-                  lightTap();
-                  setRecipeMenu(item);
-                }}
-              />
-            </SwipeableRow>
-          )}
+          data={listItems}
+          keyExtractor={(item) =>
+            item.kind === 'header' ? TO_TRY_HEADER_KEY : String(item.recipe.id)
+          }
+          renderItem={({ item, index }) => {
+            if (item.kind === 'header') {
+              return (
+                <Text style={styles.sectionHeader} accessibilityRole="header">
+                  {t('toTry.badge')}
+                </Text>
+              );
+            }
+            const recipe = item.recipe;
+            return (
+              <SwipeableRow
+                onEdit={() =>
+                  router.push({ pathname: '/recipe/edit', params: { id: recipe.id } })
+                }
+                onDelete={() => handleDeleteRecipe(recipe)}
+                peek={peekHint && index === 0}
+              >
+                <RecipeCard
+                  recipe={recipe}
+                  onPress={() => router.push(`/recipe/${recipe.id}`)}
+                  onLongPress={() => {
+                    lightTap();
+                    setRecipeMenu(recipe);
+                  }}
+                />
+              </SwipeableRow>
+            );
+          }}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
@@ -441,11 +531,54 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     padding: Spacing.base,
     gap: Spacing.xs,
   },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+  },
   cardTitle: {
+    flex: 1,
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.semibold,
     color: c.text,
     lineHeight: Typography.size.md * 1.3,
+  },
+  cardToTryIcon: {
+    marginTop: 2,
+  },
+  sectionHeader: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.bold,
+    color: c.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: Spacing.sm,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.base,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  chipActive: {
+    backgroundColor: c.primary,
+    borderColor: c.primary,
+  },
+  chipInactive: {
+    backgroundColor: c.surface,
+    borderColor: c.border,
+  },
+  chipText: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
   },
   cardMeta: {
     flexDirection: 'row',

@@ -101,6 +101,19 @@ export async function updateRecipe(
   scheduleAutoBackup();
 }
 
+/**
+ * Clears the to-try flag and bumps updated_at to now (SPEC.md §5.19 / §4 — the
+ * one deliberate exception to the edit-only updated_at rule, so the freshly
+ * tried recipe graduates to the top of its cookbook). No Undo path.
+ */
+export async function markRecipeTried(id: number): Promise<void> {
+  await db
+    .update(recipes)
+    .set({ toTry: 0, updatedAt: new Date().toISOString() })
+    .where(eq(recipes.id, id));
+  scheduleAutoBackup();
+}
+
 export async function deleteRecipe(id: number): Promise<void> {
   await db.delete(recipes).where(eq(recipes.id, id));
   scheduleAutoBackup();

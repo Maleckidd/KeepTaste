@@ -9,6 +9,7 @@ export interface RecipeFormData {
   ingredients: string;
   instructions: string;
   notes: string;
+  toTry: boolean;
 }
 
 export function emptyRecipeFormData(): RecipeFormData {
@@ -21,6 +22,7 @@ export function emptyRecipeFormData(): RecipeFormData {
     ingredients: '',
     instructions: '',
     notes: '',
+    toTry: false,
   };
 }
 
@@ -34,6 +36,7 @@ export function recipeToFormData(recipe: Recipe): RecipeFormData {
     ingredients: recipe.ingredients,
     instructions: recipe.instructions,
     notes: recipe.notes ?? '',
+    toTry: !!recipe.toTry,
   };
 }
 
@@ -49,6 +52,7 @@ export function isRecipeFormDirty(
     initial.imagePath !== current.imagePath ||
     initial.ingredients !== current.ingredients ||
     initial.instructions !== current.instructions ||
-    initial.notes !== current.notes
+    initial.notes !== current.notes ||
+    initial.toTry !== current.toTry
   );
 }

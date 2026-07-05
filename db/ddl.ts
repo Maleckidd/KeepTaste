@@ -21,6 +21,7 @@ export const MIGRATION_DDL = `
     ingredients TEXT NOT NULL DEFAULT '',
     instructions TEXT NOT NULL DEFAULT '',
     notes TEXT DEFAULT '',
+    to_try INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );

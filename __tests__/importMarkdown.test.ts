@@ -21,6 +21,7 @@ type FixtureRecipe = {
   ingredients?: string;
   instructions?: string;
   notes?: string | null;
+  toTry?: boolean;
 };
 
 function recipeToMarkdown(recipe: FixtureRecipe): string {
@@ -32,7 +33,12 @@ function recipeToMarkdown(recipe: FixtureRecipe): string {
     .filter(Boolean)
     .join(' | ');
 
-  const metaLine = timeLines ? `${timeLines}\n\n` : '';
+  // §5.19: the Status line sits below the meta line (or in its place). When the
+  // fixture has metadata we append the Status line to the same block so the
+  // exported shape matches utils/markdown.ts.
+  const statusLine = recipe.toTry ? `**Status:** to try` : '';
+  const metaBlock = [timeLines, statusLine].filter(Boolean).join('\n');
+  const metaLine = metaBlock ? `${metaBlock}\n\n` : '';
   const ingredientsSection = recipe.ingredients
     ? `### Ingredients\n\n${recipe.ingredients}\n\n`
     : '';
@@ -135,6 +141,7 @@ describe('parseCookbookMarkdown', () => {
         ingredients: '- 1 kg tomatoes\n- 2 onions',
         instructions: '1. Chop\n2. Simmer',
         notes: 'Best with bread.',
+        toTry: false,
       });
     });
 
@@ -149,6 +156,7 @@ describe('parseCookbookMarkdown', () => {
         ingredients: '- flour\n- milk',
         instructions: 'Mix and fry.',
         notes: null,
+        toTry: false,
       });
     });
   });
@@ -189,6 +197,57 @@ describe('parseCookbookMarkdown', () => {
         cookTime: null,
         servings: null,
       });
+    });
+  });
+
+  describe('to-try Status line parsing (§5.19)', () => {
+    it('a recipe with no Status line parses toTry false', () => {
+      const content = buildExport('CB', [{ title: 'Tried', instructions: 'go' }]);
+      const result = parseCookbookMarkdown(content);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.recipes[0].toTry).toBe(false);
+    });
+
+    it('a "**Status:** to try" line sets toTry true (with metadata present)', () => {
+      const content = buildExport('CB', [
+        { title: 'ToTry', prepTime: 10, instructions: 'go', toTry: true },
+      ]);
+      const result = parseCookbookMarkdown(content);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.recipes[0].toTry).toBe(true);
+      // The other fields still parse normally.
+      expect(result.recipes[0].prepTime).toBe(10);
+    });
+
+    it('a "**Status:** to try" line sets toTry true when there is no metadata', () => {
+      const content = buildExport('CB', [
+        { title: 'ToTry', instructions: 'go', toTry: true },
+      ]);
+      const result = parseCookbookMarkdown(content);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.recipes[0].toTry).toBe(true);
+    });
+
+    it('an unrecognized "**Status:** something-else" value → toTry false', () => {
+      const content = [
+        '# CB',
+        '',
+        '---',
+        '',
+        '## R',
+        '',
+        '**Status:** something-else',
+        '',
+        '### Instructions',
+        '',
+        'go',
+        '',
+        '---',
+        '',
+      ].join('\n');
+      const result = parseCookbookMarkdown(content);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.recipes[0].toTry).toBe(false);
     });
   });
 
@@ -240,6 +299,7 @@ describe('parseCookbookMarkdown', () => {
         ingredients: '',
         instructions: '',
         notes: null,
+        toTry: false,
       });
     });
   });

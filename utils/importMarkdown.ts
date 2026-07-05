@@ -11,6 +11,7 @@ export type ImportedRecipe = {
   ingredients: string;
   instructions: string;
   notes: string | null;
+  toTry: boolean;
 };
 
 export type ParseResult =
@@ -67,6 +68,7 @@ function parseRecipeBlock(blockLines: string[]): ImportedRecipe {
   let ingredients = '';
   let instructions = '';
   let notes: string | null = null;
+  let toTry = false;
 
   // Walk the rest of the block. Lines before the first ### header may contain
   // the meta line; ### headers introduce section bodies.
@@ -101,6 +103,13 @@ function parseRecipeBlock(blockLines: string[]): ImportedRecipe {
     }
 
     if (section === 'pre') {
+      // §5.19: recognize the to-try Status line. Only the exact "to try" value
+      // sets the flag; any other value (or absence) leaves it false.
+      const status = line.match(/^\*\*Status:\*\*\s*(.+)$/);
+      if (status) {
+        if (status[1].trim() === 'to try') toTry = true;
+        continue;
+      }
       // Look for the meta line (Prep/Cook/Servings tokens). Other lines in the
       // pre-section are ignored.
       if (/\*\*(Prep|Cook|Servings):\*\*/.test(line)) {
@@ -131,7 +140,7 @@ function parseRecipeBlock(blockLines: string[]): ImportedRecipe {
 
   flush();
 
-  return { title, prepTime, cookTime, servings, ingredients, instructions, notes };
+  return { title, prepTime, cookTime, servings, ingredients, instructions, notes, toTry };
 }
 
 export type BackupSection = {

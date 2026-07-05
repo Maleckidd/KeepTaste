@@ -15,7 +15,7 @@ export const db = drizzle(sqlite, { schema });
  * ladder in runMigrations and bump this. Tracked via PRAGMA user_version so a
  * backup restore can refuse data from a newer schema (SPEC.md §5.17.4).
  */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /** Reads the persisted SQLite user_version (0 on a brand-new database). */
 export function getSchemaVersion(): number {
@@ -36,7 +36,22 @@ export function runMigrations() {
   // Version ladder. The baseline DDL above brings any install up to v1; future
   // ALTER/data migrations slot in as `if (from < N) { … }` steps before the
   // stamp. Stamping unconditionally is safe because the DDL is idempotent.
-  if (getSchemaVersion() < CURRENT_SCHEMA_VERSION) {
+  const from = getSchemaVersion();
+
+  // v2 (SPEC.md §5.19): recipes.to_try. A fresh DB already has the column from
+  // the DDL above, so the ALTER throws "duplicate column name" — swallow it,
+  // matching this file's idempotent stance.
+  if (from < 2) {
+    try {
+      sqlite.execSync(
+        `ALTER TABLE recipes ADD COLUMN to_try INTEGER NOT NULL DEFAULT 0`
+      );
+    } catch {
+      // column already exists (fresh DB created by the baseline DDL)
+    }
+  }
+
+  if (from < CURRENT_SCHEMA_VERSION) {
     sqlite.execSync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
   }
 }

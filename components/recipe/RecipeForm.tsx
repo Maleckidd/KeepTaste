@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  Switch,
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -136,6 +137,9 @@ export default function RecipeForm({
 
   const set = (key: keyof RecipeFormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const setToTry = (value: boolean) =>
+    setForm((prev) => ({ ...prev, toTry: value }));
 
   // Import only sets content fields (never imagePath — the partial excludes it).
   const applyImport = (partial: Partial<RecipeFormData>) => {
@@ -358,6 +362,25 @@ export default function RecipeForm({
             multiline
           />
         </Field>
+
+        {/* To try (§5.19) */}
+        <Pressable
+          style={styles.toTryRow}
+          onPress={() => setToTry(!form.toTry)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: form.toTry }}
+          accessibilityLabel={t('recipeForm.toTryLabel')}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toTryLabel}>{t('recipeForm.toTryLabel')}</Text>
+          </View>
+          <Switch
+            value={form.toTry}
+            onValueChange={setToTry}
+            trackColor={{ false: c.border, true: c.primary }}
+            thumbColor={c.surface}
+          />
+        </Pressable>
       </ScrollView>
 
       {/* Save stays pinned in the thumb zone, above the keyboard */}
@@ -454,5 +477,21 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     fontSize: Typography.size.base,
     fontWeight: Typography.weight.semibold,
     color: c.primary,
+  },
+  toTryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    minHeight: Touch.min,
+    paddingHorizontal: Spacing.base,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surfaceAlt,
+  },
+  toTryLabel: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.text,
   },
 });

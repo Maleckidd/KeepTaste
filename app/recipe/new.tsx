@@ -32,6 +32,7 @@ export default function NewRecipeScreen() {
         ingredients: data.ingredients,
         instructions: data.instructions,
         notes: data.notes || null,
+        toTry: data.toTry ? 1 : 0,
       });
 
       router.back();

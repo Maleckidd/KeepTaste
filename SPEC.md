@@ -149,6 +149,7 @@ recipes (
   ingredients     TEXT NOT NULL DEFAULT '',     -- raw Markdown text
   instructions    TEXT NOT NULL DEFAULT '',     -- raw Markdown text
   notes           TEXT DEFAULT '',              -- notes; '' and NULL mean the same: no note
+  to_try          INTEGER NOT NULL DEFAULT 0,   -- 1 = saved to try, not cooked yet (§5.19)
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 )
@@ -172,7 +173,7 @@ CREATE INDEX idx_recipes_cookbook_id ON recipes(cookbook_id);
 ### Key behaviors
 
 - **Deleting a cookbook** → `cookbook_id` on its recipes is set to `NULL` (ON DELETE SET NULL). Recipes do not disappear; they go to the "no cookbook" pool visible in the "All recipes" view.
-- **`updated_at`** — updated **only when saving a recipe edit**. Merely opening or viewing a recipe does not change `updated_at` (and therefore the sort order).
+- **`updated_at`** — updated **only when saving a recipe edit**. Merely opening or viewing a recipe does not change `updated_at` (and therefore the sort order). **One deliberate exception:** the "Tried it" action in the recipe view (§5.19) clears `to_try` **and bumps `updated_at`**, so a freshly tried recipe surfaces at the top of its cookbook.
 - **`notes` field** — empty string and `NULL` are treated identically (no note) in all views and in export.
 - **Dates** — stored as ISO 8601 strings (TEXT), not UNIX timestamps. More readable when debugging and exporting.
 
@@ -233,6 +234,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - URL `/cookbook/[id]` — recipes assigned to a specific cookbook
 - URL `/cookbook/all` — all recipes from all cookbooks and unassigned ones
 - Recipes sorted descending by `updated_at` (most recently modified on top)
+- **To-try partition (§5.19):** recipes marked "to try" sink to a **"To try" section** at the bottom of the list, under an uppercase section header; within both parts the `updated_at` ordering is unchanged. The header renders only when the section is non-empty. Applies to both specific-cookbook and "All recipes" views
 - "+" button in the header → new recipe (with pre-filled `cookbook_id` when inside a specific cookbook)
 - **Share (PDF) icon in the header** → generates and shares the cookbook as a PDF (§5.14). Available only in a specific cookbook's view, not in "All recipes"
 
@@ -240,6 +242,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Text field above the list, filtering by recipe title across **all** cookbooks
 - Case-insensitive comparison, **correct for non-ASCII characters (e.g. Polish diacritics)** — filtering happens on the JS side via `title.toLowerCase().includes(query.toLowerCase())`, not via SQL `LIKE` (which is case-insensitive only for ASCII — searching "żurek" would not find "Żurek")
 - Search runs on every text change (no "search" button); tapping a result opens the recipe view
+- **"To try" filter chip (§5.19)** below the search field: shown only when at least one to-try recipe exists, labeled with a live count ("To try (7)"). Active chip restricts the list to to-try recipes across all cookbooks; combines with the text query (AND). Session-only state — leaving the screen resets it
 - No results → grayed-out text *"No results"* (color `textMuted`)
 - The field is **not shown** in a specific cookbook's view — search is global by design
 
@@ -252,7 +255,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 
 **Sections:**
 - Photo (full width, 240px tall) or a gray placeholder
-- Title
+- Title — with a small **"To try" badge** next to it when `to_try` is set, plus a **"Tried it ✓"** action that clears the flag, bumps `updated_at` (§4 exception) and confirms with a snackbar (§5.19)
 - Metadata: prep time, cook time, total time, servings — **items without a value are hidden** (no "—"); if all are missing, the whole metadata row disappears
 - **Ingredients** and **Instructions** as two stacked sections of a single scrollable view (no tabs, no switching) — each with an uppercase section header; an empty section is hidden entirely (consistent with the no-placeholder rule)
 - Section content rendered by `react-native-markdown-display`
@@ -292,6 +295,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 | Cook | TextInput numeric | NO | Minutes as a positive integer |
 | Servings | TextInput numeric | NO | Positive integer |
 | Photo | ImagePicker | NO | Gallery or camera, 4:3 aspect |
+| To try | Switch | NO | Marks the recipe as saved-to-try (§5.19); default off, edit preserves the stored value |
 | Ingredients | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Instructions | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Notes | TextInput multiline | NO | Exported together with the recipe (it's a cookbook, not a diary) |
@@ -369,6 +373,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 - Pure builders live in `utils/markdown.ts` (`recipeToMarkdown`, `cookbookBodyToMarkdown`, `formatTime`) and `utils/backupMarkdown.ts` (`buildBackupMarkdown`, `UNCATEGORIZED_HEADING`, `BackupSection`); the `recipes.md` produced by these is embedded as the readable layer of the `.zip` archive (§5.17), built and shared by `utils/backupArchiveFs.ts` (`exportBackupZip`), fed by `db/recipes.ts` `getBackupSections()`.
 - Within each section, recipes are sorted the same as in the list (descending by `updated_at`)
 - The metadata line (`**Prep:** ... | ...`): segments without a value are **omitted**; if a recipe has no metadata at all, the whole line is omitted
+- A to-try recipe (§5.19) carries the line `**Status:** to try` directly below the metadata line (or in its place when there is no metadata); tried recipes carry no Status line (consistent with the omit-when-absent rule). English-only, like the rest of the format
 - The "Notes" section appears in the file only if the `notes` field is not empty
 - Export date in `DD/MM/YYYY` format
 - The file is written to `FileSystem.cacheDirectory` as `keeptaste-backup.md`, then shared via `Sharing.shareAsync()`
@@ -406,6 +411,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 - `*Exported:*` / `*Recipes:*` lines are informational and never trusted (the recipe count is derived from the actual `## ` blocks, not the header).
 - Each `## ` block is a recipe, running until the next `## `, a `---` line, or EOF. Trailing `---` / whitespace produce no phantom recipes.
 - The meta line `**Prep:** … | **Cook:** … | **Servings:** …` is parsed token-by-token; each token is independent and absent tokens stay `null`. Prep/Cook strings are inverted via `parseTimeToMinutes` (the lockstep inverse of export's `formatTime` — "45 min", "1 hr 30 min", "2 hr"; the time-string mapping must stay in sync if `formatTime` ever changes). Servings is a plain integer.
+- An optional `**Status:** to try` line (§5.19) sets `toTry: true` on the recipe; absence — or any unrecognized status value — means `false`.
 - `### Ingredients` / `### Instructions` bodies default to `''` when the section is absent. `### Notes` is `null` when absent, the body when present, and `''` when the header is present but the body empty.
 - Internal body Markdown is preserved exactly; only `# `, `## `, and `### Ingredients|Instructions|Notes` are structural. Hand-edited files are best-effort — unescaped bodies that contain those structural markers may mis-split (documented limitation).
 
@@ -661,7 +667,7 @@ recipes.md    ← the §5.6 Markdown (kept verbatim — the readable escape hatc
 images/       ← every referenced photo, copied from documentDirectory
 ```
 
-- `backup.json` carries `schemaVersion` (see 5.17.4), all cookbooks (incl. `cover_image_path`), all recipes (incl. `created_at` / `updated_at` / `image_path`), all `shopping_lists` + `shopping_items`, and `app_settings`. Photo fields store the **relative** `images/<file>` path, not the device URI.
+- `backup.json` carries `schemaVersion` (see 5.17.4), all cookbooks (incl. `cover_image_path`), all recipes (incl. `created_at` / `updated_at` / `image_path` / `to_try` — §5.19; archives from before the field restore with `to_try = 0`), all `shopping_lists` + `shopping_items`, and `app_settings`. Photo fields store the **relative** `images/<file>` path, not the device URI.
 - `recipes.md` stays English-only and byte-identical to the §5.6 output, so the readability/round-trip promise (§1) is untouched even if `backup.json` is never opened by a human.
 - **Restore prefers `backup.json`**; a `.zip` with no JSON (or a plain legacy `.md`, §5.8) falls back to the Markdown path. A `.md` import remains supported forever (backward compatibility).
 
@@ -726,6 +732,36 @@ Restoring an archive made on a different schema version is a corruption vector, 
 **Testing:** the builder is pure → covered in `__tests__/shoppingListShareText.test.ts` (name + bullets, quantity in parens, checked items omitted, empty list, and a round-trip assertion through `parseIngredients`); the menu action is verified by running the app.
 
 ---
+
+### 5.19 To-try recipes
+
+**Problem:** recipes saved "to cook someday" (from websites, other apps, screenshots) get lost — they either pollute the cookbook they land in or are never seen again. KeepTaste gives them an explicit, lightweight status. This is deliberately a **dedicated boolean, not a tag** (§7): behaviors — the bottom section, the filter chip, the badge — hang off a flag the app understands, which free-form labels cannot provide.
+
+**Data:** `recipes.to_try INTEGER NOT NULL DEFAULT 0` (§4), added as an `ALTER TABLE ... ADD COLUMN` step in the `user_version` migration ladder (§5.17.4). Default `0` (= tried / normal): existing libraries are unaffected; marking is always an explicit user action.
+
+**Marking and unmarking:**
+- **Recipe form (§5.5):** a "To try" switch, default off for new recipes; edit preserves the stored value. Import flows (§5.8 backup, §5.15 link/paste) never set it except when a backup's `**Status:** to try` line says so.
+- **Recipe view (§5.4):** when the flag is set, a small "To try" badge appears next to the title and a **"Tried it ✓"** action is shown. Tapping it clears the flag, **bumps `updated_at`** (the one deliberate exception to the edit-only rule, §4 — the freshly tried recipe "graduates" to the top of its cookbook) and confirms with a snackbar. No Undo path — re-marking takes one switch flip in the edit form.
+- **Recipe cards (§5.3):** a small muted icon badge (Ionicons `flask-outline`, `textMuted`) next to the title — visible at a glance, quiet enough not to shout. No text on cards.
+
+**List behavior (§5.3):** in every recipe list (specific cookbook and "All recipes") to-try recipes are **partitioned to the bottom** under an uppercase "To try" section header; within both partitions the ordering stays `updated_at` descending. The header renders only when the partition is non-empty. A visible section, not a silent sort tweak — otherwise a recently edited to-try recipe "missing" from the top of the list would look like a bug. The partitioning is a pure helper (unit-tested), applied after the existing sort.
+
+**Aggregation — the filter chip (§5.3):** below the search field in "All recipes" (the search's only home), a **"To try (N)"** chip:
+- Hidden entirely when N = 0 — users who never mark anything never see the feature.
+- Tap toggles it. Active chip restricts the list to to-try recipes across all cookbooks; with an empty query this *is* the "what should I cook next" aggregation view, with a query it searches within to-try only (AND).
+- Session-only state (component state, no persistence) — a quick filter, not a mode.
+
+**Export / import round-trip:**
+- `.md` backup (§5.6/§5.8): the `**Status:** to try` line, present only when set; absence → tried. English-only.
+- `.zip` archive (§5.17.1): `backup.json` recipes gain `to_try`; **`schemaVersion` bump** (§5.17.4). Older archives restore with `to_try = 0`.
+- **Shares omit the status** (recipe text §5.13, cookbook PDF §5.14) — it is personal workflow state, not recipe content.
+
+**i18n:** new EN+PL strings in `dictionary.ts` (badge/section label, chip label with count, form switch label, "Tried it" button, confirmation snackbar).
+
+**Out of scope for this feature:** a dedicated "To try" virtual cookbook tile (the chip covers aggregation; revisit only if it proves too hidden), reminders/nudges, a "tried on" date, auto-marking imported recipes.
+
+---
+
 
 ## 6. Design system
 
@@ -806,7 +842,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 | Cloud sync (two-way reconciliation, server, merge) | Complexity, infrastructure costs, privacy concerns. **Note:** the one-way `.zip` backup to the user's own cloud folder (§5.17) is *not* sync — the app writes a file, never reconciles or talks to a server |
 | Direct Google Drive / Dropbox API integration (OAuth, account sign-in, app folders) | Most work, needs provider app verification (OAuth), and breaks "no accounts" — for little gain over the system share sheet (§5.17.2). Online backup is achieved via the share sheet (Level 0) or a user-chosen synced folder (Level 1, SAF) |
 | User accounts | Same as above — the app is deliberately private and local |
-| Tags (recipe labels + filtering) | Removed from the MVP — title search is enough to start; may return in the future (see §8) |
+| Tags (recipe labels + filtering) | Removed from the MVP — title search is enough to start; may return in the future (see §8). The **to-try status (§5.19) is not tags**: it's a dedicated boolean the app can hang behavior on (bottom section, filter chip, badge), which free-form labels cannot provide |
 | Ingredient scaling (servings multiplier) | Ingredients are text, not structured data — parsing would be brittle |
 | Cooking mode (step-by-step active screen) | Complexity, beyond MVP. The *reading-view* affordances a cook actually needs — keep-awake and in-recipe text zoom (A−/A+) — already ship on the recipe view (§5.4/§6); only the dedicated one-step-at-a-time screen stays out |
 | AI / network "smart parsing" for recipe import | Breaks the local-first, no-backend philosophy (§1); per-call cost. Single-recipe import stays deterministic (§5.15) |
@@ -836,6 +872,8 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **Online backup — Level 0 (share sheet)** — §5.17.2: once the archive ships this is ~free; add a Settings hint that the share sheet sends the backup to Drive/Dropbox. EN+PL string
 - [x] **Online backup — Level 1 (SAF auto-export)** — §5.17.3: `StorageAccessFramework` folder pick, new `app_settings` keys (`backup_folder_uri`, `backup_last_export_at`, `backup_auto_enabled`) + `db/settings.ts` accessors, pure `utils/backupAuto.ts` retention helpers (`parseKeepCount`/`backupsToPrune`) + change-driven dirty-flag/flush trigger in `utils/backupTrigger.ts` (unit-tested; heavy write deferred to app-background via `flushAutoBackup`), best-effort `runAutoBackupNow` write, "Automatic backup" Settings section with the synced-folder note. **Second approved exception to the no-extra-settings rule (§7), after language (§5.11)**
 - [x] **Single-recipe import (link / paste text)** — §5.15: pure parsers in `utils/recipeImport.ts` (`parseRecipeJsonLd`, `parsePastedRecipe`, `parseIsoDuration`) with unit tests, native fetch wrapper `utils/recipeImportFetch.ts`, `components/recipe/ImportSheet.tsx`, an "Import" affordance on the new-recipe form (create mode only) that pre-fills `RecipeFormData` (review-then-save; source URL → notes; photo skipped in v1), EN+PL strings. From-photo OCR and an Android share target are later phases
+
+- [ ] **To-try recipe status** — §5.19: `to_try` column (DDL + `schema.ts` + migration-ladder `ALTER TABLE`), form switch, card badge, recipe-view badge + "Tried it ✓" (bumps `updated_at` — approved exception, §4), bottom "To try" section in recipe lists (pure partition helper, unit-tested), "To try (N)" filter chip in "All recipes" search, `**Status:** to try` round-trip in `.md` (§5.6/§5.8), `to_try` in `backup.json` + `schemaVersion` bump (§5.17.1/§5.17.4), EN+PL strings
 
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)

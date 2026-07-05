@@ -15,10 +15,10 @@ import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import { useKeepAwakeSafe } from '@/utils/keepAwake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getRecipeById, deleteRecipe } from '@/db/recipes';
+import { getRecipeById, deleteRecipe, markRecipeTried } from '@/db/recipes';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import { pendingDeleteKey } from '@/utils/pendingDelete';
-import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { useUndoDelete, useSnackbar } from '@/components/ui/SnackbarProvider';
 import { parseIngredients } from '@/utils/ingredients';
 import { buildRecipeShareText } from '@/utils/recipeShareText';
 import {
@@ -116,6 +116,7 @@ export default function RecipeScreen() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const showUndoDelete = useUndoDelete();
+  const { showSnackbar } = useSnackbar();
 
   const loadData = useCallback(async () => {
     const r = await getRecipeById(Number(id));
@@ -150,6 +151,16 @@ export default function RecipeScreen() {
         },
       },
     ]);
+  };
+
+  // §5.19: clear the to-try flag (bumps updated_at so it graduates to the top),
+  // confirm with a plain snackbar (no Undo path), then reload. No animateLayout
+  // here — a snackbar mounts this frame (repo motion rule).
+  const handleMarkTried = async () => {
+    if (!recipe) return;
+    await markRecipeTried(recipe.id);
+    showSnackbar({ message: t('recipe.markedTried') });
+    await loadData();
   };
 
   const handleShare = async () => {
@@ -259,6 +270,28 @@ export default function RecipeScreen() {
           <Text style={styles.title} accessibilityRole="header">
             {recipe.title}
           </Text>
+
+          {/* To-try badge + "Tried it" action (§5.19) */}
+          {recipe.toTry ? (
+            <View style={styles.toTryRow}>
+              <View style={styles.toTryBadge}>
+                <Ionicons name="flask-outline" size={14} color={c.primary} />
+                <Text style={styles.toTryBadgeText}>{t('toTry.badge')}</Text>
+              </View>
+              <Pressable
+                onPress={handleMarkTried}
+                accessibilityRole="button"
+                accessibilityLabel={t('recipe.triedIt')}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.triedButton,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text style={styles.triedButtonText}>{t('recipe.triedIt')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {/* Metadata */}
           <View style={styles.metaRow}>
@@ -477,6 +510,39 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     color: c.text,
     letterSpacing: -0.5,
     lineHeight: Typography.size.xxl * 1.2,
+  },
+  toTryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  toTryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.full,
+    backgroundColor: c.surfaceAlt,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  toTryBadgeText: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
+  },
+  triedButton: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    backgroundColor: c.primary,
+  },
+  triedButtonText: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: c.onPrimary,
   },
   metaRow: {
     flexDirection: 'row',

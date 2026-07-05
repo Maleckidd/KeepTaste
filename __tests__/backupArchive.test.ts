@@ -31,6 +31,7 @@ function sampleContent(): BackupContent {
         ingredients: 'flour',
         instructions: 'bake',
         notes: null,
+        toTry: 0,
         createdAt: '2026-01-02T00:00:00.000Z',
         updatedAt: '2026-01-03T00:00:00.000Z',
       },
@@ -57,10 +58,21 @@ function sampleContent(): BackupContent {
   };
 }
 
+describe('BACKUP_SCHEMA_VERSION', () => {
+  it('is 2 after the to_try bump (§5.17.4 / §5.19)', () => {
+    expect(BACKUP_SCHEMA_VERSION).toBe(2);
+  });
+});
+
 describe('buildBackupJson', () => {
   it('stamps the current schema version', () => {
     const parsed = JSON.parse(buildBackupJson(sampleContent()));
     expect(parsed.schemaVersion).toBe(BACKUP_SCHEMA_VERSION);
+  });
+
+  it('stamps version 2 concretely', () => {
+    const parsed = JSON.parse(buildBackupJson(sampleContent()));
+    expect(parsed.schemaVersion).toBe(2);
   });
 
   it('produces valid JSON that preserves every section', () => {
@@ -131,6 +143,41 @@ describe('parseBackupJson', () => {
       shoppingItems: [{ id: 1, name: 'Milk', checked: 0, createdAt: 'z' }],
     });
     expect(parseBackupJson(corrupt).ok).toBe(false);
+  });
+
+  it('accepts a version-1 archive whose recipes have no to_try field (§5.19)', () => {
+    // Older archives predate the to_try column; they must still restore.
+    const legacy = JSON.stringify({
+      schemaVersion: 1,
+      cookbooks: [
+        { id: 1, name: 'Old', coverImagePath: null, createdAt: 'x' },
+      ],
+      recipes: [
+        {
+          id: 10,
+          cookbookId: 1,
+          title: 'Legacy',
+          prepTime: null,
+          cookTime: null,
+          servings: null,
+          imagePath: null,
+          ingredients: '',
+          instructions: '',
+          notes: null,
+          createdAt: 'x',
+          updatedAt: 'x',
+        },
+      ],
+      shoppingLists: [],
+      shoppingItems: [],
+      settings: [],
+    });
+    const result = parseBackupJson(legacy);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.schemaVersion).toBe(1);
+      expect(result.content.recipes[0].title).toBe('Legacy');
+    }
   });
 
   it('defaults missing optional sections to empty arrays', () => {

@@ -87,6 +87,34 @@ describe('backup build → parse round-trip', () => {
     expect(bucket!.recipes.map((r) => r.title)).toEqual(['Żurek staropolski']);
   });
 
+  it('round-trips a to-try recipe as toTry true and a tried one as false (§5.19)', () => {
+    const toTryRecipe = { ...fullRecipe, id: 3, title: 'On the list', toTry: 1 };
+    const result = roundtrip([
+      {
+        cookbookName: 'Polish Classics',
+        recipes: [toTryRecipe as any, titleOnlyRecipe as any],
+      },
+    ]);
+    if (!result.ok) throw new Error('expected ok');
+
+    const parsed = result.sections[0].recipes;
+    const onList = parsed.find((r) => r.title === 'On the list');
+    const bare = parsed.find((r) => r.title === 'Żurek staropolski');
+    expect(onList).toBeDefined();
+    expect(onList!.toTry).toBe(true);
+    expect(bare).toBeDefined();
+    expect(bare!.toTry).toBe(false);
+  });
+
+  it('round-trips a metadata-less to-try recipe as toTry true (§5.19)', () => {
+    const bareToTry = { ...titleOnlyRecipe, id: 4, title: 'Bare to try', toTry: 1 };
+    const result = roundtrip([
+      { cookbookName: 'Mains', recipes: [bareToTry as any] },
+    ]);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.sections[0].recipes[0].toTry).toBe(true);
+  });
+
   it('a cookbook literally named "Uncategorized" round-trips as a normal cookbook', () => {
     const result = roundtrip([
       { cookbookName: 'Uncategorized', recipes: [fullRecipe as any] },

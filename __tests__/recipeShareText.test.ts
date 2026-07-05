@@ -62,6 +62,13 @@ describe('buildRecipeShareText', () => {
     expect(text).not.toContain('—');
   });
 
+  it('omits the to-try status from share text (§5.19 — shares are not importable)', () => {
+    const text = buildRecipeShareText(recipe({ toTry: 1 }), en);
+    expect(text).toContain('Pierogi Ruskie');
+    expect(text).not.toContain('Status');
+    expect(text).not.toContain('to try');
+  });
+
   it('omits missing prep/cook/servings while keeping present ones', () => {
     const text = buildRecipeShareText(
       recipe({ prepTime: null, cookTime: 25, servings: null }),

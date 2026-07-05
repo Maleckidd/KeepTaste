@@ -21,7 +21,12 @@ export function recipeToMarkdown(recipe: Recipe): string {
     .filter(Boolean)
     .join(' | ');
 
-  const metaLine = timeLines ? `${timeLines}\n\n` : '';
+  // §5.19: the to-try Status line sits directly below the meta line when
+  // metadata exists, and takes the meta line's place (after the title, before
+  // the first ###) when there is none. A tried recipe emits no Status line.
+  const statusLine = recipe.toTry ? '**Status:** to try' : '';
+  const metaBlock = [timeLines, statusLine].filter(Boolean).join('\n');
+  const metaLine = metaBlock ? `${metaBlock}\n\n` : '';
 
   const ingredientsSection = recipe.ingredients
     ? `### Ingredients\n\n${recipe.ingredients}\n\n`
