@@ -72,7 +72,7 @@ components/
     CookbookForm.tsx     ← shared cookbook form (new + edit)
   recipe/
     RecipeForm.tsx       ← shared recipe form (new + edit)
-    ImportSheet.tsx      ← single-recipe import: link / paste-text mode picker (§5.15)
+    ImportSheet.tsx      ← single-recipe import: link / paste-text / photo mode picker (§5.15)
   ui/                    ← base components (§6): Button, IconButton, Input,
                            Card-level pieces, ScreenHeader, ModalHeader, Fab,
                            EmptyState, ActionSheet, SwipeableRow, SnackbarProvider
@@ -109,6 +109,8 @@ utils/
   ingredients.ts         ← pure parser: ingredients Markdown → shopping item candidates (§5.12)
   recipeImport.ts        ← pure parsers: Recipe JSON-LD + pasted-text → RecipeFormData (§5.15)
   recipeImportFetch.ts   ← native: fetch a recipe URL's HTML for parsing (§5.15)
+  recipeOcr.ts           ← native: on-device ML Kit text recognition wrapper (§5.15)
+  ocrText.ts             ← pure: OCR blocks → plain text for parsePastedRecipe (§5.15)
   i18n.ts                ← pure i18n logic: preference/locale resolution, interpolation, PL plurals
 
 constants/
@@ -583,15 +585,15 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 
 ---
 
-### 5.15 Importing a single recipe (link / paste text)
+### 5.15 Importing a single recipe (link / paste text / photo)
 
 A low-effort way to add **one** recipe from an external source by pre-filling the recipe form, instead of typing everything by hand. **Deterministic only — no AI, no network "smart parsing" service** — so the local-first, private philosophy (§1) is preserved: the only network call is a user-initiated `fetch` of a URL the user pasted, which goes straight to that site (no backend, nothing synced).
 
 This is distinct from the full-app Markdown **backup** import (§5.8), which restores a whole library from KeepTaste's own export format. §5.15 imports a single recipe from arbitrary external content into a form the user then reviews.
 
-**Scope:** two modes ship now — **From link** (T1) and **Paste text** (T2). **From a photo (OCR)** is a planned later phase (§8) — it needs an on-device OCR native module (ML Kit / Vision) and a development build, so it is deliberately out of this iteration. Importing video / transcripts (YouTube, Reels, TikTok video) and scraping raw HTML when no structured data exists stay **out of scope** (§7).
+**Scope:** three modes — **From link** (T1), **Paste text** (T2), and **From a photo (OCR)** (T3, July 2026 iteration). T3 uses an **on-device** OCR native module (ML Kit), so it needs a development build (like the `.zip` backup, §5.17.1) — in Expo Go and on web the mode is hidden. Importing video / transcripts (YouTube, Reels, TikTok video) and scraping raw HTML when no structured data exists stay **out of scope** (§7).
 
-**Entry point:** an **"Import"** affordance on the **new-recipe form** (`RecipeForm` in create mode only — never in edit mode), placed above the title field. Tapping it opens the **Import sheet** (a themed bottom sheet, same overlay pattern as `ActionSheet`/`FormattingHelpSheet`, §6) with a mode picker: **From link**, **Paste text** (and later **From photo**). The single recipe-creation entry point (FAB → new recipe) is unchanged; import lives inside it.
+**Entry point:** an **"Import"** affordance on the **new-recipe form** (`RecipeForm` in create mode only — never in edit mode), placed above the title field. Tapping it opens the **Import sheet** (a themed bottom sheet, same overlay pattern as `ActionSheet`/`FormattingHelpSheet`, §6) with a mode picker: **From link**, **Paste text**, **From photo** (the last one only when the OCR module is available — see T3). The single recipe-creation entry point (FAB → new recipe) is unchanged; import lives inside it.
 
 **Result handling — review, never auto-save:** a successful parse closes the sheet and **fills the already-open new-recipe form** with the parsed fields. The user reviews and edits everything, then taps **Save** as usual (no silent writes). Import only populates the recipe **content** fields (title, prep, cook, servings, ingredients, instructions, notes); it does **not** change the cookbook context — a `cookbookId` passed into `/recipe/new` (when launched from inside a cookbook, §5.3) is preserved. Import does not pull a photo (see below); `imagePath` is left untouched.
 
@@ -621,11 +623,20 @@ This is distinct from the full-app Markdown **backup** import (§5.8), which res
   - **Fallback (bounded downside):** with no recognized structure the whole body goes to **instructions** — identical to a no-heuristic dump, so the heuristic can only *improve* the split.
 - **Documented limitation:** without a step header *or* numbered steps (rare), method paragraphs can't be cleanly separated from a long ingredient/prose block; and **image alt-text** interleaved with steps is indistinguishable from instructions without AI — both are accepted, not faked. Positioned as **"paste any text"** — an honest light-assist the user reviews, not magic.
 
+**Mode: From photo (T3) — on-device OCR feeding the T2 pipeline.**
+- **Use case:** a screenshot of a recipe (Instagram caption, messenger, a website that blocks fetch) or a photo of a cookbook page / handwritten card. OCR turns the image into plain text; everything downstream **reuses T2's `parsePastedRecipe` unchanged** — T3 adds a text source, not a second parsing pipeline.
+- **Engine:** `@react-native-ml-kit/text-recognition` — Google **ML Kit Text Recognition v2**, fully **on-device** (no network, no accounts, free; consistent with §1 — the §7 exclusion covers *network* AI parsing, not local OCR). The Latin-script model handles Polish diacritics. It is a **native module**: available only in a development / production build (same constraint as `react-native-zip-archive`, §5.17.1); in Expo Go and on web a module-availability check hides the "From photo" tile.
+- **Flow:** tapping **From photo** opens the standard photo-source `ActionSheet` (camera / gallery, same pattern as the form's photo picker, §6) → the picked image goes to `recognizeRecipeText(uri)` (`utils/recipeOcr.ts`, thin native wrapper) **at original resolution** — the 1280px downscale used for stored photos (§5.5) is *not* applied; OCR accuracy needs the full-size source and nothing is persisted. A spinner replaces the sheet content while recognition runs.
+- **Text assembly:** ML Kit returns text blocks (with per-line granularity and bounding boxes). A pure `ocrBlocksToText(blocks)` (`utils/ocrText.ts`, unit-tested) assembles the paste-text input: blocks sorted **top-to-bottom by bounding-box y** (ML Kit's block order is not guaranteed to be reading order), lines joined with `\n`, blocks separated with `\n`, whitespace-only lines collapsed. The result feeds `parsePastedRecipe` and pre-fills the form exactly like T2 (review-then-save).
+- **The image is not attached to the recipe** — a screenshot of text is not a dish photo; `imagePath` stays untouched (consistent with T1's photo-skipped rule). The user adds a real photo manually if they want one.
+- **Errors:** recognition returning no text (blurry photo, non-text image) → "No text found in this photo — try a sharper image, or paste the text instead." and the sheet **switches to Paste-text mode** (same never-stranded rule as T1). A thrown recognition error shows the generic import error. Both leave the form untouched. Camera/gallery permission denials follow the existing photo-picker handling.
+- **Documented limitation:** OCR of multi-column layouts, decorative fonts, or low-contrast screenshots can shuffle or drop lines; T2's conservative fallback bounds the downside (worst case: everything lands in instructions for the user to tidy). Same honest light-assist positioning as T2.
+
 **Implementation notes:**
-- All parsing is **pure logic in `utils/recipeImport.ts`** (`parseRecipeJsonLd`, `parsePastedRecipe`, `parseIsoDuration`) → unit-tested in `__tests__/` via the TDD pipeline (tester → coder). The only native part is a thin `fetch` wrapper, `utils/recipeImportFetch.ts` (`fetchRecipeFromUrl`), consistent with the pure-builder + native-wrapper split used by export/PDF (§5.6/§5.14).
+- All parsing is **pure logic** (`parseRecipeJsonLd`, `parsePastedRecipe`, `parseIsoDuration` in `utils/recipeImport.ts`; `ocrBlocksToText` in `utils/ocrText.ts`) → unit-tested in `__tests__/` via the TDD pipeline (tester → coder). Native parts are thin wrappers: `utils/recipeImportFetch.ts` (`fetchRecipeFromUrl`) and `utils/recipeOcr.ts` (`recognizeRecipeText` + `isOcrAvailable`), consistent with the pure-builder + native-wrapper split used by export/PDF (§5.6/§5.14).
 - The sheet (`components/recipe/ImportSheet.tsx`) maps a parse result onto a partial `RecipeFormData` and hands it back to the open `RecipeForm`.
-- **Platforms:** `fetch` of an arbitrary recipe site works on native only. On the web test build it will typically fail CORS — link import is **not** expected to work there (web is a test environment only, §2); the pure parsers are still exercised by unit tests.
-- **i18n:** all new strings (Import affordance, sheet title, mode labels, URL/paste placeholders, the "couldn't read this page" message, network/error messages, the `Source:` prefix) get EN + PL entries in `i18n/dictionary.ts` (§5.11). The `Source:` prefix is localized to the UI language (it lands in user-facing notes, not the English-only backup format).
+- **Platforms:** `fetch` of an arbitrary recipe site works on native only. On the web test build it will typically fail CORS — link import is **not** expected to work there (web is a test environment only, §2); the pure parsers are still exercised by unit tests. **From photo** requires a development build (native ML Kit module) — `isOcrAvailable` gates the tile off in Expo Go and on web; OCR behavior is verified on-device, `ocrBlocksToText` by unit tests.
+- **i18n:** all new strings (Import affordance, sheet title, mode labels, URL/paste placeholders, the "couldn't read this page" message, network/error messages, the "recognizing…" progress label, the "no text found in this photo" message, the `Source:` prefix) get EN + PL entries in `i18n/dictionary.ts` (§5.11). The `Source:` prefix is localized to the UI language (it lands in user-facing notes, not the English-only backup format).
 
 **Optional later convenience (not required for v1):** an Android **share target** so the user can share a link from the browser directly into KeepTaste, landing on the new-recipe form with From-link import pre-run. Deferred — needs native intent-filter config; the in-app "Import → From link" path covers the same need first.
 
@@ -872,8 +883,9 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **Online backup — Level 0 (share sheet)** — §5.17.2: once the archive ships this is ~free; add a Settings hint that the share sheet sends the backup to Drive/Dropbox. EN+PL string
 - [x] **Online backup — Level 1 (SAF auto-export)** — §5.17.3: `StorageAccessFramework` folder pick, new `app_settings` keys (`backup_folder_uri`, `backup_last_export_at`, `backup_auto_enabled`) + `db/settings.ts` accessors, pure `utils/backupAuto.ts` retention helpers (`parseKeepCount`/`backupsToPrune`) + change-driven dirty-flag/flush trigger in `utils/backupTrigger.ts` (unit-tested; heavy write deferred to app-background via `flushAutoBackup`), best-effort `runAutoBackupNow` write, "Automatic backup" Settings section with the synced-folder note. **Second approved exception to the no-extra-settings rule (§7), after language (§5.11)**
 - [x] **Single-recipe import (link / paste text)** — §5.15: pure parsers in `utils/recipeImport.ts` (`parseRecipeJsonLd`, `parsePastedRecipe`, `parseIsoDuration`) with unit tests, native fetch wrapper `utils/recipeImportFetch.ts`, `components/recipe/ImportSheet.tsx`, an "Import" affordance on the new-recipe form (create mode only) that pre-fills `RecipeFormData` (review-then-save; source URL → notes; photo skipped in v1), EN+PL strings. From-photo OCR and an Android share target are later phases
+- [ ] **Single-recipe import — From photo (OCR)** — §5.15 T3: on-device ML Kit text recognition (`@react-native-ml-kit/text-recognition`, native module → dev build, `versionCode` bump), pure `ocrBlocksToText` in `utils/ocrText.ts` (unit-tested: y-sorted blocks, line joins, blank-line collapse), native wrapper `utils/recipeOcr.ts` (`recognizeRecipeText` + `isOcrAvailable` gating the tile off in Expo Go/web), "From photo" mode in `ImportSheet` (photo-source ActionSheet → OCR at original resolution → `parsePastedRecipe`; image not attached to the recipe), no-text → switch to Paste-text mode, EN+PL strings
 
-- [ ] **To-try recipe status** — §5.19: `to_try` column (DDL + `schema.ts` + migration-ladder `ALTER TABLE`), form switch, card badge, recipe-view badge + "Tried it ✓" (bumps `updated_at` — approved exception, §4), bottom "To try" section in recipe lists (pure partition helper, unit-tested), "To try (N)" filter chip in "All recipes" search, `**Status:** to try` round-trip in `.md` (§5.6/§5.8), `to_try` in `backup.json` + `schemaVersion` bump (§5.17.1/§5.17.4), EN+PL strings
+- [x] **To-try recipe status** — §5.19: `to_try` column (DDL + `schema.ts` + migration-ladder `ALTER TABLE`), form switch, card badge, recipe-view badge + "Tried it ✓" (bumps `updated_at` — approved exception, §4), bottom "To try" section in recipe lists (pure partition helper, unit-tested), "To try (N)" filter chip in "All recipes" search, `**Status:** to try` round-trip in `.md` (§5.6/§5.8), `to_try` in `backup.json` + `schemaVersion` bump (§5.17.1/§5.17.4), EN+PL strings
 
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)
