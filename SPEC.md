@@ -395,7 +395,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 **Content:**
 - **App info** — the app name ("KeepTaste") and version, read from `Constants.expoConfig?.version` (fallback `1.0.0`).
 - **Data / no-backup notice** — explains that recipes are stored only on this device, that there are no accounts and no cloud sync, that uninstalling the app deletes all recipes, and that exporting all data to a Markdown file (§5.6) is the only backup mechanism.
-- **Export all data** — a button (in the "Your data" section) that writes the whole library to a single Markdown backup and opens the share sheet (§5.6). On failure surfaces `Alert('Export failed', …)`.
+- **Export all data** — a button (in the "Your data" section) that backs up the whole library (§5.6/§5.17). On Android it opens a two-option ActionSheet — **Share / send** (share sheet) or **Save to a folder** (SAF, §5.17.2) — elsewhere it goes straight to the share sheet. On failure surfaces `Alert('Export failed', …)`.
 - **Import from Markdown** — restores cookbooks and recipes from a backup file (§5.8).
 - **Delete all data** — a destructive button that wipes every cookbook, recipe and shopping list.
 
@@ -702,6 +702,8 @@ images/       ← every referenced photo, copied from documentDirectory
 #### 5.17.2 Level 0 — share to Drive (free once 5.17.1 ships)
 
 `exportBackupZip` already hands the file to the system share sheet, where **"Save to Drive" / "Upload to Drive"** (and Dropbox, email, etc.) appear as targets on Android. No extra export code. Settings gains a one-line hint that the share sheet is how you send a backup to the cloud. This covers "online backup" for most users with **zero** OAuth, accounts, or provider integration.
+
+**Manual "Save to a folder" (Android).** The share sheet is fire-and-forget: Android reports neither the chosen target nor whether it succeeded, so a share target that silently fails (or a user picking a Google Drive location in a downstream picker) produces **no feedback** the app can act on. To give the manual export a path with guaranteed feedback, on Android "Export all data" opens an ActionSheet with **Share / send** (the share sheet, unchanged) and **Save to a folder**: a SAF directory pick + app-controlled write (`exportBackupZipToFolder` — dated archive via `createFileAsync` + the streamed `safwriter` copy, §5.17.1; **no pruning and no settings writes**, unlike the §5.17.3 auto path). Because the app owns this write, a Google Drive folder is refused **up front** (`isGoogleDriveFolderUri`, same detection as §5.17.3) with a message pointing at "Share / send" + the Drive app, a successful write confirms with an alert, and a failed one surfaces the size-aware write-failed message.
 
 #### 5.17.3 Level 1 — automatic export to a chosen folder (SAF)
 

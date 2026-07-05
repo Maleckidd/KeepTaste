@@ -418,6 +418,29 @@ export async function writeBackupToFolder(folderUri: string): Promise<void> {
 }
 
 /**
+ * Manual "save to folder" export (Android/SAF): writes one dated archive into a
+ * directory the user just picked. Unlike writeBackupToFolder it never prunes and
+ * persists nothing — a one-off save into a user-managed folder must not delete
+ * its contents or touch the auto-backup settings. Callers surface success/failure
+ * to the user (the auto path is silent).
+ */
+export async function exportBackupZipToFolder(folderUri: string): Promise<void> {
+  const { date, time } = localStamp(new Date());
+  const cacheZip = `${FileSystem.cacheDirectory}keeptaste-backup-manual.zip`;
+  await buildArchiveTo(cacheZip);
+  try {
+    const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+      folderUri,
+      datedBackupName(date, time),
+      'application/zip'
+    );
+    await copyFileToSaf(toFsPath(cacheZip), fileUri);
+  } finally {
+    await FileSystem.deleteAsync(cacheZip, { idempotent: true }).catch(() => {});
+  }
+}
+
+/**
  * Runs an automatic backup if enabled and a folder is set. Best-effort and
  * silent — invoked by flushAutoBackup when the app backgrounds. Packing now runs
  * on a native thread (RNZA), so it no longer freezes the JS thread; the banner is

@@ -432,12 +432,32 @@ export const dictionary = {
     pl: 'Eksportuj wszystkie dane',
   },
   'settings.exportAllHint': {
-    en: 'Saves a complete backup — every recipe, photo and shopping list — to one .zip file. Use the share sheet to save it to Google Drive, Dropbox or email.',
-    pl: 'Zapisuje pełną kopię zapasową — wszystkie przepisy, zdjęcia i listy zakupów — do jednego pliku .zip. Użyj arkusza udostępniania, aby zapisać go na Dysku Google, w Dropboksie lub wysłać mailem.',
+    en: 'Saves a complete backup — every recipe, photo and shopping list — to one .zip file. Share it to the Google Drive app, Dropbox or email, or save it to a folder.',
+    pl: 'Zapisuje pełną kopię zapasową — wszystkie przepisy, zdjęcia i listy zakupów — do jednego pliku .zip. Udostępnij ją do aplikacji Dysk Google, Dropbox lub mailem, albo zapisz w folderze.',
   },
   'settings.exportAllDialogTitle': {
     en: 'Back up all data',
     pl: 'Kopia zapasowa danych',
+  },
+  'settings.exportShare': {
+    en: 'Share / send',
+    pl: 'Udostępnij / wyślij',
+  },
+  'settings.exportToFolder': {
+    en: 'Save to a folder',
+    pl: 'Zapisz w folderze',
+  },
+  'settings.exportDriveFolderMessage': {
+    en: 'Google Drive folders on the phone can’t be written to, so the backup can’t be saved there. Choose “Share / send” instead and pick the Google Drive app — it will upload the backup itself.',
+    pl: 'Do folderów Dysku Google na telefonie nie da się zapisywać, więc nie można tam zapisać kopii. Wybierz „Udostępnij / wyślij” i wskaż aplikację Dysk Google — ona sama prześle kopię.',
+  },
+  'settings.exportSavedTitle': {
+    en: 'Backup saved',
+    pl: 'Kopia zapisana',
+  },
+  'settings.exportSavedMessage': {
+    en: 'The backup was saved to the selected folder.',
+    pl: 'Kopia zapasowa została zapisana w wybranym folderze.',
   },
   'settings.exportPreparing': {
     en: 'Preparing backup…',

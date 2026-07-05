@@ -28,6 +28,7 @@ import {
 } from '@/utils/importMarkdown';
 import {
   exportBackupZip,
+  exportBackupZipToFolder,
   loadBackupZip,
   commitBackupRestore,
   writeBackupToFolder,
@@ -66,6 +67,7 @@ export default function SettingsScreen() {
   // Non-null while a restore/import is reading or writing — shows a blocking
   // spinner so the user knows the (sometimes slow) file load is in progress.
   const [busyMessage, setBusyMessage] = React.useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
 
   // Automatic backup (§5.17.3) — Android only (Storage Access Framework).
   const supportsAutoBackup = Platform.OS === 'android';
@@ -238,7 +240,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleExportAll = async () => {
+  const handleExportShare = async () => {
     setBusyMessage(t('settings.exportPreparing'));
     try {
       await exportBackupZip(t('settings.exportAllDialogTitle'));
@@ -250,6 +252,47 @@ export default function SettingsScreen() {
     } finally {
       setBusyMessage(null);
     }
+  };
+
+  // App-controlled SAF save for the manual export. Unlike the share sheet
+  // (which reports nothing back — a failed Drive upload is invisible to us),
+  // this path owns the write, so it can refuse Google Drive up front and
+  // confirm success or surface failure.
+  const handleExportToFolder = async () => {
+    const perm =
+      await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!perm.granted) return;
+    if (isGoogleDriveFolderUri(perm.directoryUri)) {
+      Alert.alert(
+        t('settings.backupFolderUnwritableTitle'),
+        t('settings.exportDriveFolderMessage')
+      );
+      return;
+    }
+    setBusyMessage(t('settings.exportPreparing'));
+    try {
+      await exportBackupZipToFolder(perm.directoryUri);
+      Alert.alert(
+        t('settings.exportSavedTitle'),
+        t('settings.exportSavedMessage')
+      );
+    } catch {
+      Alert.alert(
+        t('settings.backupFolderUnwritableTitle'),
+        t('settings.backupWriteFailedMessage')
+      );
+    } finally {
+      setBusyMessage(null);
+    }
+  };
+
+  // SAF (the folder option) is Android-only; elsewhere go straight to sharing.
+  const handleExportAll = () => {
+    if (supportsAutoBackup) {
+      setExportMenuOpen(true);
+      return;
+    }
+    void handleExportShare();
   };
 
   const runRestore = async (
@@ -642,6 +685,24 @@ export default function SettingsScreen() {
             label: t('settings.themeDark'),
             icon: 'moon-outline',
             onPress: () => setThemePreference('dark'),
+          },
+        ]}
+      />
+
+      <ActionSheet
+        visible={exportMenuOpen}
+        title={t('settings.exportAll')}
+        onClose={() => setExportMenuOpen(false)}
+        actions={[
+          {
+            label: t('settings.exportShare'),
+            icon: 'share-outline',
+            onPress: () => void handleExportShare(),
+          },
+          {
+            label: t('settings.exportToFolder'),
+            icon: 'folder-outline',
+            onPress: () => void handleExportToFolder(),
           },
         ]}
       />
