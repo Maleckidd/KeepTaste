@@ -5,6 +5,8 @@ import {
   Pressable,
   StyleSheet,
   Animated,
+  ActivityIndicator,
+  Alert,
   BackHandler,
   Keyboard,
   Platform,
@@ -12,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import {
   useTheme,
   ThemePalette,
@@ -25,6 +28,7 @@ import {
 import { useT } from '@/i18n/LanguageProvider';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import type { RecipeFormData } from '@/utils/recipeForm';
 import {
   parseRecipeJsonLd,
@@ -32,6 +36,7 @@ import {
   type ParsedRecipe,
 } from '@/utils/recipeImport';
 import { fetchRecipeFromUrl } from '@/utils/recipeImportFetch';
+import { isOcrAvailable, recognizeRecipeText } from '@/utils/recipeOcr';
 
 type Props = {
   visible: boolean;
@@ -39,7 +44,7 @@ type Props = {
   onResult: (partial: Partial<RecipeFormData>) => void;
 };
 
-type Mode = 'link' | 'paste';
+type Mode = 'link' | 'paste' | 'photo';
 
 const numToField = (n: number | null | undefined): string =>
   n != null ? String(n) : '';
@@ -63,6 +68,8 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
   const [pasteText, setPasteText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [recognizing, setRecognizing] = useState(false);
   // The sheet is anchored to the bottom, so the keyboard would otherwise cover
   // it. Track the keyboard height and lift the sheet above it.
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -75,6 +82,8 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
       setPasteText('');
       setLoading(false);
       setError(null);
+      setPhotoMenuOpen(false);
+      setRecognizing(false);
       setKeyboardHeight(0);
       setRendered(true);
       Animated.timing(progress, {
@@ -184,8 +193,10 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
     }
   };
 
-  const handlePaste = () => {
-    const parsed = parsePastedRecipe(pasteText);
+  // Shared mapping from free-form text (pasted OR OCR'd) to form fields, so the
+  // photo path produces exactly the same result as the paste path.
+  const applyPastedText = (text: string) => {
+    const parsed = parsePastedRecipe(text);
     onResult({
       title: parsed.title ?? '',
       prepTime: numToField(parsed.prepTime),
@@ -197,6 +208,59 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
     });
     onClose();
   };
+
+  const handlePaste = () => applyPastedText(pasteText);
+
+  // OCR needs the original-resolution image, so — unlike RecipeForm's photo
+  // picker — we skip cropping, aspect and downscale, and never touch imagePath.
+  const runOcr = async (uri: string) => {
+    setRecognizing(true);
+    setError(null);
+    try {
+      const text = await recognizeRecipeText(uri);
+      if (!text.trim()) {
+        setError(t('import.photoNoText'));
+        setMode('paste');
+        return;
+      }
+      applyPastedText(text);
+    } catch {
+      setError(t('import.photoError'));
+    } finally {
+      setRecognizing(false);
+    }
+  };
+
+  const handlePickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 1,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await runOcr(result.assets[0].uri);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('common.permissionRequired'), t('common.permissionCamera'));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 1,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await runOcr(result.assets[0].uri);
+    }
+  };
+
+  const photoActions: ActionSheetAction[] = [
+    { label: t('common.gallery'), icon: 'images-outline', onPress: handlePickPhoto },
+    { label: t('common.camera'), icon: 'camera-outline', onPress: handleTakePhoto },
+  ];
 
   return (
     <View style={styles.root} accessibilityViewIsModal pointerEvents="box-none">
@@ -245,6 +309,19 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
             styles={styles}
             c={c}
           />
+          {isOcrAvailable ? (
+            <ModeTab
+              label={t('import.modePhoto')}
+              icon="camera-outline"
+              active={mode === 'photo'}
+              onPress={() => {
+                setMode('photo');
+                setError(null);
+              }}
+              styles={styles}
+              c={c}
+            />
+          ) : null}
         </View>
 
         {mode === 'link' ? (
@@ -268,7 +345,7 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
               disabled={!url.trim()}
             />
           </View>
-        ) : (
+        ) : mode === 'paste' ? (
           <View style={styles.body}>
             <Input
               style={[styles.pasteInput, { maxHeight: pasteInputMaxHeight }]}
@@ -284,8 +361,27 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
               disabled={!pasteText.trim()}
             />
           </View>
+        ) : recognizing ? (
+          <View style={[styles.body, styles.photoBusy]}>
+            <ActivityIndicator color={c.primary} />
+            <Text style={styles.photoBusyText}>{t('import.photoRecognizing')}</Text>
+          </View>
+        ) : (
+          <View style={styles.body}>
+            <Text style={styles.photoInstruction}>{t('import.photoInstruction')}</Text>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Button
+              label={t('import.photoPick')}
+              onPress={() => setPhotoMenuOpen(true)}
+            />
+          </View>
         )}
       </Animated.View>
+      <ActionSheet
+        visible={photoMenuOpen}
+        actions={photoActions}
+        onClose={() => setPhotoMenuOpen(false)}
+      />
     </View>
   );
 }
@@ -394,6 +490,20 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   pasteInput: {
     minHeight: 160,
+  },
+  photoInstruction: {
+    fontSize: Typography.size.base,
+    color: c.textMuted,
+    lineHeight: Typography.size.base * 1.4,
+  },
+  photoBusy: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xl,
+  },
+  photoBusyText: {
+    fontSize: Typography.size.base,
+    color: c.textMuted,
   },
   error: {
     fontSize: Typography.size.sm,

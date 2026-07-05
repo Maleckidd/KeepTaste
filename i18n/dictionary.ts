@@ -240,8 +240,8 @@ export const dictionary = {
     pl: 'Następnym razem dodać więcej cukru waniliowego...',
   },
   'recipeForm.importAction': {
-    en: 'Import from a link or text',
-    pl: 'Importuj z linku lub tekstu',
+    en: 'Import from a link, text or photo',
+    pl: 'Importuj z linku, tekstu lub zdjęcia',
   },
 
   // --- Single-recipe import sheet (components/recipe/ImportSheet.tsx) ---
@@ -270,6 +270,24 @@ export const dictionary = {
     pl: 'Ta strona blokuje automatyczny import — wklej tekst przepisu.',
   },
   'import.sourcePrefix': { en: 'Source: {url}', pl: 'Źródło: {url}' },
+  'import.modePhoto': { en: 'From photo', pl: 'Ze zdjęcia' },
+  'import.photoInstruction': {
+    en: 'Take a photo or pick a screenshot of a recipe.',
+    pl: 'Zrób zdjęcie lub wybierz zrzut ekranu z przepisem.',
+  },
+  'import.photoPick': { en: 'Choose photo', pl: 'Wybierz zdjęcie' },
+  'import.photoRecognizing': {
+    en: 'Recognizing text…',
+    pl: 'Rozpoznawanie tekstu…',
+  },
+  'import.photoNoText': {
+    en: 'No text found in this photo — try a sharper image, or paste the text instead.',
+    pl: 'Nie znaleziono tekstu na zdjęciu — spróbuj wyraźniejszego zdjęcia albo wklej tekst.',
+  },
+  'import.photoError': {
+    en: "Couldn't read this photo. Try again or paste the text.",
+    pl: 'Nie udało się odczytać zdjęcia. Spróbuj ponownie lub wklej tekst.',
+  },
 
   // --- Formatting help sheet (components/ui/FormattingHelpSheet.tsx) ---
   'formattingHelp.title': { en: 'Formatting tips', pl: 'Wskazówki formatowania' },

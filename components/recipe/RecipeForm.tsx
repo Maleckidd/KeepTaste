@@ -42,7 +42,7 @@ type Props = {
   onSave: (data: RecipeFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
-  /** Shows the "Import from a link or text" affordance (create mode only). */
+  /** Shows the "Import from a link, text or photo" affordance (create mode only). */
   enableImport?: boolean;
 };
 
