@@ -2,6 +2,22 @@
 
 > **Your recipes. Your device. No cloud required.**
 
+---
+
+## 🧪 Closed testing is live — join in (2 minutes)
+
+1. **Join the Google group** (this is what unlocks access):
+   <https://groups.google.com/g/keeptaste>
+2. **Open the testing link and opt in:**
+   <https://play.google.com/apps/testing/com.damianmalecki.keeptaste>
+3. **Install from the Play Store** and just… use it. Don't uninstall for
+   2 weeks — opening the app once every few days is enough.
+
+> ⚠️ **One gotcha:** click the links from the same Google account you use in the
+> Play Store on your phone — otherwise the app won't show up.
+
+---
+
 KeepTaste is a private, offline-first recipe manager for Android. Every recipe,
 photo, and shopping list lives in a local database on your phone — there are no
 accounts to create, no servers to trust, no subscription, and no ads. Ever.
@@ -38,8 +54,11 @@ cloud-synced folder *you* control.
 - **Cookbooks with covers** — group recipes the way you think about them.
 - **Recipes in Markdown** — ingredients, instructions, and notes with real
   formatting; prep/cook times, servings, and a photo.
-- **Import from the web** — paste a link and KeepTaste extracts the recipe
-  (Schema.org JSON-LD), or paste plain text and it's parsed into the form.
+- **Import a recipe** — paste a link and KeepTaste extracts it (Schema.org
+  JSON-LD), paste plain text, or **snap a photo** of a page and on-device OCR
+  reads it into the form — all parsed on your phone, no server.
+- **To-try list** — mark a recipe "to try"; it sinks to a "To try" section and a
+  filter chip answers "what should I cook next?"
 - **Smart search** — diacritics-safe title search (finds "żurek" when you type
   "zurek").
 
@@ -63,6 +82,7 @@ cloud-synced folder *you* control.
   library and round-trips through import.
 - **Complete `.zip` backup** — everything, including photos, shopping lists,
   and settings; restores 1:1 on a new phone (replace or merge, your choice).
+  Share it out or save it straight to a folder you pick.
 - **Automatic backup** — pick a folder once and KeepTaste quietly keeps a dated
   archive there after every change; point it at a Dropbox/Nextcloud-synced
   folder and your backup is off-device with **zero** accounts in the app.
@@ -84,6 +104,7 @@ See [SPEC.md](SPEC.md) for the full living product spec and
 - **expo-sqlite** + **Drizzle ORM** — local database (manual SQL migrations)
 - **react-native-markdown-display** — Markdown rendering
 - **expo-image-picker** + **expo-image-manipulator** — photos (downscaled on pick)
+- **@react-native-ml-kit/text-recognition** — on-device OCR for photo import
 - **expo-file-system** / **expo-sharing** / **expo-document-picker** — export & import
 - **react-native-zip-archive** + local `safwriter` Expo module — native `.zip`
   packing and streamed SAF writes (no JS-heap ceiling on backup size)
@@ -117,8 +138,9 @@ utils/                 ← pure, unit-tested logic + thin native wrappers
   backupArchive.ts, backupArchiveFs.ts                ← .zip build/restore
   backupAuto.ts, backupTrigger.ts, backupStatus.ts    ← auto-backup (SAF)
   recipeImport.ts, recipeImportFetch.ts               ← link/paste import
+  recipeOcr.ts, ocrText.ts                            ← from-photo OCR import
   cookbookPdfHtml.ts, recipeShareText.ts, shoppingListShareText.ts
-  search.ts, i18n.ts, numeric.ts, pendingDelete.ts, imageStorage.ts, …
+  search.ts, toTry.ts, i18n.ts, numeric.ts, pendingDelete.ts, imageStorage.ts, …
 
 i18n/                  ← dictionary.ts (typed EN+PL), LanguageProvider.tsx
 constants/theme.ts     ← design tokens (light/dark palettes, typography, spacing)
@@ -199,7 +221,7 @@ fidelity: photos, shopping lists, timestamps, settings) and an `images/` folder.
 cookbooks      (id, name, cover_image_path, created_at)
 recipes        (id, cookbook_id FK, title, prep_time, cook_time,
                 servings, image_path, ingredients, instructions,
-                notes, created_at, updated_at)
+                notes, to_try, created_at, updated_at)
 shopping_lists (id, name, created_at, updated_at)
 shopping_items (id, list_id FK CASCADE, name, quantity, checked, created_at)
 app_settings   (key, value)
