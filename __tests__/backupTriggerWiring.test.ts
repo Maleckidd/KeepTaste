@@ -37,12 +37,19 @@ jest.mock('../db/client', () => ({
 jest.mock('../utils/backupTrigger', () => ({
   scheduleAutoBackup: jest.fn(),
   withAutoBackupSuppressed: (fn: () => unknown) => fn(),
+  isAutoBackupSuppressed: () => false,
 }));
+
+// noteUserEdit flips the user_edited flag (SPEC.md §5.20) so a restore over a
+// pristine demo seed can be told apart from a touched library. Mocked as a plain
+// spy (bypassing its once-per-process guard) so every mutation can be asserted.
+jest.mock('../db/userEdited', () => ({ noteUserEdit: jest.fn() }));
 
 import {
   createRecipe,
   updateRecipe,
   deleteRecipe,
+  markRecipeTried,
 } from '../db/recipes';
 import {
   createCookbook,
@@ -54,17 +61,24 @@ import {
   updateShoppingListName,
   deleteShoppingList,
   createShoppingItem,
+  createShoppingItems,
+  updateShoppingItem,
   setItemChecked,
   deleteShoppingItem,
 } from '../db/shoppingLists';
 import { scheduleAutoBackup } from '../utils/backupTrigger';
+import { noteUserEdit } from '../db/userEdited';
 
 const mockSchedule = scheduleAutoBackup as jest.MockedFunction<
   typeof scheduleAutoBackup
 >;
+const mockNoteUserEdit = noteUserEdit as jest.MockedFunction<
+  typeof noteUserEdit
+>;
 
 beforeEach(() => {
   mockSchedule.mockClear();
+  mockNoteUserEdit.mockClear();
 });
 
 describe('recipe mutations schedule a backup', () => {
@@ -130,5 +144,87 @@ describe('shopping-list mutations do NOT schedule a backup', () => {
   it('deleteShoppingItem', async () => {
     await deleteShoppingItem(1);
     expect(mockSchedule).not.toHaveBeenCalled();
+  });
+});
+
+// Unlike scheduleAutoBackup, noteUserEdit MUST fire for shopping-list mutations
+// too: isDatabaseEmpty() counts shopping lists as content, so a user who only
+// makes a list (never touches recipes) must still flip user_edited — otherwise a
+// .zip restore would silently wipe that list as if the library were a pristine
+// demo seed (SPEC.md §5.20). This guards that asymmetry.
+describe('mutations mark the library user-edited (§5.20)', () => {
+  it('createRecipe', async () => {
+    await createRecipe({ title: 'Test' } as any);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateRecipe', async () => {
+    await updateRecipe(1, { title: 'Edited' } as any);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleteRecipe', async () => {
+    await deleteRecipe(1);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('markRecipeTried', async () => {
+    await markRecipeTried(1);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('createCookbook', async () => {
+    await createCookbook({ name: 'Book' } as any);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateCookbook', async () => {
+    await updateCookbook(1, { name: 'Renamed' } as any);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleteCookbook', async () => {
+    await deleteCookbook(1);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('createShoppingList', async () => {
+    await createShoppingList('Groceries');
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateShoppingListName', async () => {
+    await updateShoppingListName(1, 'Weekend');
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleteShoppingList', async () => {
+    await deleteShoppingList(1);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('createShoppingItem', async () => {
+    await createShoppingItem(1, 'Milk', null);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('createShoppingItems', async () => {
+    await createShoppingItems(1, ['Milk', 'Eggs']);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateShoppingItem', async () => {
+    await updateShoppingItem(1, 'Bread', null);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('setItemChecked', async () => {
+    await setItemChecked(1, true);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleteShoppingItem', async () => {
+    await deleteShoppingItem(1);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
   });
 });

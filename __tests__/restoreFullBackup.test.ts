@@ -31,7 +31,11 @@ const db = {
 
 jest.mock('../db/client', () => ({ db, runMigrations: jest.fn() }));
 const setSetting = jest.fn();
-jest.mock('../db/settings', () => ({ setSetting: (...a: unknown[]) => setSetting(...a) }));
+jest.mock('../db/settings', () => ({
+  setSetting: (...a: unknown[]) => setSetting(...a),
+  markDemoSeeded: () => setSetting('demo_seeded', '1'),
+  markUserEdited: () => setSetting('user_edited', '1'),
+}));
 
 import { restoreFullBackup } from '../db/backup';
 

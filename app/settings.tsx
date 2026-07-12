@@ -20,7 +20,7 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { deleteAllData } from '@/db/recipes';
-import { isDatabaseEmpty } from '@/db/backup';
+import { canSilentReplace } from '@/db/backup';
 import { importBackup } from '@/db/import';
 import {
   parseBackupMarkdown,
@@ -321,8 +321,9 @@ export default function SettingsScreen() {
     }
   };
 
-  // .zip path — the complete backup (§5.17). Into an empty library it restores
-  // silently 1:1; into a populated one it asks Replace vs Add.
+  // .zip path — the complete backup (§5.17). Into an empty library (or one
+  // holding only the untouched demo seed) it restores silently 1:1; into a
+  // populated one it asks Replace vs Add.
   const handleImportZip = async (uri: string) => {
     // Reading + unzipping can take a moment for large backups — show the spinner
     // until we either restore (runRestore keeps it up) or fall back to an Alert.
@@ -361,7 +362,10 @@ export default function SettingsScreen() {
       return;
     }
 
-    if (await isDatabaseEmpty()) {
+    // Empty library, or nothing but the untouched demo seed — restore silently
+    // 1:1. The replace path wipes first (commitBackupRestore), so the pristine
+    // seed is cleanly overwritten just like the empty-DB case (SPEC.md §5.20).
+    if (await canSilentReplace()) {
       await runRestore(loaded, 'replace');
       return;
     }

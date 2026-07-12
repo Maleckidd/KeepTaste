@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +23,8 @@ import {
   Shadow,
   Motion,
 } from '@/constants/theme';
-import { useT } from '@/i18n/LanguageProvider';
+import { useT, useLanguage } from '@/i18n/LanguageProvider';
+import { seedSampleContentIfNeeded } from '@/db/seed';
 import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
 import Fab from '@/components/ui/Fab';
@@ -86,15 +87,35 @@ export default function HomeScreen() {
   const router = useRouter();
   const c = useTheme();
   const t = useT();
+  const { language } = useLanguage();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [cookbooks, setCookbooks] = useState<Cookbook[]>([]);
   const [menuCookbook, setMenuCookbook] = useState<Cookbook | null>(null);
   const showUndoDelete = useUndoDelete();
+  // Guards the one-shot first-launch seed against a re-run (StrictMode double
+  // invoke, remounts). The seed itself is also idempotent via demo_seeded.
+  const seedAttempted = useRef(false);
 
   const loadCookbooks = useCallback(async () => {
     const data = await getCookbooks();
     setCookbooks(filterPendingDeletes(data, 'cookbook', (cb) => cb.id));
   }, []);
+
+  // First-launch sample content (SPEC.md §5.20). Runs once on mount, after the
+  // language provider has resolved the active language, so the seed is localized.
+  // If it actually seeds, reload so the new cookbook tile shows immediately.
+  useEffect(() => {
+    if (seedAttempted.current) return;
+    seedAttempted.current = true;
+    (async () => {
+      try {
+        const seeded = await seedSampleContentIfNeeded(language);
+        if (seeded) await loadCookbooks();
+      } catch {
+        // Best-effort — a failed seed must not block the home screen.
+      }
+    })();
+  }, [language, loadCookbooks]);
 
   // Reload when the screen regains focus
   useFocusEffect(

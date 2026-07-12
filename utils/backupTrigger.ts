@@ -175,6 +175,15 @@ export async function withAutoBackupSuppressed<T>(
   }
 }
 
+/**
+ * True while a withAutoBackupSuppressed() block is running. The seed writer
+ * suppresses backups, so mutation helpers use this to skip the user-edited mark
+ * for the seed's own inserts (SPEC.md §5.20).
+ */
+export function isAutoBackupSuppressed(): boolean {
+  return suppressDepth > 0;
+}
+
 /** Test-only: resets all trigger state and cancels pending timers. */
 export function __resetAutoBackupTrigger(): void {
   clearTimers();

@@ -18,3 +18,30 @@ export async function setSetting(key: string, value: string): Promise<void> {
     .values({ key, value })
     .onConflictDoUpdate({ target: appSettings.key, set: { value } });
 }
+
+// --- First-launch sample seed flags (SPEC.md §5.20) ---
+
+/** Set once the sample content has been offered (or deliberately skipped). */
+const DEMO_SEEDED_KEY = 'demo_seeded';
+/** Set the first time the user makes a real (non-seed) mutation. */
+const USER_EDITED_KEY = 'user_edited';
+
+/** True once the first-launch sample seed has run (or been skipped). */
+export async function isDemoSeeded(): Promise<boolean> {
+  return (await getSetting(DEMO_SEEDED_KEY)) === '1';
+}
+
+/** Marks the sample seed as handled so it never runs again. */
+export async function markDemoSeeded(): Promise<void> {
+  await setSetting(DEMO_SEEDED_KEY, '1');
+}
+
+/** True once the user has made at least one real edit to their library. */
+export async function isUserEdited(): Promise<boolean> {
+  return (await getSetting(USER_EDITED_KEY)) === '1';
+}
+
+/** Records that the user has edited real data (distinguishes a pristine seed). */
+export async function markUserEdited(): Promise<void> {
+  await setSetting(USER_EDITED_KEY, '1');
+}

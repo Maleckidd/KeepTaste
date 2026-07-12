@@ -62,6 +62,10 @@ const db = {
 };
 
 jest.mock('../db/client', () => ({ db, runMigrations: jest.fn() }));
+// noteUserEdit fires on these mutations (SPEC.md §5.20) but its DB write is not
+// what this suite asserts — stub it so the insert/update counts stay focused on
+// the shopping-list shapes. Its wiring is covered in backupTriggerWiring.test.ts.
+jest.mock('../db/userEdited', () => ({ noteUserEdit: jest.fn() }));
 
 import * as listsModule from '../db/shoppingLists';
 

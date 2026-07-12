@@ -7,6 +7,7 @@ import {
   type ShoppingItem,
 } from './schema';
 import { countItems } from '../utils/shoppingList';
+import { noteUserEdit } from './userEdited';
 
 export type ShoppingListWithCounts = ShoppingList & {
   totalCount: number;
@@ -44,6 +45,7 @@ export async function createShoppingList(name: string): Promise<number> {
     .insert(shoppingLists)
     .values({ name, createdAt: now, updatedAt: now })
     .returning({ id: shoppingLists.id });
+  noteUserEdit();
   return result[0].id;
 }
 
@@ -55,10 +57,12 @@ export async function updateShoppingListName(
     .update(shoppingLists)
     .set({ name, updatedAt: new Date().toISOString() })
     .where(eq(shoppingLists.id, id));
+  noteUserEdit();
 }
 
 export async function deleteShoppingList(id: number): Promise<void> {
   await db.delete(shoppingLists).where(eq(shoppingLists.id, id));
+  noteUserEdit();
 }
 
 export async function getItemsForList(listId: number): Promise<ShoppingItem[]> {
@@ -85,6 +89,7 @@ export async function createShoppingItem(
     .values({ listId, name, quantity, checked: 0, createdAt: now })
     .returning({ id: shoppingItems.id });
   await touchList(listId, now);
+  noteUserEdit();
   return result[0].id;
 }
 
@@ -108,6 +113,7 @@ export async function createShoppingItems(
     }))
   );
   await touchList(listId, now);
+  noteUserEdit();
 }
 
 export async function updateShoppingItem(
@@ -125,6 +131,7 @@ export async function updateShoppingItem(
     .set({ name, quantity })
     .where(eq(shoppingItems.id, id));
   if (listId != null) await touchList(listId, new Date().toISOString());
+  noteUserEdit();
 }
 
 export async function setItemChecked(
@@ -142,6 +149,7 @@ export async function setItemChecked(
     .set({ checked: checked ? 1 : 0 })
     .where(eq(shoppingItems.id, id));
   if (listId != null) await touchList(listId, now);
+  noteUserEdit();
 }
 
 export async function deleteShoppingItem(id: number): Promise<void> {
@@ -152,6 +160,7 @@ export async function deleteShoppingItem(id: number): Promise<void> {
   const listId = rows[0]?.listId;
   await db.delete(shoppingItems).where(eq(shoppingItems.id, id));
   if (listId != null) await touchList(listId, new Date().toISOString());
+  noteUserEdit();
 }
 
 async function touchList(listId: number, now: string): Promise<void> {

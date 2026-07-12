@@ -158,7 +158,7 @@ recipes (
 )
 
 app_settings (                                   -- key-value preferences (§5.11)
-  key             TEXT PRIMARY KEY NOT NULL,      -- e.g. 'language'
+  key             TEXT PRIMARY KEY NOT NULL,      -- e.g. 'language', 'demo_seeded', 'user_edited' (§5.20), backup_* (§5.17.3)
   value           TEXT NOT NULL                   -- e.g. 'system' | 'en' | 'pl'
 )
 ```
@@ -697,7 +697,7 @@ images/       ← every referenced photo, copied from documentDirectory
 - **Restore prefers `backup.json`**; a `.zip` with no JSON (or a plain legacy `.md`, §5.8) falls back to the Markdown path. A `.md` import remains supported forever (backward compatibility).
 
 **Restore semantics (replace vs add).** Driven by the user stories: the word "restore" means "my data becomes the backup," yet the dominant case — disaster recovery into a fresh install — has an **empty** database where replace and append are identical. So:
-- **Empty database → silent clean restore.** No prompt; the archive is simply restored 1:1.
+- **Empty database (or nothing but the untouched demo seed, §5.20) → silent clean restore.** No prompt; the archive is simply restored 1:1 (the pristine-seed case takes the Replace path, which wipes first, so the seed is cleanly overwritten). The gate is `canSilentReplace()` = empty OR (`demo_seeded && !user_edited`).
 - **Non-empty database → a confirm dialog with two choices:**
   - **Replace all** *(recommended, default)* — wipe via `deleteAllData()` (it already returns stored image paths for cleanup, then delete those files) and `restoreFullBackup` → a faithful 1:1 copy. Covers "test my backup" and "undo a mess," which append would turn into a full-library duplicate.
   - **Add to library** — the existing append behavior (duplicates allowed, §5.8 semantics) for the merge / combine-two-devices case.
@@ -788,6 +788,27 @@ Restoring an archive made on a different schema version is a corruption vector, 
 **Out of scope for this feature:** a dedicated "To try" virtual cookbook tile (the chip covers aggregation; revisit only if it proves too hidden), reminders/nudges, a "tried on" date, auto-marking imported recipes.
 
 ---
+
+### 5.20 Sample content on first launch
+
+**Problem:** a brand-new install opens on an empty home screen, so a first-time user has nothing to look at and no example of what a filled-in recipe looks like. KeepTaste seeds a small, localized sample cookbook **once**, as ordinary user data the person can edit, delete, or export like anything they wrote themselves.
+
+**One-shot guard:** a `demo_seeded` (`'1'`) key in `app_settings` marks the seed as handled so it never runs again — set after a successful seed, and also set (without seeding) whenever the library is found non-empty at first check, so a library that predates this feature is never seeded on top of. The seed additionally requires `isDatabaseEmpty()` (belt-and-suspenders — it never lands on real data). Helpers live in `db/settings.ts` (`isDemoSeeded` / `markDemoSeeded`, and `isUserEdited` / `markUserEdited` below).
+
+**Content:** `utils/seedData.ts` is a pure builder — `buildSeedContent(language)` returns a localized cookbook ("Breakfasts" / "Śniadania") and a **single** fully filled-in showcase recipe (EN "Pancakes" / PL "Naleśniki" — the user's own beer-batter thin-pancake recipe) with all of prep/cook/servings set, Markdown-list ingredients and numbered instructions (§5.6 style; the 1h batter chilling lives in the instruction text, not the numeric fields). The Notes field says it is a sample and may be edited or deleted. The pure builder always leaves `imagePath` null and never marks to-try — the photo is attached by the DB seed layer (below). EN and PL stay in lockstep index-by-index (same recipe count, same nullness pattern) so translations don't drift (unit-tested).
+
+**Bundled photos:** the showcase recipe ships with a bundled image, `assets/images/seed/pancakes.jpg`, and the cookbook cover with a separate one, `assets/images/seed/breakfast.jpg`. At seed time `db/seed.ts` resolves each via `expo-asset` (`Asset.fromModule(require(...))` + `downloadAsync()`) and copies it into the document directory through the existing `utils/imageStorage.ts` `persistImage`, exactly like a picked photo — so the recipe photo is deletable with the recipe and both are included in `.zip` backups. The cover is a **separate stored file** (not a shared path) so deleting the seeded recipe — which removes its stored image — can never orphan the cookbook's `coverImagePath` (the home-screen `CookbookTile` renders covers). The photo step is **best-effort**: any resolution/copy failure — or web, where `documentDirectory` is null — degrades gracefully to no image and never blocks seeding.
+
+**When it runs:** from the home screen (`app/(tabs)/index.tsx`) on mount, once (an invocation-guard ref plus the `demo_seeded` idempotency), after `LanguageProvider` has resolved the active language so the seed is localized. If it seeds, the cookbook list reloads so the new tile appears immediately. `db/seed.ts` `seedSampleContentIfNeeded(language)` does the inserts inside `withAutoBackupSuppressed` (one backup at the end, and — see below — its own inserts skip the user-edited mark).
+
+**"Pristine seed" vs edited — the `user_edited` flag:** a `user_edited` (`'1'`) key is set the **first time the user makes a real mutation** — any recipe create/update/delete/tried, cookbook create/update/delete, or **shopping-list/item** create/update/delete/check (`db/userEdited.ts` `noteUserEdit`, best-effort, once per process, and skipped while auto-backup is suppressed so the seed's own inserts don't count). Shopping-list mutations are deliberately included even though they never trigger auto-backup (§5.17.3), because `isDatabaseEmpty()` counts shopping lists as content — a user who only makes a list must still flip the flag, or a `.zip` restore would silently wipe that list as if the library were a pristine seed. This lets the app tell an untouched demo seed apart from a library the user has actually worked in.
+
+**Restore interaction (§5.17.1):** `canSilentReplace()` = library empty **OR** pristine seed (`demo_seeded && !user_edited`); the pure truth table is `shouldSilentReplace(flags)`. A `.zip` restore over a pristine seed skips the Replace/Add prompt and restores **1:1** like the empty-DB case (the replace path wipes first, so the seed is cleanly overwritten). Any real edit flips `user_edited`, after which a restore falls back to the Replace/Add confirm. A completed restore stamps **both** flags (it is real user data — never seed it later, never mis-read it as a pristine seed; this also covers pre-feature backups that carry neither flag).
+
+**Web:** the web test client is in-memory and resets per reload (§2), so the seed re-runs on every reload there — expected, not a concern for the product platforms.
+
+---
+
 
 ## 6. Design system
 
@@ -902,6 +923,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **Single-recipe import — Transcribe with AI** — §5.15 T4: user-mediated AI handoff (app makes **no network call**, embeds no AI; works in Expo Go, hidden on web), pure `utils/aiTranscribe.ts` (unit-tested: `buildAiTranscribePrompt(lang)` EN/PL parser-contract prompt + idempotent, non-empty-guaranteeing `cleanAiResponse`), "Transcribe with AI" mode in `ImportSheet` (photo-source ActionSheet reusing T3's picker → prompt copied via `expo-clipboard` + photo shared via `expo-sharing` at original resolution, image not attached → user pastes AI answer → `cleanAiResponse` → `parsePastedRecipe`; empty → `import.aiEmpty`, no share sheet → `import.aiNoShare`; `isSharingSupported` gate), EN+PL strings
 
 - [x] **To-try recipe status** — §5.19: `to_try` column (DDL + `schema.ts` + migration-ladder `ALTER TABLE`), form switch, card badge, recipe-view badge + "Tried it ✓" (bumps `updated_at` — approved exception, §4), bottom "To try" section in recipe lists (pure partition helper, unit-tested), "To try (N)" filter chip in "All recipes" search, `**Status:** to try` round-trip in `.md` (§5.6/§5.8), `to_try` in `backup.json` + `schemaVersion` bump (§5.17.1/§5.17.4), EN+PL strings
+- [x] **Sample content on first launch** — §5.20: pure localized builder `utils/seedData.ts` (EN+PL "Breakfasts"/"Śniadania" cookbook + one photographed pancakes showcase recipe, unit-tested), one-shot seed `db/seed.ts` `seedSampleContentIfNeeded` guarded by `demo_seeded` + `isDatabaseEmpty()` inside `withAutoBackupSuppressed`, bundled photos (`assets/images/seed/pancakes.jpg` recipe photo, `assets/images/seed/breakfast.jpg` cookbook cover) resolved via `expo-asset` + copied into the doc dir through `persistImage` as separate files (best-effort, degrades to no image), `demo_seeded`/`user_edited` flag helpers in `db/settings.ts`, best-effort once-per-process `user_edited` mark on real mutations (`db/userEdited.ts`, skipped while suppressed), `shouldSilentReplace` (pure, unit-tested) + `canSilentReplace()` in `db/backup.ts` wired into the `.zip` restore path (silent 1:1 over a pristine seed), restore stamps both flags, home-screen mount seed after language resolution
 
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)

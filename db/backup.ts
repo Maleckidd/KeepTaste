@@ -11,7 +11,13 @@ import {
   shoppingItems,
   appSettings,
 } from './schema';
-import { setSetting } from './settings';
+import {
+  setSetting,
+  isDemoSeeded,
+  isUserEdited,
+  markDemoSeeded,
+  markUserEdited,
+} from './settings';
 import type { BackupContent } from '../utils/backupArchive';
 
 /** Gathers the whole library for export (every table, in id order). */
@@ -44,6 +50,34 @@ export async function isDatabaseEmpty(): Promise<boolean> {
     db.select({ id: shoppingLists.id }).from(shoppingLists),
   ]);
   return cb.length === 0 && rec.length === 0 && lists.length === 0;
+}
+
+/**
+ * Whether a .zip restore may skip the Replace/Add prompt and go straight to a
+ * 1:1 replace (SPEC.md §5.17.1 / §5.20). Silent when the library is genuinely
+ * empty, OR when it holds nothing but the untouched demo seed (demoSeeded &&
+ * !userEdited) — either way there is no real user data to clobber. Pure so the
+ * truth table is unit-testable.
+ */
+export function shouldSilentReplace(flags: {
+  empty: boolean;
+  demoSeeded: boolean;
+  userEdited: boolean;
+}): boolean {
+  return flags.empty || (flags.demoSeeded && !flags.userEdited);
+}
+
+/**
+ * Reads the current library state and the seed flags, then delegates to
+ * shouldSilentReplace. Thin wrapper used by the restore flow in Settings.
+ */
+export async function canSilentReplace(): Promise<boolean> {
+  const [empty, demoSeeded, userEdited] = await Promise.all([
+    isDatabaseEmpty(),
+    isDemoSeeded(),
+    isUserEdited(),
+  ]);
+  return shouldSilentReplace({ empty, demoSeeded, userEdited });
 }
 
 /**
@@ -115,4 +149,10 @@ export async function restoreFullBackup(content: BackupContent): Promise<void> {
     if (s.key.startsWith('backup_')) continue; // device-specific, don't restore
     await setSetting(s.key, s.value);
   }
+
+  // A restored library is real user data: stamp both seed flags so it is never
+  // seeded later and never mis-detected as a pristine seed on the next restore
+  // (covers pre-feature backups that carry neither flag). SPEC.md §5.20.
+  await markDemoSeeded();
+  await markUserEdited();
 }
