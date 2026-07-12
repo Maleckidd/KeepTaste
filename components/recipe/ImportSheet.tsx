@@ -40,11 +40,18 @@ import {
 } from '@/utils/recipeImport';
 import { fetchRecipeFromUrl } from '@/utils/recipeImportFetch';
 import { isOcrAvailable, recognizeRecipeText } from '@/utils/recipeOcr';
+import type { ImportIntent } from '@/utils/sharedUrl';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   onResult: (partial: Partial<RecipeFormData>) => void;
+  /**
+   * Pre-arms the sheet on open from an Android share (§5.15): a `link` intent
+   * fills the URL and auto-runs the fetch; a `paste` intent prefills the text
+   * (never auto-submits). Consumed once per open. Absent → blank link mode.
+   */
+  initialImport?: ImportIntent;
 };
 
 type Mode = 'link' | 'paste' | 'photo' | 'ai';
@@ -59,7 +66,12 @@ const numToField = (n: number | null | undefined): string =>
 // Single-recipe import sheet (SPEC.md §5.15). Mirrors FormattingHelpSheet's
 // overlay pattern (no native <Modal>) so it stacks reliably and must be a
 // direct child of the screen root.
-export default function ImportSheet({ visible, onClose, onResult }: Props) {
+export default function ImportSheet({
+  visible,
+  onClose,
+  onResult,
+  initialImport,
+}: Props) {
   const c = useTheme();
   const t = useT();
   const { language } = useLanguage();
@@ -83,16 +95,36 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
   // Which handler the photo ActionSheet routes the picked URI to. Defaults to
   // the OCR path so T3 behavior is byte-identical; T4 flips it before opening.
   const onPhotoPicked = useRef<(uri: string) => void | Promise<void>>(() => {});
+  // A share-pre-armed URL to auto-fetch once the sheet has opened. Set by the
+  // open effect from `initialImport` and consumed by a follow-up effect so the
+  // fetch runs against fresh state (not the stale closure of the open effect).
+  // Prevents re-triggering on re-render — cleared as soon as it's consumed.
+  const pendingAutoFetch = useRef<string | null>(null);
   // The sheet is anchored to the bottom, so the keyboard would otherwise cover
   // it. Track the keyboard height and lift the sheet above it.
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     if (visible) {
-      // Reset transient state each time the sheet opens.
-      setMode('link');
-      setUrl('');
-      setPasteText('');
+      // Reset transient state each time the sheet opens. When pre-armed by a
+      // share (§5.15), seed the URL/paste field from `initialImport` instead of
+      // a blank link mode; a `link` intent also queues an auto-fetch.
+      if (initialImport?.mode === 'link') {
+        setMode('link');
+        setUrl(initialImport.url);
+        setPasteText('');
+        pendingAutoFetch.current = initialImport.url;
+      } else if (initialImport?.mode === 'paste') {
+        setMode('paste');
+        setUrl('');
+        setPasteText(initialImport.text);
+        pendingAutoFetch.current = null;
+      } else {
+        setMode('link');
+        setUrl('');
+        setPasteText('');
+        pendingAutoFetch.current = null;
+      }
       setLoading(false);
       setError(null);
       setPhotoMenuOpen(false);
@@ -140,6 +172,19 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
     };
   }, [visible]);
 
+  // Consume a share-pre-armed link once the sheet is open: run the existing
+  // fetch handler against the seeded URL. Guarded by the ref so a re-render
+  // never re-triggers it; the never-stranded paste fallback inside handleFetch
+  // applies unchanged.
+  useEffect(() => {
+    if (!visible) return;
+    const next = pendingAutoFetch.current;
+    if (next == null) return;
+    pendingAutoFetch.current = null;
+    void handleFetch(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
   if (!rendered) return null;
 
   const translateY = progress.interpolate({
@@ -176,8 +221,8 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
     return partial;
   };
 
-  const handleFetch = async () => {
-    const trimmed = url.trim();
+  const handleFetch = async (explicitUrl?: string) => {
+    const trimmed = (explicitUrl ?? url).trim();
     if (!trimmed || loading) return;
     setLoading(true);
     setError(null);
@@ -402,7 +447,7 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Button
               label={t('import.fetchButton')}
-              onPress={handleFetch}
+              onPress={() => handleFetch()}
               loading={loading}
               disabled={!url.trim()}
             />

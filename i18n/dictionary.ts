@@ -322,6 +322,12 @@ export const dictionary = {
     pl: 'Brak treści — najpierw wklej odpowiedź AI.',
   },
 
+  // --- Android share target (§5.15) ---
+  'share.formBusy': {
+    en: 'Finish this recipe first, then share again.',
+    pl: 'Najpierw dokończ ten przepis, potem udostępnij ponownie.',
+  },
+
   // --- Formatting help sheet (components/ui/FormattingHelpSheet.tsx) ---
   'formattingHelp.title': { en: 'Formatting tips', pl: 'Wskazówki formatowania' },
   'formattingHelp.intro': {

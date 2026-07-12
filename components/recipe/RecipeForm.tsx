@@ -19,6 +19,7 @@ import ModalHeader from '@/components/ui/ModalHeader';
 import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import FormattingHelpSheet from '@/components/ui/FormattingHelpSheet';
 import ImportSheet from '@/components/recipe/ImportSheet';
+import type { ImportIntent } from '@/utils/sharedUrl';
 import {
   useTheme,
   ThemePalette,
@@ -44,6 +45,11 @@ type Props = {
   isLoading?: boolean;
   /** Shows the "Import from a link, text or photo" affordance (create mode only). */
   enableImport?: boolean;
+  /**
+   * When set (create mode via an Android share, §5.15), opens the ImportSheet
+   * on mount pre-armed with this intent. Ignored unless `enableImport` is on.
+   */
+  initialImport?: ImportIntent;
 };
 
 function Field({
@@ -123,6 +129,7 @@ export default function RecipeForm({
   onCancel,
   isLoading,
   enableImport,
+  initialImport,
 }: Props) {
   const c = useTheme();
   const t = useT();
@@ -131,7 +138,13 @@ export default function RecipeForm({
   const [form, setForm] = useState<RecipeFormData>(initial);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [formatHelpOpen, setFormatHelpOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  // Open the ImportSheet immediately when pre-armed by a share (§5.15). Only
+  // honored in import-enabled create mode; consumed once on mount.
+  const armedImport = !!enableImport && !!initialImport;
+  const [importOpen, setImportOpen] = useState(armedImport);
+  // The share pre-arm applies to the first (auto) open only; a manual reopen
+  // must start blank. Cleared once the sheet has closed the first time.
+  const [shareArmed, setShareArmed] = useState(armedImport);
   // Inline validation instead of an Alert; cleared as soon as the user types.
   const [titleError, setTitleError] = useState(false);
 
@@ -145,6 +158,7 @@ export default function RecipeForm({
   const applyImport = (partial: Partial<RecipeFormData>) => {
     setForm((prev) => ({ ...prev, ...partial }));
     setImportOpen(false);
+    setShareArmed(false);
   };
 
   const handlePickImage = async () => {
@@ -407,8 +421,12 @@ export default function RecipeForm({
       {enableImport ? (
         <ImportSheet
           visible={importOpen}
-          onClose={() => setImportOpen(false)}
+          onClose={() => {
+            setImportOpen(false);
+            setShareArmed(false);
+          }}
           onResult={applyImport}
+          initialImport={shareArmed ? initialImport : undefined}
         />
       ) : null}
     </KeyboardAvoidingView>

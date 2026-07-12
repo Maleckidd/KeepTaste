@@ -22,7 +22,7 @@
         "backgroundColor": "#C84B31"
       },
       "package": "com.damianmalecki.keeptaste",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
         "android.permission.CAMERA"
       ],
@@ -61,6 +61,13 @@
             "targetSdkVersion": 35,
             "buildToolsVersion": "35.0.0"
           }
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "disableIOS": true,
+          "androidIntentFilters": ["text/*"]
         }
       ]
     ],

@@ -1,18 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { AppState, Platform, View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useShareIntent } from 'expo-share-intent';
 import { runMigrations } from '@/db/client';
 import { useTheme, useThemePreference, darkColors, lightColors, Typography } from '@/constants/theme';
 import { ThemeProvider } from '@/constants/ThemeProvider';
 import { LanguageProvider, useT } from '@/i18n/LanguageProvider';
-import { SnackbarProvider } from '@/components/ui/SnackbarProvider';
+import { SnackbarProvider, useSnackbar } from '@/components/ui/SnackbarProvider';
 import { useBackupRunning } from '@/utils/backupStatus';
 import { flushAutoBackup } from '@/utils/backupTrigger';
 import { maybeBackupOnLaunch } from '@/utils/backupArchiveFs';
+import { isShareIntentAvailable } from '@/utils/shareIntent';
+import { toImportIntent } from '@/utils/sharedUrl';
 
 function BackupBanner() {
   const running = useBackupRunning();
@@ -71,6 +74,63 @@ function SystemChrome() {
   // Explicit style (not "auto") so the status bar follows our override rather
   // than the OS appearance.
   return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
+
+// Consumes Android share-target intents (SPEC §5.15) for text/URL shares and
+// routes them to the new-recipe form pre-armed with the import. Rendered ONLY
+// when the native module is linked (see isShareIntentAvailable) so it never
+// mounts — and useShareIntent never runs — in Expo Go / web. Must sit inside
+// SnackbarProvider so the "form busy" notice is reachable.
+function ShareIntentHandler() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const t = useT();
+  const { showSnackbar } = useSnackbar();
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+  // Last-handled payload signature — prevents double-delivery on re-render or
+  // foreground refresh from pushing the form twice for the same share. Cleared
+  // once resetShareIntent() lands (hasShareIntent flips false), so it guards
+  // only that window — re-sharing the same URL later must work again.
+  const lastHandled = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!hasShareIntent) lastHandled.current = null;
+  }, [hasShareIntent]);
+
+  useEffect(() => {
+    if (!hasShareIntent) return;
+    // Android text/URL shares put the payload in webUrl (a shared link) or text
+    // (plain shared text). Prefer the explicit URL, else the raw text.
+    const raw = shareIntent.webUrl ?? shareIntent.text ?? null;
+    const intent = toImportIntent(raw);
+    // Consume immediately regardless of outcome so it isn't re-delivered.
+    resetShareIntent();
+    if (!intent) return;
+
+    const signature = `${intent.mode}:${
+      intent.mode === 'link' ? intent.url : intent.text
+    }`;
+    if (lastHandled.current === signature) return;
+    lastHandled.current = signature;
+
+    // A recipe form is already open — don't stack another modal or clobber the
+    // in-progress edit. Notify and drop the share (SPEC §5.15).
+    if (pathname === '/recipe/new' || pathname === '/recipe/edit') {
+      showSnackbar({ message: t('share.formBusy') });
+      return;
+    }
+
+    // Pass the raw text through; new.tsx re-derives the intent so arbitrary text
+    // survives URL-encoding as a single param.
+    router.push({
+      pathname: '/recipe/new',
+      params: {
+        sharedText: intent.mode === 'link' ? intent.url : intent.text,
+      },
+    });
+  }, [hasShareIntent, shareIntent, pathname, resetShareIntent, router, showSnackbar, t]);
+
+  return null;
 }
 
 function RootStack() {
@@ -188,6 +248,7 @@ export default function RootLayout() {
             <SystemChrome />
             <RootStack />
             <BackupBanner />
+            {isShareIntentAvailable ? <ShareIntentHandler /> : null}
           </SnackbarProvider>
         </LanguageProvider>
       </ThemeProvider>

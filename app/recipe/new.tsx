@@ -9,14 +9,26 @@ import { useTheme, ThemePalette } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
 import { parsePositiveInt } from '@/utils/numeric';
 import { persistImage } from '@/utils/imageStorage';
+import { toImportIntent } from '@/utils/sharedUrl';
 
 export default function NewRecipeScreen() {
   const router = useRouter();
   const c = useTheme();
   const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const { cookbookId } = useLocalSearchParams<{ cookbookId?: string }>();
+  const { cookbookId, sharedText } = useLocalSearchParams<{
+    cookbookId?: string;
+    // Raw text handed over by an Android share (§5.15). We derive the import
+    // intent here rather than passing pre-split params so arbitrary text
+    // survives Expo Router's URL-encoding of a single string param.
+    sharedText?: string;
+  }>();
   const [isLoading, setIsLoading] = useState(false);
+  // Derive once from the param; a link/paste intent pre-arms the ImportSheet.
+  const initialImport = useMemo(
+    () => toImportIntent(sharedText) ?? undefined,
+    [sharedText]
+  );
 
   const handleSave = async (data: RecipeFormData) => {
     setIsLoading(true);
@@ -49,6 +61,7 @@ export default function NewRecipeScreen() {
         onCancel={() => router.back()}
         isLoading={isLoading}
         enableImport
+        initialImport={initialImport}
       />
     </SafeAreaView>
   );
