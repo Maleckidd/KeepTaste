@@ -15,6 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
 import {
   useTheme,
   ThemePalette,
@@ -25,7 +27,8 @@ import {
   Motion,
   Touch,
 } from '@/constants/theme';
-import { useT } from '@/i18n/LanguageProvider';
+import { useT, useLanguage } from '@/i18n/LanguageProvider';
+import { buildAiTranscribePrompt, cleanAiResponse } from '@/utils/aiTranscribe';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
@@ -44,7 +47,11 @@ type Props = {
   onResult: (partial: Partial<RecipeFormData>) => void;
 };
 
-type Mode = 'link' | 'paste' | 'photo';
+type Mode = 'link' | 'paste' | 'photo' | 'ai';
+
+// Sharing (system share sheet used for the AI handoff) is unavailable on web;
+// gate the AI tile the same synchronous way T3 gates on OCR availability.
+const isSharingSupported = Platform.OS !== 'web';
 
 const numToField = (n: number | null | undefined): string =>
   n != null ? String(n) : '';
@@ -55,6 +62,7 @@ const numToField = (n: number | null | undefined): string =>
 export default function ImportSheet({ visible, onClose, onResult }: Props) {
   const c = useTheme();
   const t = useT();
+  const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const styles = makeStyles(c);
@@ -70,6 +78,11 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
+  const [aiPasteText, setAiPasteText] = useState('');
+  const [aiPromptCopied, setAiPromptCopied] = useState(false);
+  // Which handler the photo ActionSheet routes the picked URI to. Defaults to
+  // the OCR path so T3 behavior is byte-identical; T4 flips it before opening.
+  const onPhotoPicked = useRef<(uri: string) => void | Promise<void>>(() => {});
   // The sheet is anchored to the bottom, so the keyboard would otherwise cover
   // it. Track the keyboard height and lift the sheet above it.
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -84,6 +97,8 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
       setError(null);
       setPhotoMenuOpen(false);
       setRecognizing(false);
+      setAiPasteText('');
+      setAiPromptCopied(false);
       setKeyboardHeight(0);
       setRendered(true);
       Animated.timing(progress, {
@@ -238,7 +253,7 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
       quality: 1,
     });
     if (!result.canceled && result.assets[0]) {
-      await runOcr(result.assets[0].uri);
+      await onPhotoPicked.current(result.assets[0].uri);
     }
   };
 
@@ -253,8 +268,42 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
       quality: 1,
     });
     if (!result.canceled && result.assets[0]) {
-      await runOcr(result.assets[0].uri);
+      await onPhotoPicked.current(result.assets[0].uri);
     }
+  };
+
+  // Copy the localized prompt to the clipboard and share the picked photo to the
+  // user's own AI app. The app makes ZERO network calls and embeds no AI — the
+  // user pastes the prompt + photo into ChatGPT/Gemini/etc, then pastes the
+  // answer back. The image is at original resolution and never persisted.
+  const handleAiHandoff = async (uri: string) => {
+    setError(null);
+    await Clipboard.setStringAsync(buildAiTranscribePrompt(language));
+    if (!(await Sharing.isAvailableAsync())) {
+      setError(t('import.aiNoShare'));
+      return;
+    }
+    try {
+      await Sharing.shareAsync(uri, { dialogTitle: t('import.modeAi') });
+      // Share-sheet cancel resolves normally; either way the prompt is copied.
+      setAiPromptCopied(true);
+    } catch {
+      setError(t('import.aiNoShare'));
+    }
+  };
+
+  const openPhotoMenu = (onPicked: (uri: string) => void | Promise<void>) => {
+    onPhotoPicked.current = onPicked;
+    setPhotoMenuOpen(true);
+  };
+
+  const handleAiSubmit = () => {
+    const cleaned = cleanAiResponse(aiPasteText);
+    if (!cleaned) {
+      setError(t('import.aiEmpty'));
+      return;
+    }
+    applyPastedText(cleaned);
   };
 
   const photoActions: ActionSheetAction[] = [
@@ -322,6 +371,19 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
               c={c}
             />
           ) : null}
+          {isSharingSupported ? (
+            <ModeTab
+              label={t('import.modeAi')}
+              icon="sparkles-outline"
+              active={mode === 'ai'}
+              onPress={() => {
+                setMode('ai');
+                setError(null);
+              }}
+              styles={styles}
+              c={c}
+            />
+          ) : null}
         </View>
 
         {mode === 'link' ? (
@@ -361,6 +423,32 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
               disabled={!pasteText.trim()}
             />
           </View>
+        ) : mode === 'ai' ? (
+          <View style={styles.body}>
+            <Text style={styles.photoInstruction}>{t('import.aiStep1')}</Text>
+            <Text style={styles.photoInstruction}>{t('import.aiStep2')}</Text>
+            <Text style={styles.photoInstruction}>{t('import.aiStep3')}</Text>
+            <Button
+              label={t('import.aiPickButton')}
+              onPress={() => openPhotoMenu(handleAiHandoff)}
+            />
+            {aiPromptCopied ? (
+              <Text style={styles.aiHint}>{t('import.aiPromptCopied')}</Text>
+            ) : null}
+            <Input
+              style={[styles.pasteInput, { maxHeight: pasteInputMaxHeight }]}
+              placeholder={t('import.aiPastePlaceholder')}
+              value={aiPasteText}
+              onChangeText={setAiPasteText}
+              multiline
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Button
+              label={t('import.fetchButton')}
+              onPress={handleAiSubmit}
+              disabled={!aiPasteText.trim()}
+            />
+          </View>
         ) : recognizing ? (
           <View style={[styles.body, styles.photoBusy]}>
             <ActivityIndicator color={c.primary} />
@@ -372,7 +460,7 @@ export default function ImportSheet({ visible, onClose, onResult }: Props) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Button
               label={t('import.photoPick')}
-              onPress={() => setPhotoMenuOpen(true)}
+              onPress={() => openPhotoMenu(runOcr)}
             />
           </View>
         )}
@@ -458,11 +546,13 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   modeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
     marginBottom: Spacing.base,
   },
   modeTab: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '45%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -504,6 +594,11 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   photoBusyText: {
     fontSize: Typography.size.base,
     color: c.textMuted,
+  },
+  aiHint: {
+    fontSize: Typography.size.sm,
+    color: c.textMuted,
+    lineHeight: Typography.size.sm * 1.4,
   },
   error: {
     fontSize: Typography.size.sm,

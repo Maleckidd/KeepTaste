@@ -2,6 +2,9 @@
 import { dictionary } from '../i18n/dictionary';
 import type { Language, TranslationKey } from '../i18n/dictionary';
 
+/** Re-exported so consumers of pure i18n logic get the language type here too. */
+export type { Language } from '../i18n/dictionary';
+
 /** User-selectable language preference; 'system' follows the device locale. */
 export type LanguagePreference = Language | 'system';
 

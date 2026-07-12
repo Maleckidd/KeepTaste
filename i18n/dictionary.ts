@@ -288,6 +288,39 @@ export const dictionary = {
     en: "Couldn't read this photo. Try again or paste the text.",
     pl: 'Nie udało się odczytać zdjęcia. Spróbuj ponownie lub wklej tekst.',
   },
+  'import.modeAi': { en: 'Transcribe with AI', pl: 'Przepisz przez AI' },
+  'import.aiStep1': {
+    en: '1. Pick a photo of your recipe.',
+    pl: '1. Wybierz zdjęcie przepisu.',
+  },
+  'import.aiStep2': {
+    en: "2. We'll copy a prompt and open your AI app (ChatGPT, Gemini…). Paste the prompt there and send.",
+    pl: '2. Skopiujemy polecenie i otworzymy Twoją aplikację AI (ChatGPT, Gemini…). Wklej tam polecenie i wyślij.',
+  },
+  'import.aiStep3': {
+    en: "3. Copy the AI's answer and paste it below.",
+    pl: '3. Skopiuj odpowiedź AI i wklej ją poniżej.',
+  },
+  'import.aiPickButton': {
+    en: 'Pick photo & copy prompt',
+    pl: 'Wybierz zdjęcie i skopiuj polecenie',
+  },
+  'import.aiPastePlaceholder': {
+    en: "Paste the AI's answer",
+    pl: 'Wklej odpowiedź AI',
+  },
+  'import.aiPromptCopied': {
+    en: 'Prompt copied — paste it into your AI app.',
+    pl: 'Polecenie skopiowane — wklej je w aplikacji AI.',
+  },
+  'import.aiNoShare': {
+    en: "Sharing isn't available on this device.",
+    pl: 'Udostępnianie nie jest dostępne na tym urządzeniu.',
+  },
+  'import.aiEmpty': {
+    en: "Nothing to import — paste the AI's answer first.",
+    pl: 'Brak treści — najpierw wklej odpowiedź AI.',
+  },
 
   // --- Formatting help sheet (components/ui/FormattingHelpSheet.tsx) ---
   'formattingHelp.title': { en: 'Formatting tips', pl: 'Wskazówki formatowania' },
