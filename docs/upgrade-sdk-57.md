@@ -458,9 +458,69 @@ verified rather than assumed — hiding `node_modules/punycode` and re-running `
 web` still bundles cleanly, because Metro shims Node builtins for the web platform only. Phase 4 now
 requires a native production bundle for exactly this reason.
 
+### Phase 6, first pass — emulator, release build (2026-08-02)
+
+Target: Pixel Tablet AVD, **Android 15 / API 35** — not the Android 16 phone the plan asks for, so
+this pass is a first sweep, not the full checklist. Edge-to-edge *is* enforced here (Android 15
+enforces it from targetSdk 35), so that part is meaningful; the tablet form factor and
+Android-16-specific behavior are not covered. A `Medium_Phone` AVD on **android-37.0** exists on
+this machine and is the better target for the second pass.
+
+Method: local `./gradlew assembleRelease` (debug-keystore signed, minify off), installed with
+`adb install -r` **over the existing versionCode 9 build without uninstalling**, so the migration
+ladder ran on a carried-over database. A cookbook created on v9 beforehand served as the canary for
+user data. Driven headlessly over `adb` (`input tap` / `screencap` / `logcat`).
+
+On device after install: **`versionCode=10, targetSdk=36, versionName=1.0.1`** — the compliance goal
+itself, confirmed on a device rather than inferred from config.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Launch on carried-over DB, migration ladder | pass — no crash, clean logcat |
+| 2 | User data created on v9 (`MigracjaTest57`) + seed content survived | pass |
+| 3 | Recipe photo resolves from disk (`imageStorage` + `expo-file-system/legacy`) | pass |
+| 4 | Recipe view renders markdown (`markdown-it`, i.e. the `punycode` fix at runtime) | pass |
+| 5 | `ActionSheet` / bottom sheets (the `absoluteFill` rename) | pass — backdrop and sheet position correct |
+| 6 | Navigation bar, dark theme | **FAILED, fixed** — see below |
+| 7 | Navigation bar, light theme | pass after the fix |
+| 8 | Theme switch Light/Dark, persisted | pass |
+| 9 | Backup `.zip` export — `react-native-zip-archive` under New Arch | pass — `RNZipArchiveModule: updateProgress 0% → 100%`, `keeptaste-backup.zip` reached the share sheet |
+| 10 | **OCR / ML Kit (risk R1)** | **pass** — see below |
+
+**#6, the one real regression.** The dark theme shipped with a white navigation bar. Cause was the
+SDK 57 rewrite in `app/_layout.tsx` following the JSDoc on `NavigationBar`'s `style` prop, which
+claims "dark = a dark navigation bar with light content". The native module does the opposite —
+`val hasLightBackground = style == "dark"`, fed into `isAppearanceLightNavigationBars` — so `style`
+names the *buttons*, exactly like the `setButtonStyleAsync` it replaced. The mapping never needed
+inverting. Fixed and re-verified in both themes; the code comment now records that the docs and the
+implementation disagree.
+
+**#10 closes risk R1.** The "From photo" option appears at all, which means `isOcrAvailable` is
+true and `NativeModules.TextRecognition` resolves — the legacy bridge module **is reachable through
+the New Architecture interop layer**. Running it end to end worked: logcat shows
+`libmlkit_google_ocr_pipeline.so` loading and the TFLite recognition models initialising, and the
+recognised text populated the form (title `NALESNIKI`, body lines into instructions). No patching,
+no replacement, no disabled T3 mode needed. The risk register's contingency plans are moot.
+
+**A note on the first build failure.** `:app:buildCMakeRelWithDebInfo[arm64-v8a]` failed once with a
+missing `libappmodules.so`, and an unchanged re-run succeeded. Stale CMake incremental state, not a
+New Architecture problem — do not read the first failure as signal.
+
 ### Still ahead
 
-Phases 5-7 — `expo prebuild --clean`, EAS development build, the 17-point on-device pass, then the
-production build and the Play internal-testing track. Nothing verified here says anything about
-New Architecture at runtime: the web build does not exercise it, so R1 (OCR) and R2 (edge-to-edge)
-are both still entirely open.
+Not yet exercised on any device, in rough order of risk:
+
+- **SAF folder write** — `modules/safwriter`, our own Kotlin module. The `.zip` export path is
+  proven, but the Storage Access Framework write is a separate code path.
+- **Restore** from a `.zip`, and the `.md` export → import round-trip.
+- **Auto-backup** flush on app-background (`utils/backupTrigger.ts`) and the "saving" banner.
+- **Android share target** — share a link from a browser into the app (`expo-share-intent` 3 → 8
+  was a five-major jump, even though it needed no code change).
+- **Cookbook → PDF share** (`expo-print`), recipe → text share.
+- **Shopping lists**, swipe-to-delete, and the Undo snackbar.
+- **Splash handoff** (SPEC.md §5.20) on cold and warm start.
+- **Keyboard behaviour** in the recipe form under edge-to-edge — the classic edge-to-edge
+  regression, and untested so far.
+- **The whole visual sweep on a phone at API 37** (`Medium_Phone`), rather than a tablet at API 35.
+
+Then phase 7: production build, Play internal testing, promotion.
