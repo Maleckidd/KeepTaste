@@ -263,6 +263,15 @@ Per SPEC.md §2 web is a test environment, not a product platform — a web-only
 a release blocker, but a web build that **cannot run the form → save → list flow** is, because it
 removes the fast feedback loop for everything below.
 
+**The web gate does not cover module resolution for native.** Metro shims Node builtins on the web
+platform and does not on native, so a `require()` of a Node builtin bundles cleanly on web and
+fails only in a native release bundle (verified: see the `punycode` entry in §14). Add the native
+production bundle to the gate — it is minutes, runs without a device, and catches this class:
+
+```bash
+npx expo export --platform android --output-dir /tmp/export-check
+```
+
 Commit at this point. This is the last state that can be reasoned about without a device.
 
 ---
@@ -427,6 +436,27 @@ verified with Polish diacritics intact and no console errors.
 
 `ImagePicker.MediaTypeOptions.Images` → `mediaTypes: ['images']` at all 3 sites. It was free and
 `tsc` validates it.
+
+### Caught by the first native release build (`:app:createBundleReleaseJsAndAssets`)
+
+Metro failed to resolve `punycode` from `markdown-it`, aborting the release bundle. Gradle reported
+only `Process 'command 'node'' finished with non-zero exit value 1`; the real error came from
+re-running the same bundling directly via `npx expo export --platform android`.
+
+Root cause, and it is **not** an upgrade regression: `markdown-it@10` calls `require('punycode')`
+without declaring it as a dependency — it expects the Node builtin. Metro provides no Node builtins
+on native, so on SDK 52 this resolved by accident to the hoisted `punycode@2.3.1` that `uri-js` and
+`whatwg-url-without-unicode` dragged into the tree. Neither package survives in the SDK 57 tree, so
+the accidental resolution disappeared. The app was one unrelated dependency change away from a
+broken release bundle on SDK 52 too.
+
+Fixed by declaring `punycode@^2.3.1` as a direct dependency — we are the ones who need it, so it
+should be pinned rather than inherited.
+
+**What this says about the phase 4 gate:** the web smoke test cannot catch this, and that was
+verified rather than assumed — hiding `node_modules/punycode` and re-running `expo export --platform
+web` still bundles cleanly, because Metro shims Node builtins for the web platform only. Phase 4 now
+requires a native production bundle for exactly this reason.
 
 ### Still ahead
 
