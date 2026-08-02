@@ -73,9 +73,12 @@ components/
   recipe/
     RecipeForm.tsx       ← shared recipe form (new + edit)
     ImportSheet.tsx      ← single-recipe import: link / paste-text / photo / AI-transcribe mode picker (§5.15)
+  shopping/
+    PasteListSheet.tsx   ← bulk-paste products into a shopping list (§5.16)
   ui/                    ← base components (§6): Button, IconButton, Input,
                            Card-level pieces, ScreenHeader, ModalHeader, Fab,
-                           EmptyState, ActionSheet, SwipeableRow, SnackbarProvider
+                           EmptyState, ActionSheet, SwipeableRow, SnackbarProvider,
+                           FormattingHelpSheet (Markdown formatting help)
 
 i18n/
   dictionary.ts          ← typed EN+PL dictionary of all UI strings (§5.11)
@@ -90,17 +93,28 @@ db/
   recipes.ts             ← queries: recipe CRUD, search, delete-all-data
   import.ts              ← writes a parsed Markdown import (cookbook + recipes)
   shoppingLists.ts       ← queries: shopping list/item CRUD, check/uncheck (§5.10)
-  settings.ts            ← key-value app settings (language preference, §5.11)
+  settings.ts            ← key-value app settings (language, seed + backup flags, §5.11/§5.17.3/§5.20)
+  backup.ts              ← full-backup read/restore: getFullBackupData, isDatabaseEmpty, restoreFullBackup (§5.17.1)
+  seed.ts                ← one-shot sample-content seed on an empty library (§5.20)
+  userEdited.ts          ← marks the library as user-touched on the first real mutation (§5.20)
 
 utils/
   markdown.ts            ← pure per-recipe / per-cookbook-body .md builders + formatTime (§5.6)
   backupMarkdown.ts      ← pure full-app backup builder + §Uncategorized sentinel (§5.6)
-  backupExport.ts        ← native: gather sections, write backup .md to cache, share (§5.6)
   importMarkdown.ts      ← parser for backup / legacy .md files (parseBackupMarkdown, §5.8)
+  backupArchive.ts       ← pure: buildBackupJson / parseBackupJson for the .zip archive (§5.17.1)
+  backupArchiveFs.ts     ← native: exportBackupZip / loadBackupZip / commitBackupRestore (§5.17.1)
+  backupAuto.ts          ← pure: auto-backup retention helpers (parseKeepCount, backupsToPrune) (§5.17.3)
+  backupTrigger.ts       ← change-driven dirty flag + flushAutoBackup on app-background (§5.17.3)
+  backupStatus.ts        ← module-level pub/sub for the "backup running" banner (useBackupRunning)
   recipeShareText.ts     ← pure localized recipe → plain-text builder (§5.13)
   cookbookPdfHtml.ts     ← pure localized cookbook → HTML builder (§5.14)
   cookbookPdf.ts         ← native: HTML → PDF via expo-print, share (§5.14)
   imageStorage.ts        ← persisting picked images into documentDirectory + cleanup
+  imageDownscale.ts      ← caps newly picked photos (1280px / JPEG 0.7) to bound storage + backup size
+  seedData.ts            ← pure: localized sample cookbook + showcase recipe builder (§5.20)
+  toTry.ts               ← pure: to-try / cooked partition helper for recipe lists (§5.19)
+  shoppingListShareText.ts ← pure localized shopping list → plain-text builder (§5.18)
   cookbookForm.ts        ← cookbook form logic (normalize, dirty-check)
   recipeForm.ts          ← recipe form logic (mapping, dirty-check)
   numeric.ts             ← numeric field parsing (integer ≥ 1 or null)
@@ -115,9 +129,15 @@ utils/
   sharedUrl.ts           ← pure: Android share text → URL / import intent (§5.15 share target)
   shareIntent.ts         ← native gate: isShareIntentAvailable (expo-share-intent module present) (§5.15)
   i18n.ts                ← pure i18n logic: preference/locale resolution, interpolation, PL plurals
+  appReady.ts            ← one-shot "first screen loaded" signal for the splash gate (§5.20)
+  pendingDelete.ts       ← deferred-delete registry behind the Undo snackbar (§6)
+  motion.ts              ← animateLayout + prefersReducedMotion (reduce-motion aware)
+  haptics.ts             ← lightTap wrapper
+  keepAwake.ts           ← keeps the screen on in the recipe view; web-safe (§5.4)
 
 constants/
   theme.ts               ← design tokens: light/dark palettes + useTheme(), typography, spacing, shadows
+  ThemeProvider.tsx      ← theme context: persisted Light/Dark/System preference + ready flag (§6)
 ```
 
 ### Data flow
@@ -972,8 +992,12 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 **Photos vs cache clearing:**
 URIs returned by `expo-image-picker` may point to the system's temporary directory. If the system clears the cache, photos in the app will disappear. Mitigated: on save the file is copied to `documentDirectory` and cleaned up on replace/remove/delete (`utils/imageStorage.ts`, §5.5/§8). Images saved before this change still point at cache URIs and are re-persisted the next time the recipe/cookbook is saved.
 
-**Database migrations:**
-The current mechanism (`CREATE TABLE IF NOT EXISTS`) does not handle schema changes to existing tables. Any future column change requires a manual `ALTER TABLE` or a data migration in `client.ts`. **Being addressed** by `PRAGMA user_version` + a migration ladder (§5.17.4), introduced as a prerequisite for safe backup restore.
+**Database migrations — resolved, but carries an upkeep obligation:**
+`PRAGMA user_version` + a migration ladder in `db/client.ts` (§5.17.4) shipped; `CURRENT_SCHEMA_VERSION` is currently `2`. The original risk (`CREATE TABLE IF NOT EXISTS` cannot alter existing tables) is gone. What remains is a **discipline requirement, not a defect**: every schema change must edit `db/schema.ts`, the DDL in `db/ddl.ts`, **and** add a ladder step plus bump `CURRENT_SCHEMA_VERSION` — skipping the ladder silently breaks upgrades for existing installs, which testing on a fresh install will not catch. Restoring a backup stamped with a **newer** `schemaVersion` than the running app is refused with a clear message rather than attempted.
 
-**No / incomplete backup:**
-The user can lose data when reinstalling the app or formatting the device. The Markdown export (§5.6) is the only protection today and is **incomplete** — it omits photos, shopping lists, and timestamps. **Being addressed** by the complete `.zip` archive and online-backup options (§5.17): a full-fidelity snapshot, share-sheet upload to the user's cloud (Level 0), and optional automatic export to a synced folder (Level 1). Communicating the local-only nature in onboarding stays relevant regardless.
+**Backup — resolved; the residual risk is now the user's setup, not the format:**
+The complete `.zip` archive and both online-backup levels shipped (§5.17): a full-fidelity snapshot (photos, shopping lists, timestamps — everything the `.md` export omits), share-sheet upload to the user's cloud (Level 0), and optional automatic export to a synced folder (Level 1). The `.md` export (§5.6) remains as the human-readable escape hatch, not as the backup of record. Three real limitations survive:
+
+- **Backup is opt-in.** A user who never exports and never enables auto-backup still loses everything on reinstall or a lost device. Communicating the local-only nature in onboarding stays relevant.
+- **Auto-backup cannot target Google Drive.** SAF rejects app-controlled writes into Drive-backed folders, so Level 1 means a *locally synced* folder; Drive is reachable only through the share sheet (§5.17.2/§5.17.3, which detect and refuse Drive URIs up front).
+- **Backup flows need a real build.** `react-native-zip-archive` is a native module absent from Expo Go, so any export/restore/auto-backup work must be verified on a dev or production build.
