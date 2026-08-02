@@ -28,6 +28,11 @@ AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
   reduceMotion = enabled;
 });
 
+/** Current system reduce-motion preference (best-effort, defaults to false). */
+export function prefersReducedMotion(): boolean {
+  return reduceMotion;
+}
+
 export function animateLayout(duration: number = Motion.duration.base): void {
   if (reduceMotion || Platform.OS === 'web') return;
   LayoutAnimation.configureNext(

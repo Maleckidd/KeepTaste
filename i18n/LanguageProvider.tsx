@@ -24,6 +24,10 @@ type LanguageContextValue = {
   preference: LanguagePreference;
   setPreference: (preference: LanguagePreference) => void;
   t: Translator;
+  /** True once the persisted preference has been loaded (or failed to). The
+   * splash screen is held until then so a stored language override never
+   * flashes the device-locale language on launch. */
+  ready: boolean;
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
@@ -39,9 +43,11 @@ function deviceLocale(): string | null {
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] =
     useState<LanguagePreference>('system');
+  const [ready, setReady] = useState(false);
 
   // Load the persisted preference once on mount. Tolerates the app_settings
-  // table appearing late (migrations run on startup) via try/catch.
+  // table appearing late (migrations run on startup) via try/catch. Marks the
+  // provider ready either way so the splash gate never waits forever.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -50,6 +56,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled) setPreferenceState(parsePreference(stored));
       } catch {
         // Fall back to 'system' (already the default).
+      } finally {
+        if (!cancelled) setReady(true);
       }
     })();
     return () => {
@@ -72,8 +80,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const t = useMemo(() => createTranslator(language), [language]);
 
   const value = useMemo<LanguageContextValue>(
-    () => ({ language, preference, setPreference, t }),
-    [language, preference, t]
+    () => ({ language, preference, setPreference, t, ready }),
+    [language, preference, t, ready]
   );
 
   return (
@@ -94,6 +102,11 @@ function useLanguageContext(): LanguageContextValue {
 /** Returns the memoized translator for the active language. */
 export function useT(): Translator {
   return useLanguageContext().t;
+}
+
+/** True once the persisted language preference has loaded (splash gate). */
+export function useLanguageReady(): boolean {
+  return useLanguageContext().ready;
 }
 
 /** Returns the active language, the raw preference, and a setter. */

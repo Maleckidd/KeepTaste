@@ -14,9 +14,11 @@ const SETTING_KEY = 'theme';
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>('system');
+  const [ready, setReady] = useState(false);
 
   // Load the persisted preference once on mount. Tolerates the app_settings
-  // table appearing late (migrations run on startup) via try/catch.
+  // table appearing late (migrations run on startup) via try/catch. Marks the
+  // provider ready either way so the splash gate never waits forever.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -25,6 +27,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled) setPreferenceState(parseThemePreference(stored));
       } catch {
         // Fall back to 'system' (already the default).
+      } finally {
+        if (!cancelled) setReady(true);
       }
     })();
     return () => {
@@ -42,8 +46,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const scheme = resolveScheme(preference, systemScheme);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ scheme, preference, setPreference }),
-    [scheme, preference]
+    () => ({ scheme, preference, setPreference, ready }),
+    [scheme, preference, ready]
   );
 
   return (

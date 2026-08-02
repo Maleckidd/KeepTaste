@@ -25,6 +25,7 @@ import {
 } from '@/constants/theme';
 import { useT, useLanguage } from '@/i18n/LanguageProvider';
 import { seedSampleContentIfNeeded } from '@/db/seed';
+import { markAppReady } from '@/utils/appReady';
 import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
 import Fab from '@/components/ui/Fab';
@@ -95,6 +96,10 @@ export default function HomeScreen() {
   // Guards the one-shot first-launch seed against a re-run (StrictMode double
   // invoke, remounts). The seed itself is also idempotent via demo_seeded.
   const seedAttempted = useRef(false);
+  // False until the seed attempt has resolved. The empty state is suppressed
+  // until then — otherwise a first launch flashes "no cookbooks" for the few
+  // frames before the seeded content lands and reloads.
+  const [booted, setBooted] = useState(false);
 
   const loadCookbooks = useCallback(async () => {
     const data = await getCookbooks();
@@ -103,17 +108,25 @@ export default function HomeScreen() {
 
   // First-launch sample content (SPEC.md §5.20). Runs once on mount, after the
   // language provider has resolved the active language, so the seed is localized.
-  // If it actually seeds, reload so the new cookbook tile shows immediately.
+  // The cookbook load afterwards is unconditional: it both surfaces freshly
+  // seeded content and guarantees the data is on screen before markAppReady()
+  // drops the native splash — launch goes logo → complete home.
   useEffect(() => {
     if (seedAttempted.current) return;
     seedAttempted.current = true;
     (async () => {
       try {
-        const seeded = await seedSampleContentIfNeeded(language);
-        if (seeded) await loadCookbooks();
+        await seedSampleContentIfNeeded(language);
       } catch {
         // Best-effort — a failed seed must not block the home screen.
       }
+      try {
+        await loadCookbooks();
+      } catch {
+        // Non-fatal — the focus-effect load remains the fallback.
+      }
+      setBooted(true);
+      markAppReady();
     })();
   }, [language, loadCookbooks]);
 
@@ -209,15 +222,19 @@ export default function HomeScreen() {
         <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
       </Pressable>
 
-      {/* Cookbook grid */}
+      {/* Cookbook grid. The empty state waits for the seed attempt to resolve
+          (booted) so a first launch never flashes "no cookbooks" before the
+          sample content lands. */}
       {cookbooks.length === 0 ? (
-        <EmptyState
-          icon="book-outline"
-          title={t('home.emptyTitle')}
-          text={t('home.emptyText')}
-          actionLabel={t('home.emptyAction')}
-          onAction={handleAddCookbook}
-        />
+        booted ? (
+          <EmptyState
+            icon="book-outline"
+            title={t('home.emptyTitle')}
+            text={t('home.emptyText')}
+            actionLabel={t('home.emptyAction')}
+            onAction={handleAddCookbook}
+          />
+        ) : null
       ) : (
         <>
           <FlatList

@@ -813,6 +813,25 @@ Restoring an archive made on a different schema version is a corruption vector, 
 
 **"Pristine seed" vs edited — the `user_edited` flag:** a `user_edited` (`'1'`) key is set the **first time the user makes a real mutation** — any recipe create/update/delete/tried, cookbook create/update/delete, or **shopping-list/item** create/update/delete/check (`db/userEdited.ts` `noteUserEdit`, best-effort, once per process, and skipped while auto-backup is suppressed so the seed's own inserts don't count). Shopping-list mutations are deliberately included even though they never trigger auto-backup (§5.17.3), because `isDatabaseEmpty()` counts shopping lists as content — a user who only makes a list must still flip the flag, or a `.zip` restore would silently wipe that list as if the library were a pristine seed. This lets the app tell an untouched demo seed apart from a library the user has actually worked in.
 
+**Launch gating:** the home screen holds back its "no cookbooks" empty state until the seed attempt has resolved (a local `booted` flag), and the logo stays on screen until the first screen is fully loaded. The home screen calls `markAppReady()` (`utils/appReady.ts`, one-shot signal, unit-tested) after the seed attempt + cookbook load. Launch therefore goes logo → complete home with no blank or partial frames. On non-first launches the seed attempt is a single settings read — imperceptible.
+
+The wait is split across **two** splash layers in `app/_layout.tsx`, which is deliberate — they are not interchangeable:
+
+- **`SplashGate`** hides the *native* splash as soon as the theme preference resolves. It is released early on purpose: the native splash draws above the app window, its colors are baked at build time, and Android 12+ fades its icon out on its own — so every extra millisecond it is held risks showing a wrong-colored, logo-less screen. It must never be used to wait for data.
+- **`SplashOverlay`** is a themed, full-screen logo rendered by React from the first JS frame, and it carries the rest of the wait: theme + language preferences resolved, `appReady` fired, and a `MIN_SPLASH_VISIBLE_MS` (1.2s) floor so a fast device shows the logo as a launch moment rather than a flash. Then it fades out. It covers territory the native splash cannot: the dev-client bundle gap, a manual Dark override on a light-mode system, and the post-icon-fade window.
+
+Both layers carry an independent 5s failsafe, so a hung preference read can never trap the user on a splash.
+
+**Seamless handoff (three invariants).** The transition between the two layers must be invisible, which requires all three to hold — a mismatch in any one reads as a flicker:
+
+1. **Background color.** `expo-splash-screen` in `app.json` sets `backgroundColor` `#FAFAF7` and `dark.backgroundColor` `#1C1814`, matching `lightColors.background` / `darkColors.background` in `constants/theme.ts`. Changing a theme background means changing `app.json` too. Note Android picks the native variant by *system* dark mode, not the app's own theme setting — a manual in-app override can still start on the other variant, which is exactly why the overlay exists.
+2. **Logo size.** The plugin's `imageWidth` (160) and the overlay's `SPLASH_LOGO_SIZE` (160) both scale the same square source, so the glyph lands at 62 × 77 dp in both layers. Unequal values make the logo visibly jump the moment the overlay takes over.
+3. **Continuity.** The logo must be present in *every* frame — no gap between the native icon fading and the overlay painting.
+
+Verified on an Android 15 emulator (release build, 320 dpi) in both themes: background constant at the configured color from 0.4s, logo constant at 124 × 154 px (= 62 × 77 dp at 2×) across the whole splash, and no logo-less frame.
+
+Changing any splash color or size requires a **native rebuild** — the Android drawables and `values-night` colors are generated at prebuild time, so a JS-only reload will not pick them up.
+
 **Restore interaction (§5.17.1):** `canSilentReplace()` = library empty **OR** pristine seed (`demo_seeded && !user_edited`); the pure truth table is `shouldSilentReplace(flags)`. A `.zip` restore over a pristine seed skips the Replace/Add prompt and restores **1:1** like the empty-DB case (the replace path wipes first, so the seed is cleanly overwritten). Any real edit flips `user_edited`, after which a restore falls back to the Replace/Add confirm. A completed restore stamps **both** flags (it is real user data — never seed it later, never mis-read it as a pristine seed; this also covers pre-feature backups that carry neither flag).
 
 **Web:** the web test client is in-memory and resets per reload (§2), so the seed re-runs on every reload there — expected, not a concern for the product platforms.

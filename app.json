@@ -67,7 +67,22 @@
         "expo-share-intent",
         {
           "disableIOS": true,
-          "androidIntentFilters": ["text/*"]
+          "androidIntentFilters": [
+            "text/*"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FAFAF7",
+          "imageWidth": 160,
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#1C1814"
+          }
         }
       ]
     ],

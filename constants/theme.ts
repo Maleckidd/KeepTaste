@@ -61,6 +61,10 @@ export type ThemeContextValue = {
   scheme: ColorScheme;
   preference: ThemePreference;
   setPreference: (preference: ThemePreference) => void;
+  /** True once the persisted preference has been loaded (or failed to). The
+   * splash screen is held until then so a manual Dark override never flashes
+   * the light theme on launch. */
+  ready: boolean;
 };
 
 // Provided by ThemeProvider (constants/ThemeProvider.tsx). When absent (e.g.
