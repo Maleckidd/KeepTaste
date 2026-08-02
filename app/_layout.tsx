@@ -90,13 +90,19 @@ function SystemChrome() {
   // The navigation bar no longer gets a background color: under edge-to-edge
   // (forced from targetSdk 36, and the default since SDK 54) it draws over the
   // app rather than beside it, so setBackgroundColorAsync is gone — only the
-  // button contrast is still ours to pick. Mind the inversion versus the old
-  // setButtonStyleAsync: `style` names the BAR, not the buttons, so a dark
-  // scheme wants "dark" (dark bar, light buttons). Renders null off Android.
+  // button contrast is still ours to pick.
+  //
+  // `style` names the BUTTONS, exactly like the old setButtonStyleAsync, so a
+  // dark scheme wants "light". Do not trust the prop's JSDoc here: it claims
+  // "dark = a dark navigation bar with light content", but the native module
+  // does `hasLightBackground = style == "dark"` and feeds that straight into
+  // isAppearanceLightNavigationBars — so "dark" yields a LIGHT bar with dark
+  // icons. Verified on device; following the docs left a white nav bar sitting
+  // under the dark theme. Renders null off Android.
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <NavigationBar style={scheme === 'dark' ? 'dark' : 'light'} />
+      <NavigationBar style={scheme === 'dark' ? 'light' : 'dark'} />
     </>
   );
 }
