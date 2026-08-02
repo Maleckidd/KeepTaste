@@ -165,13 +165,13 @@ export default function FormattingHelpSheet({ visible, onClose }: Props) {
 
 const makeStyles = (c: ThemePalette) => StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
     zIndex: 1000,
     elevation: 1000,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {

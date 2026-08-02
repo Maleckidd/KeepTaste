@@ -11,7 +11,10 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
     // Native Expo modules are imported at module load time but never exercised
     // in pure-logic tests; map them to lightweight manual mocks.
-    '^expo-file-system$': '<rootDir>/__mocks__/expo-file-system.ts',
+    // Both specifiers map to the same stub: app code imports the /legacy
+    // surface (see utils/imageStorage.ts), and dropping either entry sends the
+    // backup tests into the real native module under node.
+    '^expo-file-system(/legacy)?$': '<rootDir>/__mocks__/expo-file-system.ts',
     '^expo-image-manipulator$':
       '<rootDir>/__mocks__/expo-image-manipulator.ts',
     '^expo-sharing$': '<rootDir>/__mocks__/expo-sharing.ts',

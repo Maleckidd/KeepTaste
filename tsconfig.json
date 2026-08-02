@@ -2,6 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // TS 6 (SDK 57) no longer pulls every node_modules/@types package in
+    // implicitly, so the jest globals used by __tests__/ and __mocks__/ have to
+    // be named here.
+    "types": ["jest", "node"],
     "paths": {
       "@/*": [
         "./*"

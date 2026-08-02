@@ -1,4 +1,7 @@
-import * as FileSystem from 'expo-file-system';
+// SDK 54 moved this surface behind /legacy in favor of the File/Directory API.
+// Staying on the legacy import keeps the SDK 57 upgrade free of an unrelated
+// API migration; porting it is tracked separately (docs/upgrade-sdk-57.md §3.2).
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * True only when the document directory is known (non-null) and the uri is a

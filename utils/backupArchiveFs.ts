@@ -7,7 +7,7 @@
 // (SPEC.md §5.17.1). Pure serialization lives in utils/backupArchive.ts; the DB
 // layer in db/backup.ts.
 import { zip, unzip, NO_COMPRESSION } from 'react-native-zip-archive';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { copyFileToSaf } from '@/modules/safwriter';
 import {

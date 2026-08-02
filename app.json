@@ -2,16 +2,11 @@
   "expo": {
     "name": "KeepTaste",
     "slug": "keeptaste",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "keeptaste",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FAFAF7"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.damianmalecki.keeptaste"
@@ -22,7 +17,7 @@
         "backgroundColor": "#C84B31"
       },
       "package": "com.damianmalecki.keeptaste",
-      "versionCode": 9,
+      "versionCode": 10,
       "permissions": [
         "android.permission.CAMERA"
       ],
@@ -53,16 +48,6 @@
       "expo-asset",
       "expo-font",
       "expo-localization",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "35.0.0"
-          }
-        }
-      ],
       [
         "expo-share-intent",
         {

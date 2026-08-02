@@ -18,7 +18,7 @@ import Button from '@/components/ui/Button';
 import ActionSheet from '@/components/ui/ActionSheet';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { deleteAllData } from '@/db/recipes';
 import { canSilentReplace } from '@/db/backup';
 import { importBackup } from '@/db/import';
