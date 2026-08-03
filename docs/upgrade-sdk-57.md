@@ -540,19 +540,50 @@ Re-run as a single uninterrupted sequence, the list was deleted and restored cor
 recording because the failure mode is indistinguishable from a real regression from the outside —
 timing-sensitive UI must be driven in one shot, not across tool calls.
 
+### Phase 6, third pass — phone, **Android 17 / API 37, 16 KB page size**
+
+Target: `Medium_Phone` AVD, `sdk_gphone16k_arm64`, 1080×2400, gesture navigation. Two things make
+this the more valuable device: it is a phone rather than a tablet, and it is a **16 KB page-size**
+image — the property that got versionCode 9 rejected by Play. Fresh install (seed data only).
+
+| # | Check | Result |
+|---|---|---|
+| 21 | Launch on API 37 / 16 KB pages | pass — no `dlopen` / page-size / `UnsatisfiedLink` errors, clean logcat |
+| 22 | **Keyboard occlusion under edge-to-edge** | **pass** — the form scrolls the edited field fully into view and the Save button sits above the keyboard, not behind it |
+| 23 | Nav bar / gesture pill contrast, dark theme | pass |
+| 24 | Nav bar / gesture pill contrast, light theme | pass |
+| 25 | Settings bottom content clears the gesture pill | pass |
+| 26 | Unsaved-changes guard ("Discard changes?") | pass |
+| 27 | **Restore from `.zip`** | **pass** — see below |
+| 28 | Silent replace on a pristine seed DB (`canSilentReplace`) | pass — restored without prompting, as designed |
+| 29 | Photo restore from the archive | pass — `Pancakes` came back with its image |
+
+**#22 was the outstanding edge-to-edge risk** and it is clean. The tablet pass could not answer it
+(floating IME); a real phone IME confirms the insets are handled.
+
+**#27 closes the backup round trip.** This device had never seen `MigracjaTest57` or `NALESNIKI`;
+after restoring the archive taken from the tablet, both are present, the confirmation reads
+"Backup restored — Your library now matches the backup", and `Pancakes` has its photo back. Export
+and restore are now both proven, on separate devices, with the archive moved between them.
+
+**#21 is worth calling out for the Play history.** versionCode 9 was rejected over 16 KB page-size
+support; this build launches and loads every native library on a 16 KB-page Android 17 image.
+
 ### Still ahead
 
-Not yet exercised on any device, in rough order of risk:
+Not yet exercised on any device:
 
-- **Restore** from a `.zip` (`commitBackupRestore`), and the `.md` export → import round-trip. The
-  write half of backup is proven; the read half is not.
-- **Auto-backup flush on app-background** (`utils/backupTrigger.ts`) and the "saving" banner. The
-  folder write fires on selection, which is a different trigger from the background flush.
-- **Cookbook → PDF share** (`expo-print`), recipe → text share.
-- **Keyboard occlusion under edge-to-edge** — attempted, but the tablet AVD's floating IME makes the
-  result meaningless. Needs a phone.
-- **The whole visual sweep on a phone at API 37** (`Medium_Phone`): 12 screens × 2 themes, `Fab` and
-  snackbar over the gesture bar, and nav-bar contrast with gesture navigation as well as 3-button.
+- **Cookbook → PDF share** (`expo-print`) and recipe → text share. The only untouched native
+  integration left.
+- **`.md` export → import round-trip** (SPEC.md §5.6). The `.zip` path is proven end to end; the
+  legacy Markdown path is not.
+- **The remaining screens in both themes on the phone** — `recipe/edit`, `recipe/add-to-list`,
+  `shopping/[id]`, `cookbook/edit`, and the snackbar over the gesture pill. The screens exercised so
+  far all behaved, so this is a sweep for completeness rather than an open risk.
+
+An environmental note, not an app defect: on the tablet AVD the app was repeatedly killed while the
+system document picker was foregrounded, which aborted two restore attempts. It was memory pressure
+from running two emulators; the same flow completed first try on the phone.
 
 Then phase 7: production build, Play internal testing, promotion.
 
