@@ -512,8 +512,8 @@ export const dictionary = {
     pl: 'Nie można użyć tego folderu',
   },
   'settings.backupFolderUnwritableMessage': {
-    en: "This folder can't be written to. Google Drive on the phone isn't supported for automatic backup — pick a Dropbox or Nextcloud folder instead, or use “Export all data” above to save to Drive manually.",
-    pl: 'Do tego folderu nie da się zapisywać. Google Drive na telefonie nie jest obsługiwany przy kopii automatycznej — wskaż folder Dropbox lub Nextcloud, albo użyj „Eksportuj wszystkie dane” powyżej, aby zapisać na Dysku ręcznie.',
+    en: "This folder can't be written to. Google Drive on the phone isn't supported for automatic backup — pick a folder on your phone instead. To also keep a copy on Drive, use “Export all data” above.",
+    pl: 'Do tego folderu nie da się zapisywać. Google Drive na telefonie nie jest obsługiwany przy kopii automatycznej — wskaż folder na telefonie. Aby mieć kopię także na Dysku, użyj „Eksportuj wszystkie dane” powyżej.',
   },
   'settings.backupWriteFailedMessage': {
     en: "Couldn't write a backup to this folder. The folder may be read-only, or your library may be too large to back up on this device at once. Try another folder, or reduce the number of photos.",
