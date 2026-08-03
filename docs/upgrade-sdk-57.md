@@ -569,23 +569,55 @@ and restore are now both proven, on separate devices, with the archive moved bet
 **#21 is worth calling out for the Play history.** versionCode 9 was rejected over 16 KB page-size
 support; this build launches and loads every native library on a 16 KB-page Android 17 image.
 
+### Phase 6, final items — phone, API 37
+
+| # | Check | Result |
+|---|---|---|
+| 30 | Cookbook → PDF share (`expo-print` + `cookbookPdfHtml.ts`) | pass — see below |
+| 31 | `.md` legacy export → import round-trip | pass — parsed as "2 cookbooks with 2 recipes", then "Import complete" |
+
+**#30 was checked for content, not just for a file appearing.** The share sheet produced a PDF, and
+running it through the system print preview showed the real thing: the cookbook title in the brand
+colour, both recipes with metadata, ingredient lists, numbered instructions and notes, across 2
+pages. An empty or broken PDF would have been visible there.
+
+**#31** used the `recipes.md` carried inside the `.zip` archive as the legacy export, restored on a
+device that had been populated from the same backup. Markdown import is add-to-library only (no
+replace option), so it correctly ended up with duplicate cookbooks — expected behaviour, not a bug.
+
+**Phase 6 is complete.** Every item on the plan's checklist has been exercised on a device, across
+two devices and both themes. Both original risks are closed by observation rather than by
+workaround: R1 (OCR under New Architecture) works through the interop layer, and R2 (edge-to-edge)
+is clean including the keyboard case.
+
+One item is verified by the app's owner rather than by this pass: the Google Drive warning shown
+when an unwritable cloud folder is picked for automatic backup. The detection is pure and unit
+tested (`isGoogleDriveFolderUri`, including the assertion that Dropbox is *not* matched, so other
+providers fall through to the write probe), and the SAF permission + write path around it is device
+verified — but signing into a Google account was out of scope here.
+
 ### Still ahead
 
-Not yet exercised on any device:
+Verification is done. What remains is phase 7 — release:
 
-- **Cookbook → PDF share** (`expo-print`) and recipe → text share. The only untouched native
-  integration left.
-- **`.md` export → import round-trip** (SPEC.md §5.6). The `.zip` path is proven end to end; the
-  legacy Markdown path is not.
-- **The remaining screens in both themes on the phone** — `recipe/edit`, `recipe/add-to-list`,
-  `shopping/[id]`, `cookbook/edit`, and the snackbar over the gesture pill. The screens exercised so
-  far all behaved, so this is a sweep for completeness rather than an open risk.
+1. `eas build --profile production --platform android` (1.0.1 / versionCode 10).
+2. Upload to **internal testing**, and confirm in the Play Console that the target-API warning is
+   gone from the release before promoting.
+3. Install from internal testing **over** the production build. Local release APKs are debug-key
+   signed and cannot be installed over the Play build, so this is the first and only place the real
+   upgrade path gets exercised with production signing.
+4. Promote to production.
+5. Update SPEC.md and CLAUDE.md wherever they still name SDK 52, RN 0.76, or
+   `expo-build-properties`, and refresh the `android-target-sdk` memory note.
 
 An environmental note, not an app defect: on the tablet AVD the app was repeatedly killed while the
 system document picker was foregrounded, which aborted two restore attempts. It was memory pressure
 from running two emulators; the same flow completed first try on the phone.
 
-Then phase 7: production build, Play internal testing, promotion.
+**Test data left on the emulators.** Pixel Tablet: cookbook `MigracjaTest57`, recipe `NALESNIKI`, an
+auto-backup folder pointing at `/sdcard/Backup`, `/sdcard/Pictures/ocr-test.png`. Medium_Phone: the
+restored library plus duplicate cookbooks from the Markdown import test, and two files in
+`/sdcard/Download`. Neither device is clean any more.
 
 **Test data left on the Pixel Tablet AVD:** cookbook `MigracjaTest57`, recipe `NALESNIKI`, an
 auto-backup folder pointing at `/sdcard/Backup`, and `/sdcard/Pictures/ocr-test.png`. Harmless, but
