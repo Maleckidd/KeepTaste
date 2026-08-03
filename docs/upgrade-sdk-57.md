@@ -506,21 +506,56 @@ no replacement, no disabled T3 mode needed. The risk register's contingency plan
 missing `libappmodules.so`, and an unchanged re-run succeeded. Stale CMake incremental state, not a
 New Architecture problem — do not read the first failure as signal.
 
+### Phase 6, second pass — same emulator, after the nav-bar fix
+
+| # | Check | Result |
+|---|---|---|
+| 11 | SAF folder pick + write (`modules/safwriter`) | pass — see below |
+| 12 | Auto-backup enabled, "Last backup" timestamp set | pass |
+| 13 | Retention "keep 1 most recent" | pass — the older archive was removed |
+| 14 | Android share target (`expo-share-intent` 3 → 8) | pass — see below |
+| 15 | Cold start / splash handoff (SPEC.md §5.20) | pass — logo on the themed background, no white flash; theme and data survived the restart |
+| 16 | Shopping list create, `EmptyState` | pass |
+| 17 | Swipe-to-delete (`react-native-gesture-handler` 2.20 → 2.32) | pass — Delete/Rename revealed correctly |
+| 18 | Undo snackbar + deferred delete | pass — see the note on measurement below |
+| 19 | Recipe save + `updated_at` ordering | pass — the OCR-imported recipe sorted to the top |
+| 20 | Keyboard over the import sheet | inconclusive — the tablet AVD uses a floating IME, so this does not test occlusion. Must be redone on a phone |
+
+**#11 is the strongest single result of the pass.** `safwriter` is our own Kotlin module, and the
+whole chain was verified rather than trusted to the UI: the archive landed at
+`/sdcard/Backup/keeptaste-backup-*.zip`, starts with the `PK\x03\x04` magic, and its contents pulled
+back off the device contain `backup.json`, `recipes.md` and the images — with both cookbooks
+(`Breakfasts`, `MigracjaTest57`) and both recipes (`Pancakes`, `NALESNIKI`) present. The
+`UnsupportedOperationException: Unsupported Uri` lines from `DocumentFile` in logcat are noisy but
+harmless: the write and the retention delete both completed.
+
+**#14** — a `SEND` intent with a URL opened the app on the new-recipe form with the import sheet
+already up, tried the link, and degraded exactly as designed when the site blocks fetching
+("This site blocks automatic import — paste the recipe text instead"). Five majors, no code change,
+correct behaviour.
+
+**#18, and a note on method.** The first Undo attempt appeared to fail. It had not: the snackbar
+lives 5s and the round-trip between screenshot and tap exceeded it, so the tap landed on nothing.
+Re-run as a single uninterrupted sequence, the list was deleted and restored correctly. Worth
+recording because the failure mode is indistinguishable from a real regression from the outside —
+timing-sensitive UI must be driven in one shot, not across tool calls.
+
 ### Still ahead
 
 Not yet exercised on any device, in rough order of risk:
 
-- **SAF folder write** — `modules/safwriter`, our own Kotlin module. The `.zip` export path is
-  proven, but the Storage Access Framework write is a separate code path.
-- **Restore** from a `.zip`, and the `.md` export → import round-trip.
-- **Auto-backup** flush on app-background (`utils/backupTrigger.ts`) and the "saving" banner.
-- **Android share target** — share a link from a browser into the app (`expo-share-intent` 3 → 8
-  was a five-major jump, even though it needed no code change).
+- **Restore** from a `.zip` (`commitBackupRestore`), and the `.md` export → import round-trip. The
+  write half of backup is proven; the read half is not.
+- **Auto-backup flush on app-background** (`utils/backupTrigger.ts`) and the "saving" banner. The
+  folder write fires on selection, which is a different trigger from the background flush.
 - **Cookbook → PDF share** (`expo-print`), recipe → text share.
-- **Shopping lists**, swipe-to-delete, and the Undo snackbar.
-- **Splash handoff** (SPEC.md §5.20) on cold and warm start.
-- **Keyboard behaviour** in the recipe form under edge-to-edge — the classic edge-to-edge
-  regression, and untested so far.
-- **The whole visual sweep on a phone at API 37** (`Medium_Phone`), rather than a tablet at API 35.
+- **Keyboard occlusion under edge-to-edge** — attempted, but the tablet AVD's floating IME makes the
+  result meaningless. Needs a phone.
+- **The whole visual sweep on a phone at API 37** (`Medium_Phone`): 12 screens × 2 themes, `Fab` and
+  snackbar over the gesture bar, and nav-bar contrast with gesture navigation as well as 3-button.
 
 Then phase 7: production build, Play internal testing, promotion.
+
+**Test data left on the Pixel Tablet AVD:** cookbook `MigracjaTest57`, recipe `NALESNIKI`, an
+auto-backup folder pointing at `/sdcard/Backup`, and `/sdcard/Pictures/ocr-test.png`. Harmless, but
+it is not a clean device any more.
