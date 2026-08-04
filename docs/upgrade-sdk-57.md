@@ -558,8 +558,10 @@ image — the property that got versionCode 9 rejected by Play. Fresh install (s
 | 28 | Silent replace on a pristine seed DB (`canSilentReplace`) | pass — restored without prompting, as designed |
 | 29 | Photo restore from the archive | pass — `Pancakes` came back with its image |
 
-**#22 was the outstanding edge-to-edge risk** and it is clean. The tablet pass could not answer it
-(floating IME); a real phone IME confirms the insets are handled.
+**#22 covered text fields inside the form's ScrollView** — the tablet pass could not answer it at
+all (floating IME), and a real phone IME confirms the scroll insets are handled. It did **not**
+cover bottom-pinned overlays, and that gap hid a real regression: see #32 below. Reading #22 as
+"edge-to-edge is clean" was too broad a conclusion from one screen.
 
 **#27 closes the backup round trip.** This device had never seen `MigracjaTest57` or `NALESNIKI`;
 after restoring the archive taken from the tablet, both are present, the confirmation reads
@@ -595,6 +597,42 @@ when an unwritable cloud folder is picked for automatic backup. The detection is
 tested (`isGoogleDriveFolderUri`, including the assertion that Dropbox is *not* matched, so other
 providers fall through to the write probe), and the SAF permission + write path around it is device
 verified — but signing into a Google account was out of scope here.
+
+### #32 — bottom sheets opened over an open keyboard (edge-to-edge regression, found by the app's owner)
+
+**Report:** on the recipe form, raise the keyboard, then tap the photo icon. The keyboard stays up
+and covers the photo sheet — the backdrop dims but Gallery / Camera / Remove photo are unreachable.
+
+**Reproduced exactly**, and it is a **regression introduced by this upgrade**. The activity still
+declares `android:windowSoftInputMode="adjustResize"`, but under edge-to-edge that is inert: the
+window no longer shrinks when the IME opens, it just reports an inset. Every one of these sheets is
+an absolutely-positioned overlay pinned to the bottom of the window, so "bottom of window" now means
+"behind the keyboard". Before edge-to-edge, `adjustResize` shrank the window and the same layout
+landed above the keyboard by accident.
+
+Four sheets were affected, in two different ways:
+
+| Sheet | Own text input? | Why it broke |
+|---|---|---|
+| `ActionSheet` (the photo menu) | no | no keyboard handling at all |
+| `FormattingHelpSheet` | no | same |
+| `ImportSheet` | yes | tracks `keyboardHeight`, but registers its listeners when `visible` flips — a keyboard that was **already** up never fires `keyboardDidShow` for them, so the offset stayed 0 |
+| `PasteListSheet` | yes | same |
+
+The second row is the subtle one: those two sheets *are* keyboard-aware, which is why focusing their
+own input works correctly (verified after the fix — the sheet still lifts above the keyboard). They
+simply never learn about a keyboard that predates them.
+
+**Fix:** `Keyboard.dismiss()` when each sheet opens. For the two without inputs this is plainly
+right — the field behind is unreachable under the backdrop anyway. For the two with inputs it is
+still right as an entry condition: the sheet always opens fully visible, and their existing
+listeners keep handling the keyboard once the user focuses something inside.
+
+**What this says about the verification method.** The earlier keyboard check passed because it
+exercised the case the framework already handles (a field inside a ScrollView). The broken case is
+the one the app hand-rolls — overlays positioned by `absoluteFill`. When a platform behaviour
+changes, the things to re-test are the places the app does the positioning itself, not the places it
+delegates.
 
 ### Still ahead
 

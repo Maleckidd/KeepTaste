@@ -106,6 +106,15 @@ export default function ImportSheet({
 
   useEffect(() => {
     if (visible) {
+      // Close a keyboard that was already open when the sheet was summoned (the
+      // user was typing a title, then tapped Import). The keyboardHeight
+      // listeners below only register once `visible` flips, so a keyboard that
+      // was already up never fires `keyboardDidShow` for them — the sheet would
+      // render at height 0 offset and sit under the keys. Under edge-to-edge the
+      // window does not shrink, so there is no layout fallback. Dismissing also
+      // keeps the entry consistent: the sheet always opens fully visible, and
+      // the listeners still handle the keyboard for its own inputs afterwards.
+      Keyboard.dismiss();
       // Reset transient state each time the sheet opens. When pre-armed by a
       // share (§5.15), seed the URL/paste field from `initialImport` instead of
       // a blank link mode; a `link` intent also queues an auto-fetch.

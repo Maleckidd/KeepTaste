@@ -76,6 +76,11 @@ export default function PasteListSheet({
 
   useEffect(() => {
     if (visible) {
+      // See ImportSheet: a keyboard that was already open when the sheet opens
+      // never reaches the keyboardHeight listeners below (they register with
+      // `visible`), so the sheet would sit under the keys with no layout
+      // fallback under edge-to-edge.
+      Keyboard.dismiss();
       // Reset transient state each time the sheet opens.
       setStep('paste');
       setText('');
