@@ -76,10 +76,17 @@ export function parseThemePreference(value: string | null): ThemePreference {
   return value === 'light' || value === 'dark' ? value : 'system';
 }
 
-/** Resolves the preference + OS scheme into the scheme to actually apply. */
+/**
+ * Resolves the preference + OS scheme into the scheme to actually apply.
+ *
+ * `'unspecified'` is what RN's useColorScheme() reports (since 0.86) when the
+ * OS has no preference; it is spelled out rather than imported as
+ * ColorSchemeName so this stays a pure function over a fixed set of values.
+ * Everything that is not 'dark' resolves to light, so new members are safe.
+ */
 export function resolveScheme(
   preference: ThemePreference,
-  systemScheme: ColorScheme | null | undefined
+  systemScheme: ColorScheme | 'unspecified' | null | undefined
 ): ColorScheme {
   if (preference === 'light' || preference === 'dark') return preference;
   return systemScheme === 'dark' ? 'dark' : 'light';

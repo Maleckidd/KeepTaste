@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
   BackHandler,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +54,16 @@ export default function ActionSheet({ visible, title, actions, onClose }: Props)
 
   useEffect(() => {
     if (visible) {
+      // Close the keyboard first. The sheet is an absolutely-positioned overlay
+      // pinned to the bottom of the window, and under edge-to-edge (forced from
+      // targetSdk 36) the window no longer shrinks when the IME opens —
+      // `windowSoftInputMode="adjustResize"` is inert there. So an open keyboard
+      // sits ON TOP of the sheet: the backdrop dims, but every action is hidden
+      // behind the keys. Dismissing is the right call rather than padding around
+      // the IME, because this sheet holds no text input — the field behind it is
+      // unreachable while the backdrop is up anyway. Sheets that DO own an input
+      // (ImportSheet, PasteListSheet) must avoid the keyboard instead, not close it.
+      Keyboard.dismiss();
       setRendered(true);
       Animated.timing(progress, {
         toValue: 1,
@@ -174,14 +185,14 @@ export default function ActionSheet({ visible, title, actions, onClose }: Props)
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
     zIndex: 1000,
     // Android stacks by elevation, not zIndex, within the same parent.
     elevation: 1000,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {

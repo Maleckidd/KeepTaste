@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-KeepTaste — a local-only, offline recipe manager in React Native + Expo (SDK 52, Expo Router 4). No backend, no accounts, no cloud sync; data lives in on-device SQLite and the escape hatch is Markdown export. **SPEC.md is the living product spec — consult it before implementing features and update it on significant design decisions.** Docs are in English; UI strings live in i18n/dictionary.ts with EN+PL translations — never hardcode user-facing strings in components.
+KeepTaste — a local-only, offline recipe manager in React Native + Expo (SDK 57, RN 0.86, React 19, New Architecture, Expo Router). No backend, no accounts, no cloud sync; data lives in on-device SQLite and the escape hatch is Markdown export. **SPEC.md is the living product spec — consult it before implementing features and update it on significant design decisions.** Docs are in English; UI strings live in i18n/dictionary.ts with EN+PL translations — never hardcode user-facing strings in components.
 
 ## Commands
 
@@ -20,7 +20,9 @@ eas build --profile development   # custom dev client (required for backup flows
 
 The web build runs on an in-memory sql.js database (`db/client.web.ts`) that resets on reload; use it for browser-driven smoke tests of flows (form → save → list). Native behavior (file system, sharing, image picker) must still be verified on-device. Web-only bugs outside test flows are out of scope (SPEC.md §2).
 
-**Backup work needs a custom dev client, not Expo Go.** The `.zip` backup uses `react-native-zip-archive` (native module, SPEC.md §5.17.1) which does not exist in the Expo Go runtime — any flow that touches export/restore/auto-backup must run on an EAS `development` build (`eas build --profile development`). Expo Go stays fine for all non-backup work. Bump `versionCode` (via `expo-build-properties`) on each upload.
+**Backup work needs a custom dev client, not Expo Go.** The `.zip` backup uses `react-native-zip-archive` (native module, SPEC.md §5.17.1) which does not exist in the Expo Go runtime — any flow that touches export/restore/auto-backup must run on an EAS `development` build (`eas build --profile development`). Expo Go stays fine for all non-backup work. Bump `android.versionCode` in `app.json` on each upload.
+
+**Android SDK versions are not pinned.** `expo-build-properties` was removed in the SDK 57 upgrade; `compileSdk`/`targetSdk` come from the SDK default (36 on SDK 57) via React Native's version catalog. Do not re-add a pin — an explicit one is what let the target go stale until Play threatened to block updates. See `docs/upgrade-sdk-57.md`.
 
 There is no lint script. Unit tests cover **pure logic only** (`db/` query helpers, `utils/`); UI/native-module behavior is verified by running the app (Expo Go, or the web build for browser-driven smoke tests), not by component tests.
 
@@ -43,8 +45,11 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 - `utils/` import (SPEC.md §5.15) — pure parsers: `recipeImport.ts` (JSON-LD + pasted text), `ocrText.ts`, `aiTranscribe.ts` (prompt builder + response cleanup — the app makes **no** AI network call), `sharedUrl.ts` (Android share target). Native/gated wrappers: `recipeImportFetch.ts`, `recipeOcr.ts`, `shareIntent.ts`.
 - `i18n/` — bilingual UI strings: `dictionary.ts` (typed EN+PL `Record`) and `LanguageProvider.tsx` (the `useT`/`useLanguage` context, persistence via `db/settings.ts`). Pure resolver logic (preference parsing, locale resolution, interpolation, Polish plurals) lives in `utils/i18n.ts`. See SPEC.md §5.11.
 - `constants/` — `theme.ts` design tokens (colors incl. `onPrimary`, typography incl. `size.reading` for recipe content, spacing, radii, shadows, `Motion` durations, `Touch` target sizes) and `ThemeProvider.tsx` (persisted Light/Dark/System preference). Never hardcode style values when a token exists. The light/dark backgrounds are mirrored in `app.json`'s splash config — change both together.
+- `scripts/` — build/maintenance scripts, never bundled into the app. Mostly the Play Store marketing assets (demo library, screenshots, feature graphic, promo video), all reproducible from a clean checkout; shared code lives in `scripts/lib/` (`config.ts` project facts, `brand.ts` marketing look, `render.ts` headless-Chrome rendering, `cli.ts` args, `adb.sh`/`screen.sh` emulator driving). Start at **[docs/store-assets.md](docs/store-assets.md)**; per-script index in `scripts/README.md`. macOS-only (`sips`, `ffmpeg`, Chrome for Testing out of the Playwright cache) and deliberately adds no dependency to `package.json`.
 
 **Migrations are manual, and versioned.** `runMigrations()` in `db/client.ts` executes hand-written `CREATE TABLE IF NOT EXISTS` DDL (defined in `db/ddl.ts`, shared with `db/client.web.ts`) synchronously at app start, then runs a `PRAGMA user_version` migration ladder for existing installs. Drizzle Kit auto-migrations are intentionally not used. Any schema change requires **three** edits: `db/schema.ts`, the DDL in `db/ddl.ts`, **and** a ladder step in `db/client.ts` with a `CURRENT_SCHEMA_VERSION` bump. Skipping the ladder breaks upgrades for existing users while a fresh install still looks fine — testing on a clean DB will not catch it.
+
+**File system imports go through `expo-file-system/legacy`.** SDK 54 moved the old surface (`documentDirectory`, `readAsStringAsync`, `StorageAccessFramework`, …) behind `/legacy` and put a new `File`/`Directory` API at the bare specifier. This app still uses the legacy one — importing from `expo-file-system` gets you a different API. Porting is tracked separately; do not mix the two. If you add a file that imports it, check `jest.config.js` still maps the specifier, or the tests will load the real native module under node.
 
 **Path alias:** `@/*` maps to the repo root.
 

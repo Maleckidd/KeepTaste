@@ -165,7 +165,7 @@ export default function RecipeForm({
     // Uses the Android system photo picker / iOS PHPicker — no media-library
     // permission needed, which is why READ_MEDIA_IMAGES is not declared.
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,

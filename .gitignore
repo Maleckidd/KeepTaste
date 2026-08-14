@@ -43,5 +43,17 @@ yarn-error.*
 keeptaste.apk
 # transient EAS build log
 eas-build.log
-# generated demo backup — rebuild with scripts/build-demo-backup.ts
+# generated demo backups — rebuild with scripts/build-demo-backup.ts [pl]
 assets/store/keeptaste-demo.zip
+assets/store/keeptaste-demo-pl.zip
+# cropped demo photos — rebuild with scripts/crop-demo-photos.sh
+assets/store/crops/
+# rendered Play Store frames — rebuild with scripts/build-store-screenshots.ts
+# from the raw captures in assets/app/ (those are source and stay tracked)
+assets/store/play/
+# promo video: the screen takes, the rendered mp4s and the music track. Unlike
+# the still screenshots, the raw takes are ignored too — they are tens of MB of
+# video and re-shooting them is one scripted command
+# (scripts/record-promo-clips.sh). The storyboard copy is the source and lives
+# in assets/store/promo-script.json.
+assets/store/promo/

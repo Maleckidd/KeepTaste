@@ -1,0 +1,72 @@
+{
+  "_comment": "Copy for the Play Store screenshot frames. One entry per screen, in upload order. Rendered by scripts/build-store-screenshots.ts — see docs/store-screenshots.md. Keep headlines under ~30 characters per line; the renderer does not shrink text to fit.",
+  "screens": [
+    {
+      "file": "01-cookbooks",
+      "en": {
+        "headline": "Your recipes,\nyour cookbooks",
+        "subline": "No account, no cloud, no ads"
+      },
+      "pl": {
+        "headline": "Twoje przepisy,\ntwoja kuchnia",
+        "subline": "Bez konta, chmury i reklam"
+      }
+    },
+    {
+      "file": "02-import",
+      "align": "bottom",
+      "en": {
+        "headline": "Add recipes\nwithout typing",
+        "subline": "From a link, a photo or pasted text"
+      },
+      "pl": {
+        "headline": "Dodawaj przepisy\nbez przepisywania",
+        "subline": "Z linku, ze zdjęcia lub wklejonego tekstu"
+      }
+    },
+    {
+      "file": "03-recipe-list",
+      "en": {
+        "headline": "Every dish\nat a glance",
+        "subline": "Photo, time and servings on every card"
+      },
+      "pl": {
+        "headline": "Każde danie na\nwyciągnięcie ręki",
+        "subline": "Zdjęcie, czas i porcje na każdej karcie"
+      }
+    },
+    {
+      "file": "04-recipe",
+      "en": {
+        "headline": "A recipe page\nbuilt for cooking",
+        "subline": "Large type — and the screen stays on"
+      },
+      "pl": {
+        "headline": "Wygodne gotowanie\nz funkcjonalnym przepisem",
+        "subline": "Duża czcionka, ekran nie gaśnie"
+      }
+    },
+    {
+      "file": "05-add-to-list",
+      "en": {
+        "headline": "Ingredients\nstraight to your list",
+        "subline": "One tap — every ingredient"
+      },
+      "pl": {
+        "headline": "Składniki prosto\nna listę zakupów",
+        "subline": "Jedno dotknięcie – wszystkie składniki"
+      }
+    },
+    {
+      "file": "06-shopping",
+      "en": {
+        "headline": "Shop without\nthe guesswork",
+        "subline": "Plan ahead and check items off as you shop"
+      },
+      "pl": {
+        "headline": "Zakupy bez\nzgadywania",
+        "subline": "Planuj z wyprzedzeniem, odhaczaj w sklepie"
+      }
+    }
+  ]
+}

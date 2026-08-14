@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
   BackHandler,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -40,6 +41,10 @@ export default function FormattingHelpSheet({ visible, onClose }: Props) {
 
   useEffect(() => {
     if (visible) {
+      // Same reason as ActionSheet: this sheet is opened straight from under a
+      // text field the user is typing in, and under edge-to-edge an open
+      // keyboard covers a bottom-pinned overlay instead of shrinking the window.
+      Keyboard.dismiss();
       setRendered(true);
       Animated.timing(progress, {
         toValue: 1,
@@ -165,13 +170,13 @@ export default function FormattingHelpSheet({ visible, onClose }: Props) {
 
 const makeStyles = (c: ThemePalette) => StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
     zIndex: 1000,
     elevation: 1000,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {

@@ -1,0 +1,95 @@
+{
+  "_comment": "Storyboard for the Play Store promo video. Rendered by scripts/build-promo-video.ts — see docs/store-promo-video.md. `clip` names a take in assets/store/promo/raw/<lang>/; `in`/`out` are seconds into that take. Cards have no clip. Keep headlines to two short lines: the renderer does not shrink text to fit. Copy is deliberately close to assets/store/screenshot-captions.json so the listing and the video read as one thing.",
+  "scenes": [
+    {
+      "id": "title",
+      "card": "title",
+      "duration": 2.6,
+      "en": { "headline": "KeepTaste", "subline": "A recipe book that lives on your phone" },
+      "pl": { "headline": "KeepTaste", "subline": "Książka kucharska, która żyje w telefonie" }
+    },
+    {
+      "id": "library",
+      "clip": "library",
+      "in": 0.6,
+      "out": 6.0,
+      "en": {
+        "headline": "Your recipes,\nyour cookbooks",
+        "subline": "No account, no cloud, no ads"
+      },
+      "pl": {
+        "headline": "Twoje przepisy,\ntwoja kuchnia",
+        "subline": "Bez konta, chmury i reklam"
+      }
+    },
+    {
+      "id": "import",
+      "clip": "import",
+      "in": 4.0,
+      "out": 8.8,
+      "en": {
+        "headline": "Add recipes\nwithout typing",
+        "subline": "From a link, a photo or pasted text"
+      },
+      "pl": {
+        "headline": "Dodawaj przepisy\nbez przepisywania",
+        "subline": "Z linku, ze zdjęcia lub wklejonego tekstu"
+      }
+    },
+    {
+      "id": "recipe",
+      "clip": "recipe",
+      "in": 2.4,
+      "out": 8.0,
+      "en": {
+        "headline": "A recipe page\nbuilt for cooking",
+        "subline": "Large type — and the screen stays on"
+      },
+      "pl": {
+        "headline": "Wygodne gotowanie\nz funkcjonalnym przepisem",
+        "subline": "Duża czcionka, ekran nie gaśnie"
+      }
+    },
+    {
+      "id": "add-to-list",
+      "clip": "recipe",
+      "in": 8.0,
+      "out": 15.6,
+      "en": {
+        "headline": "Ingredients\nstraight to your list",
+        "subline": "One tap — every ingredient"
+      },
+      "pl": {
+        "headline": "Składniki prosto\nna listę zakupów",
+        "subline": "Jedno dotknięcie – wszystkie składniki"
+      }
+    },
+    {
+      "id": "shopping",
+      "clip": "shopping",
+      "in": 0.5,
+      "out": 6.8,
+      "en": {
+        "headline": "Shop without\nthe guesswork",
+        "subline": "Plan ahead and check items off as you shop"
+      },
+      "pl": {
+        "headline": "Zakupy bez\nzgadywania",
+        "subline": "Planuj z wyprzedzeniem, odhaczaj w sklepie"
+      }
+    },
+    {
+      "id": "end",
+      "card": "end",
+      "duration": 3.6,
+      "en": {
+        "headline": "KeepTaste",
+        "subline": "Free. Offline. Always.\nOn Google Play"
+      },
+      "pl": {
+        "headline": "KeepTaste",
+        "subline": "Za darmo. Offline. Zawsze.\nW Google Play"
+      }
+    }
+  ]
+}

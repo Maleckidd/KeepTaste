@@ -3,7 +3,7 @@ import { Animated, AppState, Image, Platform, View, ActivityIndicator, Text, Sty
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as NavigationBar from 'expo-navigation-bar';
+import { NavigationBar } from 'expo-navigation-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -82,18 +82,29 @@ function SystemChrome() {
       const palette = scheme === 'dark' ? darkColors : lightColors;
       void SystemUI.setBackgroundColorAsync(palette.background).catch(() => {});
     }
-    // Match the Android system navigation bar to the app background; otherwise
-    // it stays white in dark mode. No-op on iOS/web. Driven by the resolved
-    // scheme so a manual Light/Dark override is honored too.
-    if (Platform.OS !== 'android') return;
-    const palette = scheme === 'dark' ? darkColors : lightColors;
-    NavigationBar.setBackgroundColorAsync(palette.background);
-    NavigationBar.setButtonStyleAsync(scheme === 'dark' ? 'light' : 'dark');
   }, [scheme]);
 
-  // Explicit style (not "auto") so the status bar follows our override rather
-  // than the OS appearance.
-  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+  // Explicit styles (not "auto") so the system bars follow our Light/Dark
+  // override rather than the OS appearance.
+  //
+  // The navigation bar no longer gets a background color: under edge-to-edge
+  // (forced from targetSdk 36, and the default since SDK 54) it draws over the
+  // app rather than beside it, so setBackgroundColorAsync is gone — only the
+  // button contrast is still ours to pick.
+  //
+  // `style` names the BUTTONS, exactly like the old setButtonStyleAsync, so a
+  // dark scheme wants "light". Do not trust the prop's JSDoc here: it claims
+  // "dark = a dark navigation bar with light content", but the native module
+  // does `hasLightBackground = style == "dark"` and feeds that straight into
+  // isAppearanceLightNavigationBars — so "dark" yields a LIGHT bar with dark
+  // icons. Verified on device; following the docs left a white nav bar sitting
+  // under the dark theme. Renders null off Android.
+  return (
+    <>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <NavigationBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    </>
+  );
 }
 
 // Minimum time the JS splash overlay stays visible after JS starts. Readiness
