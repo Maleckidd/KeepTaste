@@ -3,7 +3,9 @@
 // app's own pure modules (parseBackupMarkdown, buildBackupJson) so the output
 // is byte-for-byte the format the mobile import expects (SPEC.md §5.17.1).
 //
-// Run from the repo root:  npx --yes tsx scripts/build-demo-backup.ts
+// Run from the repo root:
+//   npx --yes tsx scripts/build-demo-backup.ts        # English demo
+//   npx --yes tsx scripts/build-demo-backup.ts pl     # Polish demo
 import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
@@ -18,25 +20,107 @@ import type {
 
 const STORE = path.resolve('assets/store');
 
-// Cookbook cover photo by cookbook name.
-const COVERS: Record<string, string> = {
-  'Italian Kitchen': 'italian.png',
-  Desserts: 'dessert.png',
-  'Weekday Dinners': 'dinner.png',
-  Breakfasts: 'breakfast.png',
+// Photos are read from assets/store/crops/ — the same source shots cropped to
+// the dish, so a recipe card shows food rather than the whole staged table
+// (the wide originals stay in assets/store/ as the master copies). The zip
+// entry keeps the plain file name either way.
+const PHOTOS = path.join(STORE, 'crops');
+
+type DemoLocale = {
+  /** Curated Markdown source, relative to assets/store/. */
+  markdown: string;
+  /** Output archive name, relative to assets/store/. */
+  output: string;
+  /** Cookbook cover photo by cookbook name. */
+  covers: Record<string, string>;
+  /** Per-recipe photo by recipe title (only the ones we have shots for). */
+  recipeImages: Record<string, string>;
+  /** Sample shopping list: name + [item, quantity, checked] rows. */
+  shoppingList: {
+    name: string;
+    items: Array<[string, string | null, 0 | 1]>;
+  };
 };
 
-// Per-recipe photo by recipe title (only the ones we have shots for).
-const RECIPE_IMG: Record<string, string> = {
-  'Ricotta Pancakes': 'pancakes.png',
-  'Banana Oatmeal with Nuts': 'oatmeal.png',
-  'Fried Eggs on Sourdough with Avocado': 'fried-eggs.png',
+const LOCALES: Record<string, DemoLocale> = {
+  en: {
+    markdown: 'demo-import.md',
+    output: 'keeptaste-demo.zip',
+    covers: {
+      'Italian Kitchen': 'italian.png',
+      Desserts: 'dessert.png',
+      'Weekday Dinners': 'dinner.png',
+      Breakfasts: 'breakfast.png',
+    },
+    recipeImages: {
+      'Ricotta Pancakes': 'pancakes.png',
+      'Banana Oatmeal with Nuts': 'oatmeal.png',
+      'Fried Eggs on Sourdough with Avocado': 'fried-eggs.png',
+    },
+    shoppingList: {
+      name: 'Weekend Shopping',
+      items: [
+        ['Spaghetti', '500 g', 0],
+        ['Pancetta', '200 g', 0],
+        ['Eggs', '1 dozen', 1],
+        ['Parmesan', '100 g', 1],
+        ['Arborio rice', null, 0],
+        ['Salmon fillets', '2', 0],
+        ['Cherry tomatoes', null, 0],
+        ['Bananas', null, 1],
+        ['Rolled oats', null, 0],
+        ['Dark chocolate', null, 0],
+      ],
+    },
+  },
+  pl: {
+    markdown: 'demo-import.pl.md',
+    output: 'keeptaste-demo-pl.zip',
+    covers: {
+      'Kuchnia włoska': 'italian.png',
+      Desery: 'dessert.png',
+      'Obiady na co dzień': 'dinner.png',
+      Śniadania: 'breakfast.png',
+    },
+    recipeImages: {
+      'Placki ricotta': 'pancakes.png',
+      'Owsianka bananowa z orzechami': 'oatmeal.png',
+      'Jajka sadzone na zakwasie z awokado': 'fried-eggs.png',
+    },
+    shoppingList: {
+      name: 'Zakupy na weekend',
+      items: [
+        ['Spaghetti', '500 g', 0],
+        ['Pancetta', '200 g', 0],
+        ['Jajka', '10 szt.', 1],
+        ['Parmezan', '100 g', 1],
+        ['Ryż arborio', null, 0],
+        ['Filety z łososia', '2', 0],
+        ['Pomidorki koktajlowe', null, 0],
+        ['Banany', null, 1],
+        ['Płatki owsiane', null, 0],
+        ['Gorzka czekolada', null, 0],
+      ],
+    },
+  },
 };
 
 async function main(): Promise<void> {
-  const md = fs.readFileSync(path.join(STORE, 'demo-import.md'), 'utf8');
+  const key = process.argv[2] ?? 'en';
+  const locale = LOCALES[key];
+  if (!locale) {
+    throw new Error(
+      `unknown locale "${key}" — expected one of: ${Object.keys(LOCALES).join(', ')}`
+    );
+  }
+  const COVERS = locale.covers;
+  const RECIPE_IMG = locale.recipeImages;
+
+  const md = fs.readFileSync(path.join(STORE, locale.markdown), 'utf8');
   const parsed = parseBackupMarkdown(md);
-  if (!parsed.ok) throw new Error(`demo-import.md parse failed: ${parsed.error}`);
+  if (!parsed.ok) {
+    throw new Error(`${locale.markdown} parse failed: ${parsed.error}`);
+  }
 
   const usedImages = new Set<string>();
   const cookbooks: Cookbook[] = [];
@@ -89,20 +173,14 @@ async function main(): Promise<void> {
   // the cart (checked) so the two-section list view (§5.10) is visible.
   const listTs = stamp();
   const shoppingLists: ShoppingList[] = [
-    { id: 1, name: 'Weekend Shopping', createdAt: listTs, updatedAt: listTs },
+    {
+      id: 1,
+      name: locale.shoppingList.name,
+      createdAt: listTs,
+      updatedAt: listTs,
+    },
   ];
-  const sampleItems: Array<[string, string | null, 0 | 1]> = [
-    ['Spaghetti', '500 g', 0],
-    ['Pancetta', '200 g', 0],
-    ['Eggs', '1 dozen', 1],
-    ['Parmesan', '100 g', 1],
-    ['Arborio rice', null, 0],
-    ['Salmon fillets', '2', 0],
-    ['Cherry tomatoes', null, 0],
-    ['Bananas', null, 1],
-    ['Rolled oats', null, 0],
-    ['Dark chocolate', null, 0],
-  ];
+  const sampleItems = locale.shoppingList.items;
   const shoppingItems: ShoppingItem[] = sampleItems.map(
     ([name, quantity, checked], i) => ({
       id: i + 1,
@@ -126,10 +204,10 @@ async function main(): Promise<void> {
   zip.file('backup.json', buildBackupJson(content));
   zip.file('recipes.md', md);
   for (const img of usedImages) {
-    zip.file(`images/${img}`, fs.readFileSync(path.join(STORE, img)));
+    zip.file(`images/${img}`, fs.readFileSync(path.join(PHOTOS, img)));
   }
 
-  const out = path.join(STORE, 'keeptaste-demo.zip');
+  const out = path.join(STORE, locale.output);
   fs.writeFileSync(out, await zip.generateAsync({ type: 'nodebuffer' }));
   console.log(
     `Wrote ${out} — ${cookbooks.length} cookbooks, ${recipes.length} recipes, ` +

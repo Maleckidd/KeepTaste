@@ -126,7 +126,9 @@ export const dictionary = {
     pl: 'Udostępnij książkę (PDF)',
   },
   'cookbook.minutes': { en: '{count} min', pl: '{count} min' },
-  'cookbook.servings': { en: '{count} servings', pl: '{count} porcji' },
+  'cookbook.servings.one': { en: '{count} serving', pl: '{count} porcja' },
+  'cookbook.servings.few': { en: '{count} servings', pl: '{count} porcje' },
+  'cookbook.servings.many': { en: '{count} servings', pl: '{count} porcji' },
   'cookbook.toTryChip': {
     en: 'To try ({count})',
     pl: 'Do wypróbowania ({count})',

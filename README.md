@@ -28,11 +28,11 @@ library exports to plain, human-readable Markdown, and a complete `.zip` backup
 cloud-synced folder *you* control.
 
 <p align="center">
-  <img src="assets/app/Screenshot_1_KeepTaste.jpg" width="19%" alt="Home screen — cookbook grid with cover photos" />
-  <img src="assets/app/Screenshot_2_KeepTaste.jpg" width="19%" alt="Cookbook — recipe list with photos, times and servings" />
-  <img src="assets/app/Screenshot_3_KeepTaste.jpg" width="19%" alt="Recipe view — photo, times, servings and ingredients" />
-  <img src="assets/app/Screenshot_4_KeepTaste.jpg" width="19%" alt="Recipe view — numbered instructions, notes and Add to shopping list" />
-  <img src="assets/app/Screenshot_5_KeepTaste.jpg" width="19%" alt="Shopping list — items to buy and the In cart section" />
+  <img src="assets/app/en/01-cookbooks.jpg" width="19%" alt="Home screen — cookbook grid with cover photos" />
+  <img src="assets/app/en/03-recipe-list.jpg" width="19%" alt="Cookbook — recipe list with photos, times and servings" />
+  <img src="assets/app/en/04-recipe.jpg" width="19%" alt="Recipe view — photo, times, servings and ingredients" />
+  <img src="assets/app/en/05-add-to-list.jpg" width="19%" alt="Recipe view — numbered instructions, notes and Add to shopping list" />
+  <img src="assets/app/en/06-shopping.jpg" width="19%" alt="Shopping list — items to buy and the In cart section" />
 </p>
 
 <p align="center"><em>Your cookbooks → a cookbook → a recipe → one tap to a shopping list → shopping with the "in cart" flow.</em></p>

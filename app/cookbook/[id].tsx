@@ -38,6 +38,8 @@ import {
   Motion,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import { pluralPl } from '@/utils/i18n';
+import type { TranslationKey } from '@/i18n/dictionary';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -48,6 +50,15 @@ import SwipeableRow from '@/components/ui/SwipeableRow';
 import type { Recipe, Cookbook } from '@/db/schema';
 
 const CARD_IMAGE_HEIGHT = 150;
+
+// "1 serving" / "2 porcje" / "5 porcji" — the card is the one place a raw
+// servings count is rendered inline, so it needs the same plural treatment as
+// the shopping-list counters.
+const servingsKeys: Record<ReturnType<typeof pluralPl>, TranslationKey> = {
+  one: 'cookbook.servings.one',
+  few: 'cookbook.servings.few',
+  many: 'cookbook.servings.many',
+};
 
 // The recipe list can carry a single "To try" section header between the normal
 // and to-try partitions (§5.19). A stable non-numeric key keeps it from ever
@@ -121,7 +132,9 @@ function RecipeCard({
               <View style={styles.metaItem}>
                 <Ionicons name="people-outline" size={14} color={c.textMuted} />
                 <Text style={styles.metaText}>
-                  {t('cookbook.servings', { count: recipe.servings })}
+                  {t(servingsKeys[pluralPl(recipe.servings)], {
+                    count: recipe.servings,
+                  })}
                 </Text>
               </View>
             ) : null}
