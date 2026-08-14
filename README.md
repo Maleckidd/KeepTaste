@@ -4,17 +4,9 @@
 
 ---
 
-## 🧪 Closed testing is live — join in (2 minutes)
+## Available on Google Play
 
-1. **Join the Google group** (this is what unlocks access):
-   <https://groups.google.com/g/keeptaste>
-2. **Open the testing link and opt in:**
-   <https://play.google.com/apps/testing/com.damianmalecki.keeptaste>
-3. **Install from the Play Store** and just… use it. Don't uninstall for
-   2 weeks — opening the app once every few days is enough.
-
-> ⚠️ **One gotcha:** click the links from the same Google account you use in the
-> Play Store on your phone — otherwise the app won't show up.
+[Install KeepTaste from Google Play](https://play.google.com/store/apps/details?id=com.damianmalecki.keeptaste)
 
 ---
 
@@ -92,7 +84,7 @@ cloud-synced folder *you* control.
 
 ## For developers
 
-KeepTaste is React Native + **Expo SDK 52** with **Expo Router 4**, TypeScript
+KeepTaste is React Native + **Expo SDK 57** with **Expo Router**, TypeScript
 strict mode, and a deliberately boring architecture: no global state manager —
 screens load from SQLite on focus and reload after mutations.
 
