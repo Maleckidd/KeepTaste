@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { deleteStoredImage } from '@/utils/imageStorage';
 import { pendingDeleteKey } from '@/utils/pendingDelete';
 import { useUndoDelete, useSnackbar } from '@/components/ui/SnackbarProvider';
 import { parseIngredients } from '@/utils/ingredients';
+import IngredientChecklist from '@/components/recipe/IngredientChecklist';
 import { buildRecipeShareText } from '@/utils/recipeShareText';
 import {
   useTheme,
@@ -115,6 +116,29 @@ export default function RecipeScreen() {
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Ingredient check-off (§5.4): which ingredients are already used up. Like
+  // the zoom above this is ephemeral cooking state — component-only, nothing in
+  // the DB — and it resets whenever the ingredients text changes, because an
+  // edit can reorder the lines the indices point at.
+  const [checkedIngredients, setCheckedIngredients] = useState<ReadonlySet<number>>(
+    () => new Set()
+  );
+  const ingredientCount = useMemo(
+    () => (recipe?.ingredients ? parseIngredients(recipe.ingredients).length : 0),
+    [recipe?.ingredients]
+  );
+  useEffect(() => {
+    setCheckedIngredients(new Set());
+  }, [recipe?.ingredients]);
+  const toggleIngredient = useCallback((index: number) => {
+    setCheckedIngredients((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(index)) next.add(index);
+      return next;
+    });
+  }, []);
+
   const showUndoDelete = useUndoDelete();
   const { showSnackbar } = useSnackbar();
 
@@ -336,11 +360,35 @@ export default function RecipeScreen() {
           {/* Ingredients — on a card, visually separated from the steps */}
           {recipe.ingredients ? (
             <View style={styles.ingredientsCard}>
-              <Text style={styles.sectionTitle} accessibilityRole="header">
-                {t('recipe.ingredients')}
-              </Text>
-              <Markdown style={markdownStyles}>{recipe.ingredients}</Markdown>
-              {parseIngredients(recipe.ingredients).length > 0 ? (
+              <View style={styles.ingredientsHeader}>
+                <Text style={styles.sectionTitle} accessibilityRole="header">
+                  {t('recipe.ingredients')}
+                </Text>
+                {checkedIngredients.size > 0 ? (
+                  <Pressable
+                    onPress={() => setCheckedIngredients(new Set())}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('recipe.clearChecked')}
+                    hitSlop={8}
+                    style={({ pressed }) => pressed && { opacity: 0.6 }}
+                  >
+                    <Text style={styles.clearChecked}>
+                      {t('recipe.clearChecked')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {ingredientCount > 0 ? (
+                <IngredientChecklist
+                  text={recipe.ingredients}
+                  fontScale={fontScale}
+                  checked={checkedIngredients}
+                  onToggle={toggleIngredient}
+                />
+              ) : (
+                <Markdown style={markdownStyles}>{recipe.ingredients}</Markdown>
+              )}
+              {ingredientCount > 0 ? (
                 <Button
                   variant="secondary"
                   icon="cart-outline"
@@ -572,6 +620,17 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     borderColor: c.border,
     padding: Spacing.base,
     gap: Spacing.sm,
+  },
+  ingredientsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  clearChecked: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
   },
   section: {
     gap: Spacing.sm,

@@ -75,6 +75,7 @@ components/
   recipe/
     RecipeForm.tsx       ← shared recipe form (new + edit)
     ImportSheet.tsx      ← single-recipe import: link / paste-text / photo / AI-transcribe mode picker (§5.15)
+    IngredientChecklist.tsx ← ingredients as tap-to-check rows for cooking (§5.4)
   shopping/
     PasteListSheet.tsx   ← bulk-paste products into a shopping list (§5.16)
   ui/                    ← base components (§6): Button, IconButton, Input,
@@ -122,7 +123,7 @@ utils/
   numeric.ts             ← numeric field parsing (integer ≥ 1 or null)
   search.ts              ← diacritics-safe title search
   shoppingList.ts        ← shopping list logic: partition, counts, input normalization
-  ingredients.ts         ← pure parser: ingredients Markdown → shopping item candidates (§5.12)
+  ingredients.ts         ← pure parsers: ingredients Markdown → rendered lines (§5.4) / shopping item candidates (§5.12)
   recipeImport.ts        ← pure parsers: Recipe JSON-LD + pasted-text → RecipeFormData (§5.15)
   recipeImportFetch.ts   ← native: fetch a recipe URL's HTML for parsing (§5.15)
   recipeOcr.ts           ← native: on-device ML Kit text recognition wrapper (§5.15)
@@ -285,8 +286,15 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Title — with a small **"To try" badge** next to it when `to_try` is set, plus a **"Tried it ✓"** action that clears the flag, bumps `updated_at` (§4 exception) and confirms with a snackbar (§5.19)
 - Metadata: prep time, cook time, total time, servings — **items without a value are hidden** (no "—"); if all are missing, the whole metadata row disappears
 - **Ingredients** and **Instructions** as two stacked sections of a single scrollable view (no tabs, no switching) — each with an uppercase section header; an empty section is hidden entirely (consistent with the no-placeholder rule)
-- Section content rendered by `react-native-markdown-display`
+- Section content rendered by `react-native-markdown-display`; ingredients are the one exception — they render as a **check-off list** (below), one `Markdown` per line so inline `**bold**` still works
 - Notes (if present) — highlighted box with a left border in the primary color
+
+**Ingredient check-off (cooking aid):**
+- Every ingredient line is a **checkbox row** — tapping it strikes the ingredient through and mutes it, tapping again brings it back. This is the "what have I already put in" tracker for cooking, not a shopping list
+- Lines come from `parseIngredientLines` (`utils/ingredients.ts`) — the same normalization as the shopping-list parser (§5.12), so `#` grouping labels stay plain headings (not checkable) and item indices line up 1:1 with `parseIngredients`
+- **Ephemeral by design**, exactly like the text zoom below: the checked set lives in the recipe screen's state — no `app_settings` key, no column, nothing in the backup. Leaving the recipe clears it, and so does an ingredients edit (the indices would point at reordered lines)
+- A **"Clear"** text button appears next to the INGREDIENTS header while at least one ingredient is checked
+- The checkbox scales with the text zoom; ingredients that parse into no items at all (e.g. only headings) fall back to plain Markdown rendering
 
 **Markdown in ingredients and instructions:**
 
@@ -975,6 +983,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **Single-recipe import — Android share target** — §5.15 share target: intent-filter via `expo-share-intent` (shipped on 3.2.3, now `^8` — one major per Expo SDK, see §5.15; `expo-linking` promoted to direct dep; Android-only config plugin `disableIOS`/`androidIntentFilters:["text/*"]`; `versionCode` bump), pure `utils/sharedUrl.ts` (unit-tested: `extractSharedUrl` first-http(s)-URL + trailing-punct/angle-bracket strip + query-string preserve, `toImportIntent` link/never-stranded-paste), cold+warm delivery in `app/_layout.tsx` `ShareIntentHandler` (inside `SnackbarProvider`, `useShareIntent()` + `resetShareIntent` + last-handled-signature ref, cold push from post-mount effect), form-busy guard (`usePathname` `/recipe/new`|`/recipe/edit` → ignore + `share.formBusy` snackbar) else `router.push('/recipe/new', {sharedText})`, `RecipeForm`/`ImportSheet` `initialImport` pre-arm (link auto-fetch, paste prefill; consumed once per open), Expo Go/web degradation via `utils/shareIntent.ts` `isShareIntentAvailable` (mirrors `isOcrAvailable`), EN+PL string
 
 - [x] **To-try recipe status** — §5.19: `to_try` column (DDL + `schema.ts` + migration-ladder `ALTER TABLE`), form switch, card badge, recipe-view badge + "Tried it ✓" (bumps `updated_at` — approved exception, §4), bottom "To try" section in recipe lists (pure partition helper, unit-tested), "To try (N)" filter chip in "All recipes" search, `**Status:** to try` round-trip in `.md` (§5.6/§5.8), `to_try` in `backup.json` + `schemaVersion` bump (§5.17.1/§5.17.4), EN+PL strings
+- [x] **Ingredient check-off while cooking** — §5.4: pure `parseIngredientLines` in `utils/ingredients.ts` (rendered lines: `#` headings kept, items carry an index that matches `parseIngredients` 1:1 — unit-tested), `components/recipe/IngredientChecklist.tsx` (checkbox row per ingredient, strike-through + muted when checked, per-line `Markdown` so inline bold survives, icon scales with the text zoom, `**` stripped from the a11y label, `lightTap`), ephemeral checked set in `app/recipe/[id].tsx` reset on ingredients change, "Clear" button in the INGREDIENTS header, EN+PL strings. No DB, no schema, no backup impact
 - [x] **Sample content on first launch** — §5.20: pure localized builder `utils/seedData.ts` (EN+PL "Breakfasts"/"Śniadania" cookbook + one photographed pancakes showcase recipe, unit-tested), one-shot seed `db/seed.ts` `seedSampleContentIfNeeded` guarded by `demo_seeded` + `isDatabaseEmpty()` inside `withAutoBackupSuppressed`, bundled photos (`assets/images/seed/pancakes.jpg` recipe photo, `assets/images/seed/breakfast.jpg` cookbook cover) resolved via `expo-asset` + copied into the doc dir through `persistImage` as separate files (best-effort, degrades to no image), `demo_seeded`/`user_edited` flag helpers in `db/settings.ts`, best-effort once-per-process `user_edited` mark on real mutations (`db/userEdited.ts`, skipped while suppressed), `shouldSilentReplace` (pure, unit-tested) + `canSilentReplace()` in `db/backup.ts` wired into the `.zip` restore path (silent 1:1 over a pristine seed), restore stamps both flags, home-screen mount seed after language resolution
 
 ### Medium priority

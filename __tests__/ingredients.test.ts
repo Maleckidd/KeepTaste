@@ -1,7 +1,10 @@
 // Tests for the ingredients → shopping item candidates parser (SPEC.md §5.12).
 // Target module: utils/ingredients.ts (pure, no native imports).
 
-import { parseIngredients } from '../utils/ingredients';
+import {
+  parseIngredients,
+  parseIngredientLines,
+} from '../utils/ingredients';
 
 describe('parseIngredients — basics', () => {
   it('returns [] for empty and whitespace-only text', () => {
@@ -155,5 +158,72 @@ describe('parseIngredients — realistic input', () => {
       '1 cebula',
       'majeranek',
     ]);
+  });
+});
+
+// The rendered-line variant backs the in-recipe check-off list (SPEC.md §5.4):
+// same normalization, but headings survive and items carry a stable index.
+describe('parseIngredientLines', () => {
+  it('returns [] for empty and whitespace-only text', () => {
+    expect(parseIngredientLines('')).toEqual([]);
+    expect(parseIngredientLines('   \n \n\t')).toEqual([]);
+  });
+
+  it('numbers items from 0, skipping headings', () => {
+    expect(parseIngredientLines('# Dough\n- flour\n- butter')).toEqual([
+      { kind: 'heading', text: 'Dough' },
+      { kind: 'item', text: 'flour', index: 0 },
+      { kind: 'item', text: 'butter', index: 1 },
+    ]);
+  });
+
+  it('strips the # markers of a heading, with or without a space', () => {
+    expect(parseIngredientLines('## Sauce\n#Krem')).toEqual([
+      { kind: 'heading', text: 'Sauce' },
+      { kind: 'heading', text: 'Krem' },
+    ]);
+  });
+
+  it('drops a line that is only # markers', () => {
+    expect(parseIngredientLines('#\n## \nflour')).toEqual([
+      { kind: 'item', text: 'flour', index: 0 },
+    ]);
+  });
+
+  it('keeps item indices contiguous across sections and blank lines', () => {
+    const text = [
+      '# Zakwas',
+      '- 500 ml zakwasu żytniego',
+      '',
+      '# Wywar',
+      '- 4 jajka',
+      '- majeranek',
+    ].join('\n');
+    expect(parseIngredientLines(text)).toEqual([
+      { kind: 'heading', text: 'Zakwas' },
+      { kind: 'item', text: '500 ml zakwasu żytniego', index: 0 },
+      { kind: 'heading', text: 'Wywar' },
+      { kind: 'item', text: '4 jajka', index: 1 },
+      { kind: 'item', text: 'majeranek', index: 2 },
+    ]);
+  });
+
+  it('normalizes item text exactly like parseIngredients', () => {
+    const text = [
+      '# Ciasto',
+      '  -   2 ząbki czosnku  ',
+      '**butter**',
+      '2 cups **strong** flour',
+      '12. salt',
+      '-',
+      '',
+      'all-purpose flour',
+    ].join('\r\n');
+    const items = parseIngredientLines(text).filter(
+      (line): line is Extract<typeof line, { kind: 'item' }> =>
+        line.kind === 'item'
+    );
+    expect(items.map((i) => i.text)).toEqual(parseIngredients(text));
+    expect(items.map((i) => i.index)).toEqual([0, 1, 2, 3, 4]);
   });
 });

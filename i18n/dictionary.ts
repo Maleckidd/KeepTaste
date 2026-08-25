@@ -142,6 +142,7 @@ export const dictionary = {
   'recipe.ingredients': { en: 'Ingredients', pl: 'Składniki' },
   'recipe.instructions': { en: 'Instructions', pl: 'Przygotowanie' },
   'recipe.notes': { en: 'Notes', pl: 'Notatki' },
+  'recipe.clearChecked': { en: 'Clear', pl: 'Wyczyść' },
   'recipe.minutesShort': { en: '{count} min', pl: '{count} min' },
   'recipe.hours': { en: '{hours}h', pl: '{hours}h' },
   'recipe.hoursMinutes': { en: '{hours}h {minutes}m', pl: '{hours}h {minutes}m' },
