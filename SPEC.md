@@ -207,7 +207,7 @@ CREATE INDEX idx_recipes_cookbook_id ON recipes(cookbook_id);
 
 ### Migrations
 
-Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shared by the native client `db/client.ts` and the web test client `db/client.web.ts`) and run synchronously at app startup (`runMigrations()` in `_layout.tsx`). We do not use automatic Drizzle Kit migrations on a mobile device — too risky during app updates. For breaking changes, a migration will be added as an `ALTER TABLE` or a data migration.
+Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shared by the native client `db/client.ts` and the web test client `db/client.web.ts`) and run synchronously **when `db/client.ts` is imported** — not from a screen effect, because React fires child effects before the parent's and a screen's first query would otherwise outrun the schema on a fresh install (that race silently skipped the §5.20 first-launch seed). `_layout.tsx` still calls `runMigrations()`, now only as an idempotent retry. We do not use automatic Drizzle Kit migrations on a mobile device — too risky during app updates. For breaking changes, a migration will be added as an `ALTER TABLE` or a data migration.
 
 ---
 

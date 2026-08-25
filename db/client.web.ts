@@ -50,8 +50,12 @@ export const db = drizzle(
   { schema }
 );
 
-// Queries await getDatabase() themselves; kicking it off here just warms up
-// the WASM download during app startup.
+// Queries await getDatabase() themselves — the DDL is part of that promise, so
+// the web client can never race the schema the way the native one could.
+// Kicking it off at import (and again from the root layout) just warms up the
+// WASM download during app startup.
 export function runMigrations() {
   void getDatabase();
 }
+
+runMigrations();

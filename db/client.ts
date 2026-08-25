@@ -25,8 +25,13 @@ export function getSchemaVersion(): number {
   return row?.user_version ?? 0;
 }
 
+/** Guards against a second run; also lets a failed run be retried. */
+let migrated = false;
+
 // Migration — create tables if they don't exist, then advance the version.
 export function runMigrations() {
+  if (migrated) return;
+
   sqlite.execSync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -54,4 +59,21 @@ export function runMigrations() {
   if (from < CURRENT_SCHEMA_VERSION) {
     sqlite.execSync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION}`);
   }
+
+  migrated = true;
+}
+
+// The schema is created here, at import time, not from a screen effect. React
+// fires child effects before the parent's, so migrations kicked off from the
+// root layout's effect landed *after* the home screen's first-launch seed had
+// already queried app_settings — on a brand-new install that query hit tables
+// that did not exist yet, the seed swallowed the error and the sample content
+// (SPEC.md §5.20) silently never appeared. Every consumer goes through this
+// module, so doing it on import means no query can outrun the schema. Failures
+// are logged rather than thrown (an import-time throw would take the app down);
+// `migrated` stays false, so the root layout's call retries.
+try {
+  runMigrations();
+} catch (e) {
+  console.error('Database migration error:', e);
 }

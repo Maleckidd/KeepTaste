@@ -365,8 +365,10 @@ function RootStack() {
 
 export default function RootLayout() {
   useEffect(() => {
-    // Run database migrations on app startup (creates app_settings, used by
-    // LanguageProvider). Provider tolerates the table appearing late.
+    // Migrations already ran when db/client was imported — the schema has to
+    // exist before the first query, and child effects (e.g. the home screen's
+    // first-launch seed) fire before this one. This call is the retry path for
+    // an import-time failure; it is a no-op once the schema is in place.
     try {
       runMigrations();
     } catch (e) {
