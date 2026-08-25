@@ -168,8 +168,10 @@ eas build --platform android --profile production --local --output ./keeptaste.a
 ```
 
 Requirements for `--local`: `eas-cli`, JDK 17, Android SDK (`ANDROID_HOME`).
-Bump `versionCode` before each Play upload; `targetSdkVersion` is set via the
-`expo-build-properties` plugin.
+Bump `versionCode` before each Play upload. `targetSdkVersion` is **not**
+pinned — `expo-build-properties` was dropped in the SDK 57 upgrade, so the
+target follows the SDK default (36 on SDK 57); see
+[docs/upgrade-sdk-57.md](docs/upgrade-sdk-57.md).
 
 ### Testing
 
