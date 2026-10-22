@@ -162,7 +162,7 @@ const NOISE_EXACT = new Set([
   'ukryj zdjęcia', 'ukryj zdjecia', 'pokaż zdjęcia', 'pokaz zdjecia', 'komentarze', 'komentarz',
   'video', 'wideo', 'wartość energetyczna', 'wartosc energetyczna', 'wartość odżywcza',
   'węglowodany', 'weglowodany', 'białko', 'bialko', 'tłuszcze', 'tluszcze',
-  'w tym cukry', 'w 100 g', 'w 100g',
+  'w tym cukry', 'w 100 g', 'w 100g', 'dowiedz się więcej', 'dowiedz sie wiecej',
 ]);
 const NOISE_PREFIX = [
   'ilość lajków', 'ilosc lajkow', 'dieta:', 'hity kwestii smaku', 'średnia ', 'srednia ',
@@ -175,6 +175,10 @@ function isNoise(line: string): boolean {
   if (NOISE_PREFIX.some((p) => n.startsWith(p))) return true;
   if (/^[0-9]+([.,][0-9]+)?\s*kcal$/.test(n)) return true; // "186 kcal"
   if (/^[0-9]+([.,][0-9]+)?\s*\/\s*[0-9]+/.test(n)) return true; // rating "4.8 / 5 (…)"
+  if (/\s[>›»]$/.test(n)) return true; // a button/link label: "EMAIL >", "STERUJ GŁOSEM ›"
+  // A chrome label with its icon OCR'd as a stray letter: "DODAJ NOTATKĘ E".
+  const iconless = /^(.*\S)\s\S$/.exec(n);
+  if (iconless && NOISE_EXACT.has(iconless[1])) return true;
   return false;
 }
 
@@ -211,19 +215,23 @@ function extractMinutes(s: string): number | null {
   return found && total >= 1 ? total : null;
 }
 
-const PASTE_INGREDIENT_MAIN = new Set(['składniki', 'skladniki', 'ingredients']);
+// "Składniki", also OCR-mangled ("Sktadniki": ł read as t) and carrying the
+// yield ("SKŁADNIKI / 4 PORCJE", "Składniki (4 porcje)").
+const PASTE_INGREDIENT_MAIN =
+  /^(?:sk[łlt]adniki|ingredients)(?:\s*[/(–\-:|·]\s*(\d+)\s*(?:porcj\p{L}*|os\p{L}*|sztuk\p{L}*|servings?|portions?)\)?)?$/u;
 const PASTE_STEP_HEADERS = new Set([
   'przygotowanie', 'sposób przygotowania', 'sposob przygotowania', 'sposób wykonania',
   'sposob wykonania', 'wykonanie', 'sposób przyrządzania', 'instrukcje', 'kroki',
-  'instructions', 'method', 'steps', 'directions', 'preparation',
+  'instructions', 'method', 'steps', 'directions', 'preparation', 'przygotowanie krok po kroku',
+  'krok po kroku',
 ]);
 const PASTE_NOTES_HEADERS = new Set([
   'wskazówki', 'wskazowki', 'wskazówka', 'rady/porady', 'rady i porady', 'porada',
-  'porady', 'rada', 'uwagi', 'tip', 'tips', 'note', 'notes',
+  'porady', 'rada', 'dobra rada', 'uwagi', 'tip', 'tips', 'note', 'notes',
 ]);
 
 type PasteHeader =
-  | { kind: 'ingredients-main' }
+  | { kind: 'ingredients-main'; servings?: number | null }
   | { kind: 'ingredients-group'; label: string }
   | { kind: 'instructions' }
   | { kind: 'instructions-title' } // e.g. "Przepis i sposób przygotowania na:" — next line is the dish title
@@ -233,8 +241,9 @@ function classifyPasteHeader(line: string): PasteHeader | null {
   const lower = line.trim().replace(/:$/, '').trim().toLowerCase();
   if (!lower) return null;
   if (lower.startsWith('przepis') && / na$/.test(lower)) return { kind: 'instructions-title' };
-  if (PASTE_INGREDIENT_MAIN.has(lower)) return { kind: 'ingredients-main' };
-  const grp = /^sk[łl]adniki na (.+)$/.exec(lower);
+  const main = PASTE_INGREDIENT_MAIN.exec(lower);
+  if (main) return { kind: 'ingredients-main', servings: main[1] ? parsePositiveInt(main[1]) : null };
+  const grp = /^sk[łlt]adniki na (.+)$/.exec(lower);
   if (grp) return { kind: 'ingredients-group', label: grp[1] };
   if (PASTE_STEP_HEADERS.has(lower)) return { kind: 'instructions' };
   if (PASTE_NOTES_HEADERS.has(lower)) return { kind: 'notes' };
@@ -292,7 +301,10 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     }
     if (
       cookTime === null &&
-      (/czas\s+(gotowania|pieczenia|sma[żz]enia|duszenia)/.test(lower) ||
+      // `\S*` before the -enia stems absorbs OCR letter noise ("smnażenia")
+      // and prefixed forms ("wypieczenia"); "gotowania" stays exact so
+      // "przygotowania" can never read as a cook time.
+      (/czas\s+(gotowania|\S*pieczenia|\S*a[żz]enia|duszenia)/.test(lower) ||
         /^\s*(cook|cooking|bake|baking|total)(\s*time)?\s*[:\-–]?\s*\d/.test(lower))
     ) {
       cookTime = extractMinutes(lines[i]); consumed[i] = true; continue;
@@ -367,6 +379,8 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
         current = 'ingredients';
         if (header.kind === 'ingredients-group') {
           ingredientParts.push(`# ${capitalize(header.label)}`);
+        } else if (header.servings != null) {
+          if (servings === null) servings = header.servings;
         } else {
           // Peek for a standalone yield line right after "Składniki" (e.g. "2 sztuki").
           const y = nextContent(i + 1);

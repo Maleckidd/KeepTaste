@@ -332,6 +332,51 @@ describe('parsePastedRecipe', () => {
     expect(r.cookTime).toBe(90);
   });
 
+  it('cook-time label survives OCR letter noise before the "-enia" stem', () => {
+    // Real ML Kit read of "Czas smażenia: 25 min" (§5.15 T3), after normalizeOcrText.
+    for (const label of ['Czas smnażenia: 25 min', 'Czas wypieczenia: 25 min']) {
+      const r = parsePastedRecipe(['Tytuł', label, 'Składniki', 'x'].join('\n'));
+      expect(r.cookTime).toBe(25);
+    }
+  });
+
+  it('"Czas przygotowania" stays the prep time, never the cook time', () => {
+    const r = parsePastedRecipe(['Tytuł', 'Czas przygotowania: 20 min', 'Składniki', 'x'].join('\n'));
+    expect(r.prepTime).toBe(20);
+    expect(r.cookTime).toBeNull();
+  });
+
+  it('ingredients header carrying the yield ("SKŁADNIKI / 4 PORCJE") sets servings', () => {
+    for (const h of ['SKŁADNIKI / 4 PORCJE', 'Składniki (4 porcje)', 'Składniki – 6 osób', 'INGREDIENTS / 2 SERVINGS']) {
+      const r = parsePastedRecipe(['Tytuł', h, 'mąka', 'Przygotowanie', 'Wymieszaj.'].join('\n'));
+      expect(r.servings).toBeGreaterThan(1);
+      expect(r.ingredients).toBe('mąka');
+    }
+  });
+
+  it('OCR-mangled "Sktadniki" and "Przygotowanie krok po kroku" are still headers', () => {
+    const r = parsePastedRecipe(
+      ['Menu', 'Blog', 'Sktadniki', 'mąka', 'Przygotowanie krok po kroku', 'Krok 1', 'Wymieszaj.'].join('\n')
+    );
+    expect(r.ingredients).toBe('mąka');
+    expect(r.instructions).toBe('Krok 1\nWymieszaj.');
+  });
+
+  it('drops button-like lines ("EMAIL >", "Dowiedz się więcej") and routes "Dobra rada" to notes', () => {
+    const r = parsePastedRecipe(
+      ['Tytuł', 'Składniki', 'mąka', 'EMAIL >', 'Przygotowanie', 'Wymieszaj.', 'STERUJ GŁOSEM ›',
+        'Dowiedz się więcej', 'Dobra rada:', 'Dodaj szczyptę soli.'].join('\n')
+    );
+    expect(r.ingredients).toBe('mąka');
+    expect(r.instructions).toBe('Wymieszaj.');
+    expect(r.notes).toBe('Dodaj szczyptę soli.');
+  });
+
+  it('drops a chrome label with a stray icon letter OCR glued on ("DODAJ NOTATKĘ E")', () => {
+    const r = parsePastedRecipe(['Tytuł', 'Składniki', 'mąka', 'Przygotowanie', 'DODAJ NOTATKĘ E', 'Wymieszaj.'].join('\n'));
+    expect(r.instructions).toBe('Wymieszaj.');
+  });
+
   it('no reliable title (first content is metadata/header) -> title undefined', () => {
     const r = parsePastedRecipe(
       ['Czas przygotowania: 30 minut', 'Liczba porcji: 4', 'Składniki', 'mąka'].join('\n')

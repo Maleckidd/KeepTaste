@@ -4,15 +4,22 @@
 // Expo Go, on web, or under Jest the native module is absent, so we guard the
 // require and expose `isOcrAvailable` for callers to gate the UI.
 import { NativeModules, Platform } from 'react-native';
-import { ocrBlocksToText, type OcrBlock } from './ocrText';
+import {
+  dropClippedEdgeLines,
+  normalizeOcrText,
+  ocrBlocksToText,
+  type OcrBlock,
+  type OcrImageSize,
+} from './ocrText';
 
 // Shape we consume from the library's recognize() result. Kept minimal so the
 // mapping to OcrBlock is obvious (see index.ts: TextRecognitionResult).
-type MlkitLine = { text: string };
+type MlkitFrame = { top: number; left?: number; width?: number; height?: number };
+type MlkitLine = { text: string; frame?: MlkitFrame };
 type MlkitBlock = {
   text: string;
   lines?: MlkitLine[];
-  frame?: { top: number; left?: number; width?: number; height?: number };
+  frame?: MlkitFrame;
 };
 type MlkitResult = { text: string; blocks: MlkitBlock[] };
 type TextRecognitionModule = {
@@ -36,19 +43,24 @@ if (Platform.OS !== 'web' && NativeModules.TextRecognition != null) {
 export const isOcrAvailable: boolean = mlkit != null;
 
 /**
- * Runs on-device OCR over the image at `uri` and returns the assembled,
- * top-to-bottom recognized text. Throws when the native module is unavailable
- * (callers should gate on `isOcrAvailable`).
+ * Runs on-device OCR over the image at `uri` and returns the recognized text,
+ * assembled in reading order and cleaned of systematic misreads. With the
+ * image's pixel `imageSize`, lines a crop edge cut in half are dropped. Throws
+ * when the native module is unavailable (callers should gate on
+ * `isOcrAvailable`).
  */
-export async function recognizeRecipeText(uri: string): Promise<string> {
+export async function recognizeRecipeText(
+  uri: string,
+  imageSize?: OcrImageSize,
+): Promise<string> {
   if (!mlkit) {
     throw new Error('OCR is not available in this build.');
   }
   const result = await mlkit.recognize(uri);
   const blocks: OcrBlock[] = (result.blocks ?? []).map((b) => ({
     text: b.text,
-    lines: b.lines?.map((l) => ({ text: l.text })),
+    lines: b.lines?.map((l) => ({ text: l.text, frame: l.frame })),
     frame: b.frame,
   }));
-  return ocrBlocksToText(blocks);
+  return normalizeOcrText(ocrBlocksToText(dropClippedEdgeLines(blocks, imageSize)));
 }

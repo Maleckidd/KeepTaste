@@ -40,6 +40,7 @@ import {
 } from '@/utils/recipeImport';
 import { fetchRecipeFromUrl } from '@/utils/recipeImportFetch';
 import { isOcrAvailable, recognizeRecipeText } from '@/utils/recipeOcr';
+import type { OcrImageSize } from '@/utils/ocrText';
 import type { ImportIntent } from '@/utils/sharedUrl';
 
 type Props = {
@@ -59,6 +60,16 @@ type Mode = 'link' | 'paste' | 'photo' | 'ai';
 // Sharing (system share sheet used for the AI handoff) is unavailable on web;
 // gate the AI tile the same synchronous way T3 gates on OCR availability.
 const isSharingSupported = Platform.OS !== 'web';
+// The system crop UI is free-form on Android; on iOS it forces a square, which
+// would cut a recipe page apart — so the OCR crop step is Android-only.
+const canCropBeforeOcr = Platform.OS === 'android';
+
+// Where the photo ActionSheet sends the picked image. The size (the cropped
+// size when the crop UI ran) lets OCR tell which lines touch the image edge.
+type PhotoPicked = (uri: string, size?: OcrImageSize) => void | Promise<void>;
+
+const pickedSize = (asset: ImagePicker.ImagePickerAsset): OcrImageSize | undefined =>
+  asset.width > 0 && asset.height > 0 ? { width: asset.width, height: asset.height } : undefined;
 
 const numToField = (n: number | null | undefined): string =>
   n != null ? String(n) : '';
@@ -94,7 +105,10 @@ export default function ImportSheet({
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   // Which handler the photo ActionSheet routes the picked URI to. Defaults to
   // the OCR path so T3 behavior is byte-identical; T4 flips it before opening.
-  const onPhotoPicked = useRef<(uri: string) => void | Promise<void>>(() => {});
+  const onPhotoPicked = useRef<PhotoPicked>(() => {});
+  // Whether the picker opens the crop UI first (OCR only: trimming ads, app
+  // chrome and tags off a screenshot before recognition).
+  const cropPicked = useRef(false);
   // A share-pre-armed URL to auto-fetch once the sheet has opened. Set by the
   // open effect from `initialImport` and consumed by a follow-up effect so the
   // fetch runs against fresh state (not the stale closure of the open effect).
@@ -281,12 +295,14 @@ export default function ImportSheet({
   const handlePaste = () => applyPastedText(pasteText);
 
   // OCR needs the original-resolution image, so — unlike RecipeForm's photo
-  // picker — we skip cropping, aspect and downscale, and never touch imagePath.
-  const runOcr = async (uri: string) => {
+  // picker — there is no fixed aspect and no downscale, and imagePath is never
+  // touched. The user may crop (free-form, quality 1 keeps full resolution) to
+  // just the recipe, leaving out ads and app chrome around it.
+  const runOcr = async (uri: string, size?: OcrImageSize) => {
     setRecognizing(true);
     setError(null);
     try {
-      const text = await recognizeRecipeText(uri);
+      const text = await recognizeRecipeText(uri, size);
       if (!text.trim()) {
         setError(t('import.photoNoText'));
         setMode('paste');
@@ -303,12 +319,11 @@ export default function ImportSheet({
   const handlePickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: false,
+      allowsEditing: cropPicked.current,
       quality: 1,
     });
-    if (!result.canceled && result.assets[0]) {
-      await onPhotoPicked.current(result.assets[0].uri);
-    }
+    const asset = result.canceled ? undefined : result.assets[0];
+    if (asset) await onPhotoPicked.current(asset.uri, pickedSize(asset));
   };
 
   const handleTakePhoto = async () => {
@@ -318,12 +333,11 @@ export default function ImportSheet({
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
+      allowsEditing: cropPicked.current,
       quality: 1,
     });
-    if (!result.canceled && result.assets[0]) {
-      await onPhotoPicked.current(result.assets[0].uri);
-    }
+    const asset = result.canceled ? undefined : result.assets[0];
+    if (asset) await onPhotoPicked.current(asset.uri, pickedSize(asset));
   };
 
   // Copy the localized prompt to the clipboard and share the picked photo to the
@@ -346,8 +360,12 @@ export default function ImportSheet({
     }
   };
 
-  const openPhotoMenu = (onPicked: (uri: string) => void | Promise<void>) => {
+  const openPhotoMenu = (
+    onPicked: PhotoPicked,
+    crop = false,
+  ) => {
     onPhotoPicked.current = onPicked;
+    cropPicked.current = crop;
     setPhotoMenuOpen(true);
   };
 
@@ -511,10 +529,13 @@ export default function ImportSheet({
         ) : (
           <View style={styles.body}>
             <Text style={styles.photoInstruction}>{t('import.photoInstruction')}</Text>
+            {canCropBeforeOcr ? (
+              <Text style={styles.photoInstruction}>{t('import.photoCropHint')}</Text>
+            ) : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Button
               label={t('import.photoPick')}
-              onPress={() => openPhotoMenu(runOcr)}
+              onPress={() => openPhotoMenu(runOcr, canCropBeforeOcr)}
             />
           </View>
         )}

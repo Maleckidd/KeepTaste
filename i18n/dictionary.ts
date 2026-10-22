@@ -278,6 +278,10 @@ export const dictionary = {
     en: 'Take a photo or pick a screenshot of a recipe.',
     pl: 'Zrób zdjęcie lub wybierz zrzut ekranu z przepisem.',
   },
+  'import.photoCropHint': {
+    en: 'Then crop it to just the recipe — leave out ads and app buttons.',
+    pl: 'Potem przytnij do samego przepisu — bez reklam i przycisków aplikacji.',
+  },
   'import.photoPick': { en: 'Choose photo', pl: 'Wybierz zdjęcie' },
   'import.photoRecognizing': {
     en: 'Recognizing text…',
