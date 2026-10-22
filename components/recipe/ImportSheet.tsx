@@ -479,15 +479,23 @@ export default function ImportSheet({
           </View>
         ) : mode === 'ai' ? (
           <View style={styles.body}>
-            <Text style={styles.photoInstruction}>{t('import.aiStep1')}</Text>
-            <Text style={styles.photoInstruction}>{t('import.aiStep2')}</Text>
-            <Text style={styles.photoInstruction}>{t('import.aiStep3')}</Text>
-            <Button
-              label={t('import.aiPickButton')}
-              onPress={() => openPhotoMenu(handleAiHandoff)}
-            />
-            {aiPromptCopied ? (
-              <Text style={styles.aiHint}>{t('import.aiPromptCopied')}</Text>
+            {/* While the keyboard is up the user is pasting the answer — the
+                steps and pick button would push the import button under the
+                keys (they don't fit in sheetChromeHeight), so hide them. A
+                single conditional slot keeps the Input mounted and focused. */}
+            {keyboardHeight === 0 ? (
+              <>
+                <Text style={styles.photoInstruction}>{t('import.aiStep1')}</Text>
+                <Text style={styles.photoInstruction}>{t('import.aiStep2')}</Text>
+                <Text style={styles.photoInstruction}>{t('import.aiStep3')}</Text>
+                <Button
+                  label={t('import.aiPickButton')}
+                  onPress={() => openPhotoMenu(handleAiHandoff)}
+                />
+                {aiPromptCopied ? (
+                  <Text style={styles.aiHint}>{t('import.aiPromptCopied')}</Text>
+                ) : null}
+              </>
             ) : null}
             <Input
               style={[styles.pasteInput, { maxHeight: pasteInputMaxHeight }]}
