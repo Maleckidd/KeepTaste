@@ -173,7 +173,7 @@ export default function CookbookScreen() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
   const [recipeMenu, setRecipeMenu] = useState<Recipe | null>(null);
-  const [peekHint, setPeekHint] = useState(false);
+  const [peekRecipeId, setPeekRecipeId] = useState<number | null>(null);
   // §5.19 filter chip: session-only, "All recipes" view only. Count is over the
   // whole library, independent of the query.
   const [toTryOnly, setToTryOnly] = useState(false);
@@ -213,22 +213,6 @@ export default function CookbookScreen() {
   );
 
   useEffect(() => subscribePendingDeletes(loadData), [loadData]);
-
-  // Swipe actions are otherwise invisible: on the very first visit that shows
-  // any recipes, briefly reveal the first row's actions, then never again.
-  useEffect(() => {
-    if (!isLoaded || recipes.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      if (await getSetting('swipeHintSeen')) return;
-      if (cancelled) return;
-      setPeekHint(true);
-      await setSetting('swipeHintSeen', '1');
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded, recipes.length]);
 
   // Confirmation first (deliberate speed bump for recipes and cookbooks),
   // then the delete still goes through the undo snackbar before committing.
@@ -316,6 +300,27 @@ export default function CookbookScreen() {
     return items;
   }, [recipes, toTryOnly]);
 
+  // Swipe actions are otherwise invisible: on the very first visit that shows
+  // any recipes, briefly reveal the first row's actions, then never again.
+  // The hint is pinned to that recipe's id and cleared once it has played —
+  // a plain "first row" flag would replay on every row that later mounts at
+  // index 0 (e.g. each newly saved recipe).
+  const firstRecipeId =
+    listItems[0]?.kind === 'recipe' ? listItems[0].recipe.id : null;
+  useEffect(() => {
+    if (!isLoaded || firstRecipeId === null) return;
+    let cancelled = false;
+    (async () => {
+      if (await getSetting('swipeHintSeen')) return;
+      if (cancelled) return;
+      setPeekRecipeId(firstRecipeId);
+      await setSetting('swipeHintSeen', '1');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, firstRecipeId]);
+
   return (
     <View style={styles.container}>
       <ScreenHeader title={headerTitle} back>
@@ -402,7 +407,7 @@ export default function CookbookScreen() {
           keyExtractor={(item) =>
             item.kind === 'header' ? TO_TRY_HEADER_KEY : String(item.recipe.id)
           }
-          renderItem={({ item, index }) => {
+          renderItem={({ item }) => {
             if (item.kind === 'header') {
               return (
                 <Text style={styles.sectionHeader} accessibilityRole="header">
@@ -417,7 +422,8 @@ export default function CookbookScreen() {
                   router.push({ pathname: '/recipe/edit', params: { id: recipe.id } })
                 }
                 onDelete={() => handleDeleteRecipe(recipe)}
-                peek={peekHint && index === 0}
+                peek={recipe.id === peekRecipeId}
+                onPeekEnd={() => setPeekRecipeId(null)}
               >
                 <RecipeCard
                   recipe={recipe}
