@@ -219,7 +219,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Displays a **grid of cookbook tiles, 2 per row**, each tile = one cookbook
 - Tiles have rotating background colors from the palette (`cookbookColors` in theme)
 - If a cookbook has a cover (`cover_image_path`), the photo covers the background color with a slight dark overlay for title readability
-- Header (left): "KeepTaste" eyebrow + "Cookbooks" title; header (right): a **"New cookbook" text button** (→ new cookbook modal, §5.2) and a **settings gear** (→ §5.7)
+- Header (left): the "KeepTaste" title; header (right): a **"New cookbook" text button** (→ new cookbook modal, §5.2) and a **settings gear** (→ §5.7)
 - **The floating "+" button (FAB) creates a recipe**, not a cookbook: it opens `/recipe/new` with no cookbook pre-selected; the cookbook is chosen in the form (§5.5). The FAB is shown whether or not any cookbook exists
 - A fixed "All recipes" row above the grid — the **only entry point** to the `/cookbook/all` view; entering through it focuses the search field (§5.3)
 - Long-press on a tile (with a light haptic) → bottom **ActionSheet**: **Edit / Delete / Cancel**
@@ -372,7 +372,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 - `new.tsx` — starts with an empty form, optionally accepts `cookbookId` as a URL param (pre-selects the Cookbook field)
 - `edit.tsx` — loads the recipe data from the database, fills the form, calls `updateRecipe` instead of `createRecipe` on save
 
-**Save confirmation (iteration 1, problem 6):** the modal closing silently left the user unsure the recipe was kept. After **creating** a recipe, a snackbar names where it went — *"Saved in „Cakes”"*, or *"Recipe saved"* with no cookbook — with a **"Show"** action that opens the new recipe (from the home screen the new recipe is otherwise out of sight). After an **edit that changed the cookbook**: *"Moved to „Cakes”"*. A plain edit needs no snackbar — it returns to the recipe view, which shows the result. Navigation-action snackbars last 8 s (§6). The snackbar must not mount in the same frame as a `LayoutAnimation` (§6).
+**Save confirmation (iteration 1, problem 6):** the modal closing silently left the user unsure the recipe was kept. After **creating** a recipe, a snackbar names where it went — *"Saved in „Cakes”"*, or *"Recipe saved"* with no cookbook — with a **"Show"** action that opens the new recipe (from the home screen the new recipe is otherwise out of sight). After an **edit that changed the cookbook**: *"Moved to „Cakes”"* — or *"Moved to „No cookbook”"* when the recipe was taken out of its cookbook. A plain edit needs no snackbar — it returns to the recipe view, which shows the result. Navigation-action snackbars last 8 s (§6). The snackbar must not mount in the same frame as a `LayoutAnimation` (§6).
 
 ---
 
@@ -966,6 +966,7 @@ Editing & deleting (June 2026 iteration):
 - **Shopping list rename is inline** — tap the title on the list screen (also reachable via `?rename=1` from the lists tab). The `shopping/edit` modal route was removed.
 - **Form validation is inline** (error text under the field) instead of Alerts; "Added to list" feedback is a snackbar with a "View list" action. `Alert` remains only for: discard-changes, permissions, import/export dialogs and delete-all.
 - **Snackbar durations:** 5 s by default and for Undo (tied to the deferred delete, `utils/pendingDelete.ts`); **8 s for snackbars whose action navigates** ("View list", "Show") — 5 s is too short for someone holding the phone in one hand in a shop (iteration 1, problem 12).
+- **A snackbar never covers the FAB** (Material pattern): while a snackbar is visible, a FAB that would overlap it slides up just above it and returns when the bar hides. The snackbar sits at a fixed height from the window bottom, so without this the home FAB (above the tab bar) covered the "Show" action and the cookbook-view FAB covered "Undo".
 
 Persona testing, iteration 1 (October 2026):
 - **No unlabeled action icons.** Screen-specific actions are text — a text button or a labeled item in the "⋯" menu — never an icon-only button. Icon-only buttons are kept only for glyphs everyone reads: back, close, settings gear, "⋯", the FAB "+", and the add/confirm buttons of the shopping-list add row. The share icons in the cookbook and recipe headers were removed for this (§5.3, §5.4), and the home "New cookbook" action is a text button (§5.1).
@@ -1022,7 +1023,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 ### Persona testing — iteration 1 fixes (October 2026)
 Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; acceptance = iteration 2 on the same personas (`run.sh --personas-file`). Ideas not taken now are parked in `UX_NOTES.md` ("Persona testing, iteration 1").
 - [x] **Swipe peek hint replays on every save** — fixed separately in PR #6 (pin the hint to one recipe id, `onPeekEnd`)
-- [ ] **A. First recipe** — FAB → new recipe, "New cookbook" text button in the home header (§5.1/§5.2); Cookbook picker in the form, which also moves recipes (§5.5); save snackbar with "Show" (§5.5); `updateRecipe` takes `cookbookId` (unit-tested)
+- [x] **A. First recipe** — FAB → new recipe, "New cookbook" text button in the home header (§5.1/§5.2); Cookbook picker in the form, which also moves recipes (§5.5); save snackbar with "Show" (§5.5); `updateRecipe` takes `cookbookId` (unit-tested)
 - [ ] **B. Search** — title + ingredient search with diacritic folding and stem matching, title matches first, "in ingredients" hint, "×" clear button, focus on entry, explicit no-results text (§5.3); pure helpers in `utils/search.ts` (unit-tested)
 - [ ] **C. Recipe form wording** — "e.g." placeholders, "One ingredient per line" hint (§5.5); EN+PL strings only
 - [ ] **D. Paste parser** — inline `Header: content` lines, servings from a parenthetical in the title (§5.15); `utils/recipeImport.ts` (unit-tested)

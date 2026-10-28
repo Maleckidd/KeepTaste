@@ -24,6 +24,7 @@ export const dictionary = {
   },
   'common.keepEditing': { en: 'Keep editing', pl: 'Kontynuuj edycję' },
   'common.discard': { en: 'Discard', pl: 'Odrzuć' },
+  'common.show': { en: 'Show', pl: 'Pokaż' },
   'common.gallery': { en: 'Gallery', pl: 'Galeria' },
   'common.camera': { en: 'Camera', pl: 'Aparat' },
   'common.removePhoto': { en: 'Remove photo', pl: 'Usuń zdjęcie' },
@@ -49,7 +50,6 @@ export const dictionary = {
   'a11y.back': { en: 'Go back', pl: 'Wstecz' },
   'a11y.close': { en: 'Close', pl: 'Zamknij' },
   'a11y.settings': { en: 'Settings', pl: 'Ustawienia' },
-  'a11y.addCookbook': { en: 'Add cookbook', pl: 'Dodaj książkę kucharską' },
   'a11y.addRecipe': { en: 'Add recipe', pl: 'Dodaj przepis' },
   'a11y.addList': { en: 'New shopping list', pl: 'Nowa lista zakupów' },
   'a11y.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
@@ -65,6 +65,10 @@ export const dictionary = {
   'a11y.recipePhoto': { en: 'Recipe photo', pl: 'Zdjęcie przepisu' },
   'a11y.changePhoto': { en: 'Add or change photo', pl: 'Dodaj lub zmień zdjęcie' },
   'a11y.import': { en: 'Import recipe', pl: 'Importuj przepis' },
+  'a11y.cookbookPicker': {
+    en: 'Cookbook: {name}',
+    pl: 'Książka kucharska: {name}',
+  },
 
   // --- Tabs ---
   'tabs.recipes': { en: 'Recipes', pl: 'Przepisy' },
@@ -95,6 +99,7 @@ export const dictionary = {
   // names the screen's function. App name stays untranslated.
   'home.title': { en: 'KeepTaste', pl: 'KeepTaste' },
   'home.allRecipes': { en: 'All recipes', pl: 'Wszystkie przepisy' },
+  'home.newCookbook': { en: 'New cookbook', pl: 'Nowa książka' },
   'home.emptyTitle': { en: 'No cookbooks', pl: 'Brak książek kucharskich' },
   'home.emptyText': {
     en: 'Create your first cookbook and start collecting recipes',
@@ -212,6 +217,8 @@ export const dictionary = {
     en: 'e.g. Strawberry tart...',
     pl: 'np. Tarta truskawkowa...',
   },
+  'recipeForm.cookbook': { en: 'Cookbook', pl: 'Książka kucharska' },
+  'recipeForm.noCookbook': { en: 'No cookbook', pl: 'Bez książki' },
   'recipeForm.prep': { en: 'Prep (min)', pl: 'Przygot. (min)' },
   'recipeForm.cook': { en: 'Cook (min)', pl: 'Gotow. (min)' },
   'recipeForm.servings': { en: 'Servings', pl: 'Porcje' },
@@ -246,6 +253,10 @@ export const dictionary = {
     en: 'Import from a link, text or photo',
     pl: 'Importuj z linku, tekstu lub zdjęcia',
   },
+  // Post-save snackbar (SPEC.md §5.5 "Save confirmation").
+  'recipeForm.savedIn': { en: 'Saved in "{name}"', pl: 'Zapisano w „{name}”' },
+  'recipeForm.saved': { en: 'Recipe saved', pl: 'Przepis zapisany' },
+  'recipeForm.movedTo': { en: 'Moved to "{name}"', pl: 'Przeniesiono do „{name}”' },
 
   // --- Single-recipe import sheet (components/recipe/ImportSheet.tsx) ---
   'import.title': { en: 'Import recipe', pl: 'Importuj przepis' },

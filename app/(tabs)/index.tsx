@@ -22,6 +22,7 @@ import {
   Radius,
   Shadow,
   Motion,
+  Touch,
 } from '@/constants/theme';
 import { useT, useLanguage } from '@/i18n/LanguageProvider';
 import { seedSampleContentIfNeeded } from '@/db/seed';
@@ -147,6 +148,11 @@ export default function HomeScreen() {
     router.push('/cookbook/new');
   };
 
+  // The FAB creates a recipe, not a cookbook (§5.1) — no cookbook pre-selected.
+  const handleAddRecipe = () => {
+    router.push('/recipe/new');
+  };
+
   const handleOpenAllRecipes = () => {
     router.push('/cookbook/all');
   };
@@ -198,13 +204,25 @@ export default function HomeScreen() {
         <Text style={styles.headerTitle} accessibilityRole="header">
           {t('home.title')}
         </Text>
-        <IconButton
-          icon="settings-outline"
-          accessibilityLabel={t('a11y.settings')}
-          color={c.primary}
-          raised
-          onPress={() => router.push('/settings')}
-        />
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={handleAddCookbook}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.newCookbookButton,
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={styles.newCookbookText}>{t('home.newCookbook')}</Text>
+          </Pressable>
+          <IconButton
+            icon="settings-outline"
+            accessibilityLabel={t('a11y.settings')}
+            color={c.primary}
+            raised
+            onPress={() => router.push('/settings')}
+          />
+        </View>
       </View>
 
       {/* "All recipes" tile */}
@@ -236,24 +254,27 @@ export default function HomeScreen() {
           />
         ) : null
       ) : (
-        <>
-          <FlatList
-            data={cookbooks}
-            renderItem={renderItem}
-            keyExtractor={(item) => String(item.id)}
-            numColumns={2}
-            contentContainerStyle={styles.grid}
-            columnWrapperStyle={styles.row}
-            showsVerticalScrollIndicator={false}
-          />
-          {/* Tab bar already sits below — no extra bottom inset needed */}
-          <Fab
-            accessibilityLabel={t('a11y.addCookbook')}
-            onPress={handleAddCookbook}
-            withBottomInset={false}
-          />
-        </>
+        <FlatList
+          data={cookbooks}
+          renderItem={renderItem}
+          keyExtractor={(item) => String(item.id)}
+          numColumns={2}
+          contentContainerStyle={styles.grid}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+        />
       )}
+
+      {/* Shown with or without cookbooks (§5.1) — only held back over the
+          pre-boot blank, like the empty state. Tab bar already sits below —
+          no extra bottom inset needed. */}
+      {booted || cookbooks.length > 0 ? (
+        <Fab
+          accessibilityLabel={t('a11y.addRecipe')}
+          onPress={handleAddRecipe}
+          withBottomInset={false}
+        />
+      ) : null}
 
       <ActionSheet
         visible={menuCookbook !== null}
@@ -294,6 +315,21 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.base,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  newCookbookButton: {
+    minHeight: Touch.min,
+    paddingHorizontal: Spacing.sm,
+    justifyContent: 'center',
+  },
+  newCookbookText: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
   },
   headerTitle: {
     fontSize: Typography.size.xxl,
