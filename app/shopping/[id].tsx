@@ -28,6 +28,8 @@ import {
   validateItemName,
   groupedNames,
   buildActiveRows,
+  classifyAddRowChange,
+  collapseLineBreaks,
 } from '@/utils/shoppingList';
 import {
   pendingDeleteKey,
@@ -89,6 +91,8 @@ export default function ShoppingListScreen() {
   const [menuItem, setMenuItem] = useState<ShoppingItem | null>(null);
   const [listMenuOpen, setListMenuOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
+  // Products parsed from a paste into the add row; the sheet opens on Review.
+  const [pasteProducts, setPasteProducts] = useState<string[] | null>(null);
   // Inline title rename (replaces the old "Rename list" modal).
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -194,15 +198,41 @@ export default function ShoppingListScreen() {
       await updateShoppingItem(editingItemId, normalized.name, normalized.quantity);
       closeRow();
     } else {
-      await createShoppingItem(listId, normalized.name, normalized.quantity);
+      // Clear the fields BEFORE the insert: typing that lands while the write
+      // is in flight must start the next product, not extend this one.
       setName('');
       setQuantity('');
       nameInputRef.current?.focus();
+      await createShoppingItem(listId, normalized.name, normalized.quantity);
     }
     // No animateLayout(): adding a 2nd copy of a name makes a group header
     // appear — a structural list change LayoutAnimation crashes on (see
     // handleToggle).
     loadData();
+  };
+
+  // The name field is single-line; a multi-line paste into it is detected
+  // here (§5.10): 2+ products open the paste sheet on Review, one product
+  // goes into the field, a typed line break is swallowed.
+  const handleNameChange = (next: string) => {
+    const change = classifyAddRowChange(name, next);
+    if (change.kind === 'paste') {
+      if (editingItemId === null) {
+        setName('');
+        setPasteProducts(change.products);
+        setPasteOpen(true);
+      } else {
+        // Editing one product: a pasted list can't become several items.
+        setName(collapseLineBreaks(next));
+      }
+      return;
+    }
+    setName(change.value);
+  };
+
+  const openPasteSheet = () => {
+    setPasteProducts(null);
+    setPasteOpen(true);
   };
 
   const openAdd = () => {
@@ -230,10 +260,11 @@ export default function ShoppingListScreen() {
 
   const { active, inCart } = partitionItems(items);
   // Cluster same-name products under a virtual header so multiples are managed
-  // together. A "group" is a name appearing >=2x across the whole list, so a
-  // lone remaining unchecked copy still shows its header. Purely presentational
-  // — items stay separate rows in the DB; nothing is merged. In-cart stays flat.
-  const grouped = groupedNames(items);
+  // together. A header appears only for a name with 2+ ACTIVE copies; in-cart
+  // copies don't count (§5.10), so a lone remaining copy is a plain row. Purely
+  // presentational — items stay separate rows in the DB; nothing is merged.
+  // In-cart stays flat.
+  const grouped = groupedNames(active);
   const activeRows = buildActiveRows(active, grouped);
 
   const rows: Row[] = [
@@ -425,46 +456,62 @@ export default function ShoppingListScreen() {
       {addOpen ? (
         <View
           style={[
-            styles.addRow,
+            styles.addPanel,
             { paddingBottom: Spacing.md + insets.bottom },
           ]}
         >
-          <Input
-            ref={nameInputRef}
-            style={styles.addNameInput}
-            placeholder={
-              editingItemId !== null
-                ? t('shoppingList.productNamePlaceholder')
-                : t('shoppingList.addProductPlaceholder')
-            }
-            value={name}
-            onChangeText={setName}
-            returnKeyType="done"
-            onSubmitEditing={handleConfirm}
-          />
-          <Input
-            style={styles.addQtyInput}
-            placeholder={t('shoppingList.qtyPlaceholder')}
-            value={quantity}
-            onChangeText={setQuantity}
-            returnKeyType="done"
-            onSubmitEditing={handleConfirm}
-          />
-          <IconButton
-            icon={editingItemId !== null ? 'checkmark' : 'add'}
-            size={24}
-            color={c.onPrimary}
-            accessibilityLabel={t('a11y.confirmProduct')}
-            onPress={handleConfirm}
-            style={styles.confirmButton}
-          />
-          <IconButton
-            icon="close"
-            size={22}
-            color={c.textSecondary}
-            accessibilityLabel={t('a11y.close')}
-            onPress={closeRow}
-          />
+          <View style={styles.addRow}>
+            <Input
+              ref={nameInputRef}
+              style={styles.addNameInput}
+              placeholder={
+                editingItemId !== null
+                  ? t('shoppingList.productNamePlaceholder')
+                  : t('shoppingList.addProductPlaceholder')
+              }
+              value={name}
+              onChangeText={handleNameChange}
+              returnKeyType="done"
+              onSubmitEditing={handleConfirm}
+            />
+            <Input
+              style={styles.addQtyInput}
+              placeholder={t('shoppingList.qtyPlaceholder')}
+              value={quantity}
+              onChangeText={setQuantity}
+              returnKeyType="done"
+              onSubmitEditing={handleConfirm}
+            />
+            <IconButton
+              icon={editingItemId !== null ? 'checkmark' : 'add'}
+              size={24}
+              color={c.onPrimary}
+              accessibilityLabel={t('a11y.confirmProduct')}
+              onPress={handleConfirm}
+              style={styles.confirmButton}
+            />
+            <IconButton
+              icon="close"
+              size={22}
+              color={c.textSecondary}
+              accessibilityLabel={t('a11y.close')}
+              onPress={closeRow}
+            />
+          </View>
+          {editingItemId === null ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.pasteLink,
+                pressed && styles.pasteLinkPressed,
+              ]}
+              onPress={openPasteSheet}
+              accessibilityRole="button"
+            >
+              <Text style={styles.pasteLinkText}>
+                {t('shoppingList.pasteWholeList')}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : items.length > 0 ? (
         // FAB — the primary "add product" action stays in the thumb zone.
@@ -509,10 +556,10 @@ export default function ShoppingListScreen() {
           {
             label: t('shoppingList.pasteProducts'),
             icon: 'clipboard-outline',
-            onPress: () => setPasteOpen(true),
+            onPress: openPasteSheet,
           },
           {
-            label: t('shopping.shareList'),
+            label: t('shopping.shareList', { count: active.length }),
             icon: 'share-outline',
             onPress: handleShareList,
           },
@@ -529,7 +576,11 @@ export default function ShoppingListScreen() {
       <PasteListSheet
         visible={pasteOpen}
         listId={listId}
-        onClose={() => setPasteOpen(false)}
+        initialProducts={pasteProducts}
+        onClose={() => {
+          setPasteOpen(false);
+          setPasteProducts(null);
+        }}
         onAdded={(count) => {
           // No animateLayout() here: it would catch the snackbar mounting in
           // the same frame (see handleDeleteItem).
@@ -641,15 +692,30 @@ const makeStyles = (c: ThemePalette) =>
       marginTop: Spacing.lg,
       marginBottom: Spacing.xs,
     },
-    addRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Spacing.sm,
+    addPanel: {
       paddingHorizontal: Spacing.base,
       paddingTop: Spacing.md,
       borderTopWidth: 1,
       borderTopColor: c.border,
       backgroundColor: c.surface,
+    },
+    addRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+    },
+    pasteLink: {
+      minHeight: Touch.min,
+      alignSelf: 'flex-start',
+      justifyContent: 'center',
+    },
+    pasteLinkPressed: {
+      opacity: 0.6,
+    },
+    pasteLinkText: {
+      fontSize: Typography.size.sm,
+      fontWeight: Typography.weight.semibold,
+      color: c.primary,
     },
     addNameInput: {
       flex: 1,

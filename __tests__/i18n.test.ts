@@ -38,6 +38,8 @@ describe('i18n/dictionary — completeness', () => {
     ['tabs.recipes', 'Recipes'],
     ['tabs.shopping', 'Shopping'],
     ['shopping.inCart', '{checked}/{total} in cart'],
+    ['shoppingList.pasteWholeList', 'Paste a whole list'],
+    ['shopping.shareList', "Send what's left ({count})"],
   ] as const)('contains pinned key %p with en %p', (key, en) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].en).toBe(en);
@@ -126,6 +128,27 @@ describe('utils/i18n — createTranslator', () => {
   it('interpolates params in the English locale', () => {
     expect(en('shopping.inCart', { checked: 3, total: 8 })).toBe(
       '3/8 in cart'
+    );
+  });
+
+  it('interpolates the share label count in English (shopping.shareList)', () => {
+    expect(en('shopping.shareList' as TranslationKey, { count: 3 })).toBe(
+      "Send what's left (3)"
+    );
+    expect(en('shopping.shareList' as TranslationKey, { count: 0 })).toBe(
+      "Send what's left (0)"
+    );
+  });
+
+  it('interpolates the share label count in Polish (shopping.shareList)', () => {
+    expect(pl('shopping.shareList' as TranslationKey, { count: 3 })).toBe(
+      'Wyślij brakujące (3)'
+    );
+  });
+
+  it('has the Polish label for shoppingList.pasteWholeList', () => {
+    expect(pl('shoppingList.pasteWholeList' as TranslationKey)).toBe(
+      'Wklej całą listę'
     );
   });
 

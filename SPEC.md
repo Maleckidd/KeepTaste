@@ -535,7 +535,7 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 - "Add product" reveals an inline row with two inputs: **product name** (required, trimmed) and **quantity** (optional, free-form text — "2", "1 kg", "3 packs"; stored as TEXT, no numeric parsing so units stay possible)
 - Confirming adds the product to the list and clears the inputs so the next product can be typed immediately; the row stays open until dismissed
 - The "Add product" affordance remains available on a non-empty list (e.g. as the header "+" or a persistent row)
-- **Pasting a whole list into the add row (iteration 1, problem 9):** a persona pasted a multi-line message into the one-line name field, another typed seven products one by one — neither found "Paste products" in the "⋯" menu. So: (1) a **"Paste a whole list"** text link sits right under the add row and opens the `PasteListSheet` (§5.16); (2) if the name field receives text containing a **line break** (a paste — the field keeps line breaks, and Enter still confirms), the field is cleared and the `PasteListSheet` opens **directly on its Review step** with that text parsed. A paste that parses to zero products stays in the field as typed text
+- **Pasting a whole list into the add row (iteration 1, problem 9):** a persona pasted a multi-line message into the one-line name field, another typed seven products one by one — neither found "Paste products" in the "⋯" menu. So: (1) a **"Paste a whole list"** text link sits right under the add row and opens the `PasteListSheet` (§5.16); (2) if the name field receives text containing a **line break** (a paste — the field keeps line breaks, and Enter still confirms), the field is cleared and the `PasteListSheet` opens **directly on its Review step** with that text parsed. A paste that parses to zero products stays in the field as typed text, and one that parses to a single product puts that product in the field (one line is not a list)
 
 **Duplicate grouping:** active items with the same name (trimmed, case-insensitive) render under one group header *"bananas (2)"* with the copies indented below it — **only when at least 2 copies are active**. A single active copy is a plain row even when another copy sits in "In cart" (iteration 1, problem 13: a header "bananas (1)" over one item read as a bug). Pure logic in `utils/shoppingList.ts` (`groupedNames` / `buildActiveRows`, unit-tested).
 
@@ -731,7 +731,10 @@ A fast way to fill an existing shopping list from text the user already has (a n
 
 **Scope:** paste targets the **currently open list only** — there is no list-picker and no "create a new list from a paste" path (unlike §5.12's recipe bridge, which must choose a destination). To start a fresh list the user creates it first (§5.10), then pastes into it.
 
-**Entry point:** a **"Paste products"** item (`clipboard-outline`) in the "⋯" header menu of the list detail view (§5.10), between "Rename" and "Delete list". It opens the `PasteListSheet`.
+**Entry points:**
+- a **"Paste products"** item (`clipboard-outline`) in the "⋯" header menu of the list detail view (§5.10), between "Rename" and "Delete list". It opens the `PasteListSheet` on its Paste step;
+- a **"Paste a whole list"** text link right under the add row (add mode only, not while editing a product). Same as the menu item;
+- **auto-detect** in the add row's name field (§5.10): a paste with line breaks that parses to 2+ products clears the field and opens the `PasteListSheet` **directly on its Review step** with those products (pure `classifyAddRowChange` in `utils/shoppingList.ts`, unit-tested).
 
 **`PasteListSheet` (`components/shopping/PasteListSheet.tsx`):** a bottom sheet modeled on `ImportSheet` (§5.15) — overlay (no native `<Modal>`), `translateY` animation, keyboard-height lift, hardware-back handling — with two steps:
 1. **Paste** — a multiline input (placeholder "Paste products, one per line") and a "Next" button (disabled while empty). On Next: `parseIngredients(text)`. Zero candidates → inline "No products found", stay on step 1.
@@ -1027,7 +1030,7 @@ Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; accep
 - [x] **B. Search** — title + ingredient search with diacritic folding and stem matching, title matches first, "in ingredients" hint, "×" clear button, focus on entry, explicit no-results text (§5.3); pure helpers in `utils/search.ts` (unit-tested)
 - [x] **C. Recipe form wording** — "e.g." placeholders, "One ingredient per line" hint (§5.5); EN+PL strings only
 - [x] **D. Paste parser** — inline `Header: content` lines, servings from a parenthetical in the title (§5.15); `utils/recipeImport.ts` (unit-tested)
-- [ ] **E. Shopping list** — multi-line paste in the add row → Review step, "Paste a whole list" link (§5.10/§5.16), "Send what's left (N)" (§5.18), group header only for ≥2 active copies (§5.10, unit-tested), 8 s navigation snackbars (§6)
+- [x] **E. Shopping list** — multi-line paste in the add row → Review step, "Paste a whole list" link (§5.10/§5.16), "Send what's left (N)" (§5.18), group header only for ≥2 active copies (§5.10, unit-tested), 8 s navigation snackbars (§6)
 - [ ] **F. Icons and PDF** — share icons out of the cookbook/recipe headers into "⋯" menus (§5.3/§5.4/§6); PDF named `{cookbook} {YYYY-MM-DD}.pdf` via pure `cookbookPdfFileName` (§5.14, unit-tested)
 
 ### Medium priority
