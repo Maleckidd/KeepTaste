@@ -1,6 +1,8 @@
 // Pure helpers for the Shopping lists feature (SPEC.md §5.10).
 // No native imports, no DB access.
 
+import { parseIngredients } from './ingredients';
+
 export interface ItemInput {
   name: string;
   quantity: string;
@@ -64,9 +66,9 @@ export function progressCounts(counts: {
 
 /**
  * Normalized names (trim + toLowerCase, plain — no diacritic folding) that occur
- * 2+ times across the ENTIRE items array (active + in-cart together). Ignores
- * `checked`; counts names over the whole list. Returns lowercased keys. A name
- * being in this set is what keeps a lone remaining unchecked copy under a header.
+ * 2+ times in the given items. Ignores `checked`; returns lowercased keys.
+ * Callers pass the ACTIVE items: in-cart copies don't count towards a group
+ * header (SPEC.md §5.10).
  */
 export function groupedNames<T extends { name: string }>(items: T[]): Set<string> {
   const counts = new Map<string, number>();
@@ -85,14 +87,15 @@ export type ActiveRow<T> =
   | { kind: 'item'; item: T; isRepeat: boolean };
 
 /**
- * Builds the ordered ACTIVE-section render rows. `grouped` is the whole-list
- * grouped-name set from groupedNames(). For a name in `grouped`, at the slot of
- * its first occurrence emits one groupHeader (name = first copy's original
- * casing, count = number of active copies, childIds = their ids in render order)
- * followed by its child item rows — ALL flagged isRepeat (every child is
- * indented under the header, not just the 2nd+). Names NOT in `grouped` emit a
- * single plain item row (isRepeat false). Order preserved at first occurrence;
- * relative order within a group preserved. Does not mutate input.
+ * Builds the ordered ACTIVE-section render rows. `grouped` is the grouped-name
+ * set from groupedNames() (callers pass the active items). For a name in
+ * `grouped` with 2+ ACTIVE copies, at the slot of its first occurrence emits one
+ * groupHeader (name = first copy's original casing, count = number of active
+ * copies, childIds = their ids in render order) followed by its child item rows
+ * — ALL flagged isRepeat (every child is indented under the header, not just
+ * the 2nd+). Any other name — including a lone active copy whose name is in
+ * `grouped` — emits plain item rows (isRepeat false). Order preserved at first
+ * occurrence; relative order within a group preserved. Does not mutate input.
  */
 export function buildActiveRows<T extends { id: number; name: string }>(
   active: T[],
@@ -112,7 +115,7 @@ export function buildActiveRows<T extends { id: number; name: string }>(
     if (seen.has(key)) continue;
     seen.add(key);
     const members = groups.get(key)!;
-    if (grouped.has(key)) {
+    if (grouped.has(key) && members.length >= 2) {
       rows.push({
         kind: 'groupHeader',
         name: members[0].name,
@@ -127,6 +130,48 @@ export function buildActiveRows<T extends { id: number; name: string }>(
     }
   }
   return rows;
+}
+
+/**
+ * Collapses every run of line breaks (\r\n, \r, \n) together with the
+ * spaces/tabs around it into a single space; a run at the start or end is
+ * removed. Text without a line break is returned unchanged.
+ */
+export function collapseLineBreaks(text: string): string {
+  if (!/[\r\n]/.test(text)) return text;
+  return text
+    .replace(/^[ \t]*(?:[\r\n][ \t]*)+/, '')
+    .replace(/(?:[ \t]*[\r\n])+[ \t]*$/, '')
+    .replace(/[ \t]*(?:[\r\n][ \t]*)+/g, ' ');
+}
+
+export type AddRowChange =
+  | { kind: 'text'; value: string }
+  | { kind: 'paste'; products: string[] };
+
+/**
+ * Classifies a change of the single-line add-row name field (SPEC.md §5.10):
+ * - no line break in `next` → plain typing, keep `next`;
+ * - exactly one typed line break (next is prev plus one break) → swallow it,
+ *   keep `prev`;
+ * - otherwise a paste: the WHOLE field value is parsed — 2+ products open the
+ *   Review sheet, a single product goes into the field (one line is not a
+ *   list), zero products stay as typed text with line breaks collapsed.
+ * Detection doesn't depend on growth: a paste over a selection that shortens
+ * the field still counts.
+ */
+export function classifyAddRowChange(prev: string, next: string): AddRowChange {
+  if (!/[\r\n]/.test(next)) return { kind: 'text', value: next };
+  if (
+    next.length === prev.length + 1 &&
+    next.replace(/[\r\n]/g, '') === prev
+  ) {
+    return { kind: 'text', value: prev };
+  }
+  const products = parseIngredients(next.replace(/\r\n?/g, '\n'));
+  if (products.length >= 2) return { kind: 'paste', products };
+  if (products.length === 1) return { kind: 'text', value: products[0] };
+  return { kind: 'text', value: collapseLineBreaks(next) };
 }
 
 /** Aggregates per-list totals and checked counts. Lists with no items are absent. */

@@ -42,6 +42,12 @@ const SnackbarContext = createContext<SnackbarContextValue | null>(null);
 
 const DEFAULT_DURATION = 5000;
 
+/**
+ * For snackbars whose action navigates ("Show", "View list") — 5 s is too
+ * short to reach the action one-handed (SPEC.md §6 "Snackbar durations").
+ */
+export const NAVIGATION_SNACKBAR_MS = 8000;
+
 export function SnackbarProvider({ children }: { children: React.ReactNode }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();

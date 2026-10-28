@@ -388,7 +388,10 @@ export const dictionary = {
   },
   'shopping.emptyAction': { en: 'Create a list', pl: 'Stwórz listę' },
   'shopping.rename': { en: 'Rename', pl: 'Zmień nazwę' },
-  'shopping.shareList': { en: 'Share list', pl: 'Udostępnij listę' },
+  'shopping.shareList': {
+    en: "Send what's left ({count})",
+    pl: 'Wyślij brakujące ({count})',
+  },
   'shopping.shareDialogTitle': {
     en: 'Shopping list',
     pl: 'Lista zakupów',
@@ -431,6 +434,10 @@ export const dictionary = {
   },
   'shoppingList.qtyPlaceholder': { en: 'Qty', pl: 'Ilość' },
   'shoppingList.pasteProducts': { en: 'Paste products', pl: 'Wklej produkty' },
+  'shoppingList.pasteWholeList': {
+    en: 'Paste a whole list',
+    pl: 'Wklej całą listę',
+  },
 
   // --- Paste products into a shopping list (components/shopping/PasteListSheet.tsx, §5.16) ---
   'pasteList.title': { en: 'Paste products', pl: 'Wklej produkty' },

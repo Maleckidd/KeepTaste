@@ -11,7 +11,10 @@ import {
   countItems,
   groupedNames,
   buildActiveRows,
+  collapseLineBreaks,
+  classifyAddRowChange,
 } from '../utils/shoppingList';
+import { parseIngredients } from '../utils/ingredients';
 
 describe('utils/shoppingList — normalizeItemInput', () => {
   it('trims the name', () => {
@@ -215,15 +218,67 @@ describe('utils/shoppingList — buildActiveRows', () => {
     ]);
   });
 
-  it('still emits a header for a lone active copy whose name is grouped (count 1)', () => {
+  // SPEC.md §5.10 reversed the old behaviour: a header needs 2+ ACTIVE copies.
+  // A lone active copy is a plain row even if its name is in `grouped`.
+  it('emits a plain row (no header) for a lone active copy whose name is grouped', () => {
     const rows = buildActiveRows<Item>(
       [{ id: 3, name: 'Milk' }],
       new Set(['milk'])
     );
     expect(summary(rows)).toEqual([
-      { kind: 'groupHeader', name: 'Milk', count: 1, childIds: [3] },
+      { kind: 'item', id: 3, name: 'Milk', isRepeat: false },
+    ]);
+  });
+
+  it('in-cart copies do not count: one active + one in cart is a plain row', () => {
+    const items = [
+      { id: 1, name: 'Milk', checked: 0 },
+      { id: 2, name: 'Milk', checked: 1 },
+    ];
+    const { active } = partitionItems(items);
+    const expected = [{ kind: 'item', id: 1, name: 'Milk', isRepeat: false }];
+    // Whatever grouped set the caller passes (whole list or active only),
+    // a single active copy never gets a header.
+    expect(summary(buildActiveRows(active, groupedNames(items)))).toEqual(
+      expected
+    );
+    expect(summary(buildActiveRows(active, groupedNames(active)))).toEqual(
+      expected
+    );
+  });
+
+  it('two active copies plus one in cart -> header counts only the active ones', () => {
+    const items = [
+      { id: 1, name: 'Milk', checked: 0 },
+      { id: 2, name: 'Milk', checked: 1 },
+      { id: 3, name: 'Milk', checked: 0 },
+    ];
+    const { active } = partitionItems(items);
+    const rows = buildActiveRows(active, groupedNames(active));
+    expect(summary(rows)).toEqual([
+      { kind: 'groupHeader', name: 'Milk', count: 2, childIds: [1, 3] },
+      { kind: 'item', id: 1, name: 'Milk', isRepeat: true },
       { kind: 'item', id: 3, name: 'Milk', isRepeat: true },
     ]);
+  });
+
+  it('mixed: lone active Milk (other copy in cart) stays plain, 2 active Eggs get the only header', () => {
+    const items = [
+      { id: 1, name: 'Milk', checked: 0 },
+      { id: 2, name: 'Eggs', checked: 0 },
+      { id: 3, name: 'Milk', checked: 1 },
+      { id: 4, name: 'Eggs', checked: 0 },
+    ];
+    const { active } = partitionItems(items);
+    // Whole-list grouped set contains both names; only Eggs has 2+ active.
+    const rows = buildActiveRows(active, groupedNames(items));
+    expect(summary(rows)).toEqual([
+      { kind: 'item', id: 1, name: 'Milk', isRepeat: false },
+      { kind: 'groupHeader', name: 'Eggs', count: 2, childIds: [2, 4] },
+      { kind: 'item', id: 2, name: 'Eggs', isRepeat: true },
+      { kind: 'item', id: 4, name: 'Eggs', isRepeat: true },
+    ]);
+    expect(rows.filter((r) => r.kind === 'groupHeader')).toHaveLength(1);
   });
 
   it('places the group at the first occurrence slot, leaving later uniques after', () => {
@@ -306,5 +361,88 @@ describe('utils/shoppingList — buildActiveRows', () => {
     const snapshot = active.map((i) => ({ id: i.id, name: i.name }));
     buildActiveRows(active, new Set(['milk']));
     expect(active.map((i) => ({ id: i.id, name: i.name }))).toEqual(snapshot);
+  });
+});
+
+describe('utils/shoppingList — collapseLineBreaks', () => {
+  it.each([
+    ['a\nb', 'a b'],
+    ['a  \r\n\n  b', 'a b'],
+    ['a\rb', 'a b'],
+    ['Milk\n', 'Milk'],
+    ['\n\nMilk', 'Milk'],
+    [' \n ', ''],
+    ['', ''],
+    // No line break -> unchanged (leading spaces kept).
+    ['  Milk', '  Milk'],
+    ['Milk 2l', 'Milk 2l'],
+  ])('%p -> %p', (input, expected) => {
+    expect(collapseLineBreaks(input)).toBe(expected);
+  });
+});
+
+describe('utils/shoppingList — classifyAddRowChange', () => {
+  describe('plain typing (no line break) -> text next', () => {
+    it.each([
+      ['Mil', 'Milk', 'Milk'],
+      ['Milk', '', ''],
+      ['', 'M', 'M'],
+    ])('(%p, %p) -> text %p', (prev, next, value) => {
+      expect(classifyAddRowChange(prev, next)).toEqual({ kind: 'text', value });
+    });
+  });
+
+  describe('a single typed line break is swallowed -> text prev', () => {
+    it.each([
+      ['Milk', 'Milk\n', 'Milk'],
+      ['Milk', 'Mi\nlk', 'Milk'],
+      ['Milk', '\nMilk', 'Milk'],
+    ])('(%p, %p) -> text %p', (prev, next, value) => {
+      expect(classifyAddRowChange(prev, next)).toEqual({ kind: 'text', value });
+    });
+  });
+
+  describe('a multi-product paste -> paste with parsed products', () => {
+    it.each([
+      ['', 'Milk\nBread\nEggs', ['Milk', 'Bread', 'Eggs']],
+      ['', 'Milk\r\nBread', ['Milk', 'Bread']],
+      ['', 'Milk\rBread', ['Milk', 'Bread']],
+      ['', 'Weekend\n\n- Milk\n- Apples (1kg)', ['Weekend', 'Milk', 'Apples (1kg)']],
+      ['', '1. Milk\n2. Eggs', ['Milk', 'Eggs']],
+      // Paste appended to existing text: the whole field value is parsed.
+      ['Mil', 'Milk\nBread', ['Milk', 'Bread']],
+      // Paste over a selection that SHORTENS the field still counts.
+      ['Bananas and apples', 'a\nb', ['a', 'b']],
+    ] as const)('(%p, %p) -> paste %p', (prev, next, products) => {
+      expect(classifyAddRowChange(prev, next)).toEqual({
+        kind: 'paste',
+        products: [...products],
+      });
+    });
+  });
+
+  describe('a paste parsing to exactly one product -> text with that product', () => {
+    it.each([
+      ['', 'Milk\n', 'Milk'],
+      ['', '  Milk  \n\n', 'Milk'],
+      ['', '- Milk\n', 'Milk'],
+    ])('(%p, %p) -> text %p', (prev, next, value) => {
+      expect(classifyAddRowChange(prev, next)).toEqual({ kind: 'text', value });
+    });
+  });
+
+  describe('a paste parsing to zero products -> text with line breaks collapsed', () => {
+    it("('', '\\n\\n') -> text ''", () => {
+      expect(classifyAddRowChange('', '\n\n')).toEqual({ kind: 'text', value: '' });
+    });
+
+    it("('', '# Fruit\\n') -> text '# Fruit' (heading-only parses to no products)", () => {
+      // Precondition pinned so a parser change surfaces here, not as a mystery.
+      expect(parseIngredients('# Fruit\n')).toEqual([]);
+      expect(classifyAddRowChange('', '# Fruit\n')).toEqual({
+        kind: 'text',
+        value: '# Fruit',
+      });
+    });
   });
 });
