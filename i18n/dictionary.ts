@@ -230,19 +230,28 @@ export const dictionary = {
   'recipeForm.prep': { en: 'Prep (min)', pl: 'Przygot. (min)' },
   'recipeForm.cook': { en: 'Cook (min)', pl: 'Gotow. (min)' },
   'recipeForm.servings': { en: 'Servings', pl: 'Porcje' },
+  // Example placeholders start with "e.g." so they never read as entered
+  // values (SPEC.md §5.5, persona iteration 1, problem 3).
+  'recipeForm.prepPlaceholder': { en: 'e.g. 15', pl: 'np. 15' },
+  'recipeForm.cookPlaceholder': { en: 'e.g. 45', pl: 'np. 45' },
+  'recipeForm.servingsPlaceholder': { en: 'e.g. 4', pl: 'np. 4' },
   'recipeForm.ingredients': { en: 'Ingredients', pl: 'Składniki' },
+  'recipeForm.ingredientsHint': {
+    en: 'One ingredient per line',
+    pl: 'Każdy składnik w osobnej linii',
+  },
   'recipeForm.formatHelpLink': {
     en: 'See formatting tips',
     pl: 'Zobacz wskazówki formatowania',
   },
   'recipeForm.ingredientsPlaceholder': {
-    en: '200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream',
-    pl: '200g mąki\n100g masła\n- 3 jajka\n\n#Krem\n300ml śmietanki kremówki',
+    en: 'e.g. 200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream',
+    pl: 'np. 200g mąki\n100g masła\n- 3 jajka\n\n#Krem\n300ml śmietanki kremówki',
   },
   'recipeForm.instructions': { en: 'Instructions', pl: 'Przygotowanie' },
   'recipeForm.instructionsPlaceholder': {
-    en: '# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.',
-    pl: '# Przygotuj ciasto\nWymieszaj mąkę z masłem...\n\n# Pieczenie\n**Piecz przez 45 minut** w 180°C.',
+    en: 'e.g.\n# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.',
+    pl: 'np.\n# Przygotuj ciasto\nWymieszaj mąkę z masłem...\n\n# Pieczenie\n**Piecz przez 45 minut** w 180°C.',
   },
   'recipeForm.toTryLabel': {
     en: 'Mark as "to try"',
@@ -254,8 +263,8 @@ export const dictionary = {
     pl: 'Twoje uwagi, poprawki, co zmienić następnym razem...',
   },
   'recipeForm.notesPlaceholder': {
-    en: 'Next time add more vanilla sugar...',
-    pl: 'Następnym razem dodać więcej cukru waniliowego...',
+    en: 'e.g. Next time add more vanilla sugar...',
+    pl: 'np. Następnym razem dodać więcej cukru waniliowego...',
   },
   'recipeForm.importAction': {
     en: 'Import from a link, text or photo',
