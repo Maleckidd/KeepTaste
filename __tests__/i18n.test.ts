@@ -38,10 +38,29 @@ describe('i18n/dictionary — completeness', () => {
     ['tabs.recipes', 'Recipes'],
     ['tabs.shopping', 'Shopping'],
     ['shopping.inCart', '{checked}/{total} in cart'],
+    ['cookbook.menuSharePdf', 'Share as PDF'],
+    ['recipe.menuShare', 'Share'],
   ] as const)('contains pinned key %p with en %p', (key, en) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].en).toBe(en);
   });
+
+  // Package F: share actions moved into the "⋯" menus (SPEC.md §5.3/§5.4).
+  it.each([
+    ['cookbook.menuSharePdf', 'Udostępnij jako PDF'],
+    ['recipe.menuShare', 'Udostępnij'],
+  ] as const)('contains pinned key %p with pl %p', (key, pl) => {
+    expect(dictionary[key as TranslationKey]).toBeDefined();
+    expect(dictionary[key as TranslationKey].pl).toBe(pl);
+  });
+
+  // The header share icon buttons are gone, so their a11y labels are dead keys.
+  it.each(['a11y.shareRecipe', 'a11y.shareCookbook'])(
+    'no longer contains dead key %p',
+    (key) => {
+      expect(Object.prototype.hasOwnProperty.call(dictionary, key)).toBe(false);
+    },
+  );
 });
 
 describe('utils/i18n — parsePreference', () => {

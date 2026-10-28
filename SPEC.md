@@ -112,7 +112,8 @@ utils/
   backupStatus.ts        ← module-level pub/sub for the "backup running" banner (useBackupRunning)
   recipeShareText.ts     ← pure localized recipe → plain-text builder (§5.13)
   cookbookPdfHtml.ts     ← pure localized cookbook → HTML builder (§5.14)
-  cookbookPdf.ts         ← native: HTML → PDF via expo-print, share (§5.14)
+  cookbookPdfFileName.ts ← pure readable PDF file name `{name} {YYYY-MM-DD}.pdf` (§5.14)
+  cookbookPdf.ts         ← native: HTML → PDF via expo-print, rename, share (§5.14)
   imageStorage.ts        ← persisting picked images into documentDirectory + cleanup
   imageDownscale.ts      ← caps newly picked photos (1280px / JPEG 0.7) to bound storage + backup size
   seedData.ts            ← pure: localized sample cookbook + showcase recipe builder (§5.20)
@@ -320,7 +321,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 
 **Navigation:**
 - Back button (arrow-back)
-- **Text zoom (A− / A+)** — two header buttons (left of Share) scale the recipe **content** read while cooking: ingredients, instructions, step numbers, in-content `#` headings and the Notes box. Title and metadata are unaffected. The scale runs 1×–1.8× in 0.2 steps; each button disables at its bound. The zoom is **ephemeral by design** — it lives in component state (no persistence, no `app_settings` key), so leaving the recipe resets it to 1× on the next open. Ionicons has no clean "A+/A−" glyph, so these are text buttons, not `IconButton`. This is a polish of the existing reading view, **not** the step-by-step cooking mode that stays out of scope (§7).
+- **Text zoom (A− / A+)** — two header buttons (left of the "⋯" menu) scale the recipe **content** read while cooking: ingredients, instructions, step numbers, in-content `#` headings and the Notes box. Title and metadata are unaffected. The scale runs 1×–1.8× in 0.2 steps; each button disables at its bound. The zoom is **ephemeral by design** — it lives in component state (no persistence, no `app_settings` key), so leaving the recipe resets it to 1× on the next open. Ionicons has no clean "A+/A−" glyph, so these are text buttons, not `IconButton`. This is a polish of the existing reading view, **not** the step-by-step cooking mode that stays out of scope (§7).
 - "⋯" menu (ActionSheet, same pattern as the cookbook and shopping-list headers):
   - **Share** → shares the recipe as plain text (§5.13). No separate share icon in the header (§6, "No unlabeled action icons")
   - **Edit** → opens `/recipe/edit?id=X`
@@ -378,7 +379,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 
 ### 5.6 Full-app backup to Markdown
 
-**Trigger:** an "Export all data" button in the Settings screen (§5.7), in the "Your data" section → the whole library is written to a single `.md` file and shared via the system share sheet (`Sharing.shareAsync()`, `text/markdown`). This replaces the former per-cookbook Markdown export; cookbook headers now share a **PDF** instead (§5.14).
+**Trigger:** an "Export all data" button in the Settings screen (§5.7), in the "Your data" section → the whole library is written to a single `.md` file and shared via the system share sheet (`Sharing.shareAsync()`, `text/markdown`). This replaces the former per-cookbook Markdown export; the cookbook header "⋯" menu now shares a **PDF** instead (§5.14).
 
 > **Scope note:** the `.md` backup is the human-readable escape hatch (§1), but **not a complete copy** — it omits photos, shopping lists, timestamps, and the language preference. The complete, restore-fidelity backup (and online-backup options) is the `.zip` archive in **§5.17**, which embeds this same `.md` as its readable layer.
 
@@ -635,9 +636,9 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 
 **Trigger:** **"Share as PDF"** in the `/cookbook/[id]` header "⋯" menu (§5.3; unavailable in "All recipes", same as before).
 
-**File name (iteration 1, problem 11):** `expo-print` writes a random UUID name (`09a12d42-….pdf`), which is what the recipient saw — wrong for a gift. Before sharing, the file is moved (`moveAsync` from `expo-file-system/legacy`) inside `cacheDirectory` to **`{cookbook name} {YYYY-MM-DD}.pdf`** — e.g. `Christmas 2026-10-26.pdf` — the date telling apart editions sent at different times. The name comes from a pure `cookbookPdfFileName(name, date)` (unit-tested): characters invalid in file names (`/ \ : * ? " < > |` and control characters) removed, whitespace collapsed, trimmed, cut to 60 characters, falling back to the localized word "Cookbook" when nothing is left; diacritics are kept.
+**File name (iteration 1, problem 11):** `expo-print` writes a random UUID name (`09a12d42-….pdf`), which is what the recipient saw — wrong for a gift. Before sharing, the file is moved (`moveAsync` from `expo-file-system/legacy`) inside `cacheDirectory` to **`{cookbook name} {YYYY-MM-DD}.pdf`** — e.g. `Christmas 2026-10-26.pdf` — the date telling apart editions sent at different times. The name comes from a pure `cookbookPdfFileName(name, date, fallback)` (`utils/cookbookPdfFileName.ts`, unit-tested): characters invalid in file names (`/ \ : * ? " < > |` and control characters) removed, whitespace collapsed, trimmed, cut to 60 characters, falling back to `fallback` — the localized word "Cookbook" passed by the caller (`t('stack.cookbook')`) — when nothing is left; diacritics are kept. The local calendar date is used. If the move fails, the original UUID file is shared rather than nothing.
 
-**Behavior:** the pure `buildCookbookHtml(cookbook, recipes, t)` (`utils/cookbookPdfHtml.ts`) renders a full HTML document; `utils/cookbookPdf.ts` (`shareCookbookPdf`) turns it into a PDF via `expo-print` `printToFileAsync({ html })` and shares it via `Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle })`. On failure surfaces `Alert('Export failed', …)`.
+**Behavior:** the pure `buildCookbookHtml(cookbook, recipes, t)` (`utils/cookbookPdfHtml.ts`) renders a full HTML document; `utils/cookbookPdf.ts` (`shareCookbookPdf`) turns it into a PDF via `expo-print` `printToFileAsync({ html })`, renames it (above) and shares the renamed file via `Sharing.shareAsync(target, { mimeType: 'application/pdf', dialogTitle })`. On failure surfaces `Alert('Export failed', …)`.
 
 **Content/styling:** cookbook name as the document title, then each recipe (title, optional metadata, then Ingredients / Instructions / Notes). All labels are **localized** (current UI language). User content is **HTML-escaped** (`&`, `<`, `>`) and newlines become `<br>`; missing metadata/sections are omitted (no `—`). Print styling uses values consistent with `constants/theme.ts` (light palette).
 
@@ -1027,7 +1028,7 @@ Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; accep
 - [ ] **C. Recipe form wording** — "e.g." placeholders, "One ingredient per line" hint (§5.5); EN+PL strings only
 - [ ] **D. Paste parser** — inline `Header: content` lines, servings from a parenthetical in the title (§5.15); `utils/recipeImport.ts` (unit-tested)
 - [ ] **E. Shopping list** — multi-line paste in the add row → Review step, "Paste a whole list" link (§5.10/§5.16), "Send what's left (N)" (§5.18), group header only for ≥2 active copies (§5.10, unit-tested), 8 s navigation snackbars (§6)
-- [ ] **F. Icons and PDF** — share icons out of the cookbook/recipe headers into "⋯" menus (§5.3/§5.4/§6); PDF named `{cookbook} {YYYY-MM-DD}.pdf` via pure `cookbookPdfFileName` (§5.14, unit-tested)
+- [x] **F. Icons and PDF** — share icons out of the cookbook/recipe headers into "⋯" menus (§5.3/§5.4/§6); PDF named `{cookbook} {YYYY-MM-DD}.pdf` via pure `cookbookPdfFileName` (§5.14, unit-tested)
 
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)
