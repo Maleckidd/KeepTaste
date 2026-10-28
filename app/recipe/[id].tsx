@@ -234,11 +234,6 @@ export default function RecipeScreen() {
             styles={styles}
           />
           <IconButton
-            icon="share-outline"
-            accessibilityLabel={t('a11y.shareRecipe')}
-            onPress={handleShare}
-          />
-          <IconButton
             icon="ellipsis-horizontal"
             accessibilityLabel={t('a11y.moreActions')}
             onPress={() => setMenuOpen(true)}
@@ -252,6 +247,11 @@ export default function RecipeScreen() {
         title={recipe.title}
         onClose={() => setMenuOpen(false)}
         actions={[
+          {
+            label: t('recipe.menuShare'),
+            icon: 'share-outline',
+            onPress: handleShare,
+          },
           {
             label: t('common.edit'),
             icon: 'create-outline',

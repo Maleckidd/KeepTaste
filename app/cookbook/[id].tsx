@@ -347,18 +347,11 @@ export default function CookbookScreen() {
     <View style={styles.container}>
       <ScreenHeader title={headerTitle} back>
         {!isAll && cookbook ? (
-          <>
-            <IconButton
-              icon="share-outline"
-              accessibilityLabel={t('a11y.shareCookbook')}
-              onPress={handleExport}
-            />
-            <IconButton
-              icon="ellipsis-horizontal"
-              accessibilityLabel={t('a11y.moreActions')}
-              onPress={() => setCookbookMenuOpen(true)}
-            />
-          </>
+          <IconButton
+            icon="ellipsis-horizontal"
+            accessibilityLabel={t('a11y.moreActions')}
+            onPress={() => setCookbookMenuOpen(true)}
+          />
         ) : null}
       </ScreenHeader>
 
@@ -488,6 +481,11 @@ export default function CookbookScreen() {
         title={cookbook?.name}
         onClose={() => setCookbookMenuOpen(false)}
         actions={[
+          {
+            label: t('cookbook.menuSharePdf'),
+            icon: 'share-outline',
+            onPress: handleExport,
+          },
           {
             label: t('common.edit'),
             icon: 'create-outline',

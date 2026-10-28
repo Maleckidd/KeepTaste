@@ -53,10 +53,8 @@ export const dictionary = {
   'a11y.addRecipe': { en: 'Add recipe', pl: 'Dodaj przepis' },
   'a11y.addList': { en: 'New shopping list', pl: 'Nowa lista zakupów' },
   'a11y.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
-  'a11y.shareRecipe': { en: 'Share recipe', pl: 'Udostępnij przepis' },
   'a11y.increaseFont': { en: 'Increase text size', pl: 'Zwiększ rozmiar tekstu' },
   'a11y.decreaseFont': { en: 'Decrease text size', pl: 'Zmniejsz rozmiar tekstu' },
-  'a11y.shareCookbook': { en: 'Share cookbook', pl: 'Udostępnij książkę' },
   'a11y.clearSearch': { en: 'Clear search', pl: 'Wyczyść wyszukiwanie' },
   'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
   'a11y.checkAllInGroup': {
@@ -138,6 +136,7 @@ export const dictionary = {
     en: 'Share cookbook (PDF)',
     pl: 'Udostępnij książkę (PDF)',
   },
+  'cookbook.menuSharePdf': { en: 'Share as PDF', pl: 'Udostępnij jako PDF' },
   'cookbook.minutes': { en: '{count} min', pl: '{count} min' },
   'cookbook.servings.one': { en: '{count} serving', pl: '{count} porcja' },
   'cookbook.servings.few': { en: '{count} servings', pl: '{count} porcje' },
@@ -168,6 +167,7 @@ export const dictionary = {
     en: 'Share recipe',
     pl: 'Udostępnij przepis',
   },
+  'recipe.menuShare': { en: 'Share', pl: 'Udostępnij' },
 
   // To-try status (§5.19) — shared badge/section label, view action + snackbar.
   'toTry.badge': { en: 'To try', pl: 'Do wypróbowania' },
