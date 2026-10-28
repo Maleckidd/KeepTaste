@@ -13,6 +13,13 @@ describe('db/recipes — tag helpers removed', () => {
     expect((recipesModule as Record<string, unknown>)[name]).toBeUndefined();
   });
 
+  // Search moved to pure utils/search.ts matchRecipes (SPEC.md §5.3).
+  it('does not export searchRecipes', () => {
+    expect(
+      (recipesModule as Record<string, unknown>).searchRecipes
+    ).toBeUndefined();
+  });
+
   it('still exports core recipe helpers', () => {
     expect(typeof recipesModule.getAllRecipes).toBe('function');
     expect(typeof recipesModule.createRecipe).toBe('function');

@@ -1023,7 +1023,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; acceptance = iteration 2 on the same personas (`run.sh --personas-file`). Ideas not taken now are parked in `UX_NOTES.md` ("Persona testing, iteration 1").
 - [x] **Swipe peek hint replays on every save** — fixed separately in PR #6 (pin the hint to one recipe id, `onPeekEnd`)
 - [ ] **A. First recipe** — FAB → new recipe, "New cookbook" text button in the home header (§5.1/§5.2); Cookbook picker in the form, which also moves recipes (§5.5); save snackbar with "Show" (§5.5); `updateRecipe` takes `cookbookId` (unit-tested)
-- [ ] **B. Search** — title + ingredient search with diacritic folding and stem matching, title matches first, "in ingredients" hint, "×" clear button, focus on entry, explicit no-results text (§5.3); pure helpers in `utils/search.ts` (unit-tested)
+- [x] **B. Search** — title + ingredient search with diacritic folding and stem matching, title matches first, "in ingredients" hint, "×" clear button, focus on entry, explicit no-results text (§5.3); pure helpers in `utils/search.ts` (unit-tested)
 - [ ] **C. Recipe form wording** — "e.g." placeholders, "One ingredient per line" hint (§5.5); EN+PL strings only
 - [ ] **D. Paste parser** — inline `Header: content` lines, servings from a parenthetical in the title (§5.15); `utils/recipeImport.ts` (unit-tested)
 - [ ] **E. Shopping list** — multi-line paste in the add row → Review step, "Paste a whole list" link (§5.10/§5.16), "Send what's left (N)" (§5.18), group header only for ≥2 active copies (§5.10, unit-tested), 8 s navigation snackbars (§6)

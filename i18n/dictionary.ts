@@ -57,6 +57,7 @@ export const dictionary = {
   'a11y.increaseFont': { en: 'Increase text size', pl: 'Zwiększ rozmiar tekstu' },
   'a11y.decreaseFont': { en: 'Decrease text size', pl: 'Zmniejsz rozmiar tekstu' },
   'a11y.shareCookbook': { en: 'Share cookbook', pl: 'Udostępnij książkę' },
+  'a11y.clearSearch': { en: 'Clear search', pl: 'Wyczyść wyszukiwanie' },
   'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
   'a11y.checkAllInGroup': {
     en: 'Add all {count} {name} to cart',
@@ -107,10 +108,17 @@ export const dictionary = {
 
   // --- Cookbook / recipes grid (app/cookbook/[id].tsx) ---
   'cookbook.searchPlaceholder': {
-    en: 'Search recipes...',
-    pl: 'Szukaj przepisów...',
+    en: 'Search by name or ingredient',
+    pl: 'Szukaj po nazwie lub składniku',
   },
-  'cookbook.noResults': { en: 'No results', pl: 'Brak wyników' },
+  'cookbook.noResults': {
+    en: 'Nothing found in names or ingredients',
+    pl: 'Nic nie znaleziono w nazwach ani składnikach',
+  },
+  'cookbook.inIngredients': {
+    en: 'in ingredients: {line}',
+    pl: 'w składnikach: {line}',
+  },
   'cookbook.emptyRecipes': {
     en: 'No recipes here yet — add your first one.',
     pl: 'Nie ma tu jeszcze przepisów — dodaj pierwszy.',

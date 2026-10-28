@@ -60,7 +60,7 @@ Feature work uses four project agents in `.claude/agents/`, in order:
 - Tags are removed from the MVP entirely (SPEC.md §7/§8) — strip leftover tag code when touched, don't add tag features.
 - Dates are stored as ISO 8601 TEXT, not timestamps.
 - The only required form field is the recipe title; numeric fields save an integer ≥ 1 or `null` — never `NaN` (SPEC.md §5.5).
-- Title search must handle non-ASCII characters (e.g. Polish diacritics in recipe titles): filter via `toLowerCase()` in JS, not SQL `LIKE` (SPEC.md §5.1).
+- Title + ingredient search (`utils/search.ts`: diacritic folding + stem matching) filters in JS, never SQL `LIKE` (SPEC.md §5.3).
 - `updated_at` changes only on edit-save; recipes sort descending by `updated_at` everywhere.
 - Export vs share (SPEC.md §5.6/§5.13/§5.14): the `.md` backup (Settings) covers the whole app, stays English-only, and must round-trip through import; shares (cookbook → PDF, recipe → text via RN `Share.share`) are localized to the UI language and not importable. PDF share is unavailable in the "all" view.
 - Missing metadata (times, servings) is hidden in the UI and omitted in export/share — no "—" placeholders.
