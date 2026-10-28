@@ -243,11 +243,82 @@ function classifyPasteHeader(line: string): PasteHeader | null {
   if (lower.startsWith('przepis') && / na$/.test(lower)) return { kind: 'instructions-title' };
   const main = PASTE_INGREDIENT_MAIN.exec(lower);
   if (main) return { kind: 'ingredients-main', servings: main[1] ? parsePositiveInt(main[1]) : null };
-  const grp = /^sk[łlt]adniki na (.+)$/.exec(lower);
+  // No colon in the label: "Składniki na ciasto: 200 g mąki" is an inline
+  // header (splitInlineHeader), not a group named "ciasto: 200 g mąki".
+  const grp = /^sk[łlt]adniki na ([^:]+)$/.exec(lower);
   if (grp) return { kind: 'ingredients-group', label: grp[1] };
   if (PASTE_STEP_HEADERS.has(lower)) return { kind: 'instructions' };
   if (PASTE_NOTES_HEADERS.has(lower)) return { kind: 'notes' };
   return null;
+}
+
+/**
+ * An inline header: one of the parser's own header words, then a colon and
+ * content on the same line ("Method: Soften the onion…", "Składniki: 1 l
+ * wody"). The whole part before the FIRST colon must be a header (exact,
+ * case-insensitive — "Sól: do smaku", "Uwaga: gorące!", "Follow the method: …"
+ * don't trigger) and the remainder must be non-empty (a bare "Method:" is a
+ * plain header line). "Przepis … na:" is excluded: its next line is the title.
+ */
+function splitInlineHeader(line: string): { header: PasteHeader; rest: string } | null {
+  const colon = line.indexOf(':');
+  if (colon <= 0) return null;
+  const head = line.slice(0, colon).trim();
+  const rest = line.slice(colon + 1).trim();
+  if (!head || !rest) return null;
+  const header = classifyPasteHeader(head);
+  if (!header || header.kind === 'instructions-title') return null;
+  return { header, rest };
+}
+
+// A number with an optional range ("4-6", "4–6", "4 to 6", "4 do 6") — the
+// range takes its first number, like servings labels and JSON-LD recipeYield.
+const YIELD_N = '(\\d+)(?:\\s*(?:-|–|—|to|do)\\s*\\d+)?';
+// Whole-bracket yield forms (matched on the lowercased bracket content).
+// Deliberately narrow: "(for 2 hours)", "(na 2 dni)", "(4)" don't match.
+const TITLE_YIELD_PATTERNS = [
+  `(?:serves|servings?|for|yields?)\\s*:?\\s*${YIELD_N}(?:\\s+(?:people|persons|portions?|servings?))?`,
+  `makes\\s*:?\\s*${YIELD_N}(?:\\s+\\p{L}+){0,2}`,
+  `${YIELD_N}\\s*(?:servings?|portions?|people|persons)`,
+  `dla\\s+${YIELD_N}(?:\\s+os\\p{L}*\\.?)?`,
+  `(?:na\\s+)?${YIELD_N}\\s+porcj\\p{L}*`,
+  `porcj\\p{L}*\\s*:?\\s*${YIELD_N}`,
+  `${YIELD_N}\\s+os\\p{L}*\\.?`,
+  `${YIELD_N}\\s+sztuk\\p{L}*`,
+].map((p) => new RegExp(`^(?:${p})$`, 'u'));
+
+/**
+ * Servings from a parenthetical yield in a recipe title ("Shakshuka (serves
+ * 2)", "Pierogi (dla 4 osób)", "Zupa (4–6 porcji)"). The first bracket whose
+ * whole content is a yield with a number ≥ 1 is removed (spaces collapsed,
+ * trailing dash/colon/comma stripped); other brackets are kept. No yield
+ * bracket → title unchanged, servings null. Paste path only (SPEC §5.15).
+ */
+export function extractTitleServings(title: string): { title: string; servings: number | null } {
+  const groupRe = /\(([^()]*)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = groupRe.exec(title)) !== null) {
+    const content = m[1].trim().toLowerCase();
+    for (const re of TITLE_YIELD_PATTERNS) {
+      const ym = re.exec(content);
+      if (!ym) continue;
+      const servings = parsePositiveInt(ym[1]);
+      if (servings === null) break;
+      const before = title.slice(0, m.index);
+      const after = title.slice(m.index + m[0].length);
+      // "Shakshuka (serves 2)!" → "Shakshuka!" — no space (or dangling dash)
+      // left in front of punctuation that followed the bracket.
+      const joined = /^\s*[!?.,;:]/.test(after)
+        ? before.replace(/[\s–\-—:,]+$/, '') + after.trimStart()
+        : `${before} ${after}`;
+      const cleaned = joined
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[\s–\-—:,]+$/, '');
+      return { title: cleaned, servings };
+    }
+  }
+  return { title, servings: null };
 }
 
 const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -281,6 +352,11 @@ function tryMergeQuantity(parts: string[], line: string): boolean {
  * conservative: when a line can't be confidently classified it is kept (not
  * dropped), and with no recognized structure the body falls back to
  * instructions. Author tips (Wskazówki / Rady-porady) route to notes.
+ * A header with content after its colon ("Method: Soften the onion…") is an
+ * inline header: it switches the section and the remainder becomes the
+ * section's first line. A parenthetical yield in the final title ("Shakshuka
+ * (serves 2)") sets servings unless a label already did, and is removed from
+ * the title (extractTitleServings).
  */
 export function parsePastedRecipe(text: string): ParsedPastedRecipe {
   const lines = text.split(/\r?\n/);
@@ -295,7 +371,14 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     if (
       prepTime === null &&
       (/czas\s+(przygotowania|szykowania)/.test(lower) ||
-        /^\s*(prep|preparation)(\s*time)?\s*[:\-–]?\s*\d/.test(lower))
+        // `(?!…)` — a step marker followed by text ("Preparation: 1. Mix") is
+        // an inline header, not prep = 1. "Prep: 5." still reads as a time, and
+        // "Prep: 1.5 h" is still recognized as a label (the decimal itself is
+        // not parsed — extractMinutes handles integers only).
+        /^\s*(prep|preparation)(\s*time)?\s*[:\-–]?\s*\d(?!\d*[.)]\s+\S)/.test(lower) ||
+        // PL "Przygotowanie: 15 min" only when the whole line is a duration;
+        // "Przygotowanie: Gotuj 15 min." is an inline method header.
+        /^\s*przygotowanie\s*[:\-–]\s*(\d+\s*(godz\p{L}*|h|min\p{L}*)\.?\s*)+$/u.test(lower))
     ) {
       prepTime = extractMinutes(lines[i]); consumed[i] = true; continue;
     }
@@ -305,7 +388,7 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       // and prefixed forms ("wypieczenia"); "gotowania" stays exact so
       // "przygotowania" can never read as a cook time.
       (/czas\s+(gotowania|\S*pieczenia|\S*a[żz]enia|duszenia)/.test(lower) ||
-        /^\s*(cook|cooking|bake|baking|total)(\s*time)?\s*[:\-–]?\s*\d/.test(lower))
+        /^\s*(cook|cooking|bake|baking|total)(\s*time)?\s*[:\-–]?\s*\d(?!\d*[.)]\s+\S)/.test(lower))
     ) {
       cookTime = extractMinutes(lines[i]); consumed[i] = true; continue;
     }
@@ -345,7 +428,7 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       new RegExp(`^[${FRACTION}]`).test(t) ||
       isPureQuantity(t) ||
       /czas\s+\w+|liczba\s+porcji|^porcje\b|kcal/i.test(t);
-    if (classifyPasteHeader(t) === null && !looksData) {
+    if (classifyPasteHeader(t) === null && splitInlineHeader(t) === null && !looksData) {
       title = t;
       consumed[firstIdx] = true;
     }
@@ -372,7 +455,14 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     // A line repeating the title (a duplicated page heading) is chrome — drop it.
     if (title && line.toLowerCase() === title.toLowerCase()) continue;
 
-    const header = classifyPasteHeader(line);
+    let header = classifyPasteHeader(line);
+    // Inline header ("Method: Soften…"): the remainder is the section's first
+    // line, pushed as-is (no quantity merge, no >80-char prose rule).
+    let inlineRest: string | null = null;
+    if (!header) {
+      const inline = splitInlineHeader(line);
+      if (inline) { header = inline.header; inlineRest = inline.rest; }
+    }
     if (header) {
       if (header.kind === 'ingredients-main' || header.kind === 'ingredients-group') {
         if (firstBoundary === null) { firstBoundary = 'ingredients'; preamble.length = 0; }
@@ -381,7 +471,7 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
           ingredientParts.push(`# ${capitalize(header.label)}`);
         } else if (header.servings != null) {
           if (servings === null) servings = header.servings;
-        } else {
+        } else if (inlineRest === null) {
           // Peek for a standalone yield line right after "Składniki" (e.g. "2 sztuki").
           const y = nextContent(i + 1);
           if (servings === null && y >= 0) {
@@ -389,6 +479,7 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
             if (ym) { servings = parsePositiveInt(ym[1]); consumed[y] = true; }
           }
         }
+        if (inlineRest !== null) ingredientParts.push(inlineRest);
         continue;
       }
       if (header.kind === 'instructions' || header.kind === 'instructions-title') {
@@ -405,10 +496,15 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
           const ti = nextContent(i + 1);
           if (ti >= 0) { title = lines[ti].trim(); consumed[ti] = true; }
         }
+        if (inlineRest !== null) instructionLines.push(inlineRest);
         continue;
       }
-      // notes
-      current = 'notes';
+      // notes — an inline notes line ("Note: use cold milk.") is an aside:
+      // only its remainder goes to notes and the section does NOT switch, so
+      // the ingredients/steps that follow stay where they are. A bare notes
+      // header line ("Wskazówki") starts the notes section.
+      if (inlineRest !== null) noteLines.push(inlineRest);
+      else current = 'notes';
       continue;
     }
 
@@ -456,6 +552,15 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
   // No structure found at all → body is the instructions (fallback dump).
   if (firstBoundary === null && preamble.length) {
     instructionLines.push(...preamble);
+  }
+
+  // Servings in the title ("Shakshuka (serves 2)"): the bracket is removed
+  // even when a servings label already won. Applied to the final title, so a
+  // late "Przepis … na:" title is covered too.
+  if (title !== undefined) {
+    const ts = extractTitleServings(title);
+    if (servings === null) servings = ts.servings;
+    title = ts.title || undefined;
   }
 
   return {
