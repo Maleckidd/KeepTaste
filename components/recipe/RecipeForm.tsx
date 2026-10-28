@@ -55,12 +55,15 @@ type Props = {
 function Field({
   label,
   children,
+  labelHint,
   hint,
   linkText,
   onLinkPress,
 }: {
   label: string;
   children: React.ReactNode;
+  /** Short permanent guidance between the label and the input. */
+  labelHint?: string;
   hint?: string;
   /** Optional tappable link shown under the field (e.g. "See formatting tips"). */
   linkText?: string;
@@ -71,6 +74,7 @@ function Field({
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}</Text>
+      {labelHint ? <Text style={fieldStyles.hint}>{labelHint}</Text> : null}
       {children}
       {hint ? <Text style={fieldStyles.hint}>{hint}</Text> : null}
       {linkText && onLinkPress ? (
@@ -300,7 +304,7 @@ export default function RecipeForm({
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.prep')}>
               <Input
-                placeholder="15"
+                placeholder={t('recipeForm.prepPlaceholder')}
                 value={form.prepTime}
                 onChangeText={(v) => set('prepTime', v)}
                 keyboardType="numeric"
@@ -312,7 +316,7 @@ export default function RecipeForm({
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.cook')}>
               <Input
-                placeholder="45"
+                placeholder={t('recipeForm.cookPlaceholder')}
                 value={form.cookTime}
                 onChangeText={(v) => set('cookTime', v)}
                 keyboardType="numeric"
@@ -324,7 +328,7 @@ export default function RecipeForm({
           <View style={{ flex: 0.7 }}>
             <Field label={t('recipeForm.servings')}>
               <Input
-                placeholder="4"
+                placeholder={t('recipeForm.servingsPlaceholder')}
                 value={form.servings}
                 onChangeText={(v) => set('servings', v)}
                 keyboardType="numeric"
@@ -338,6 +342,7 @@ export default function RecipeForm({
         {/* Ingredients */}
         <Field
           label={t('recipeForm.ingredients')}
+          labelHint={t('recipeForm.ingredientsHint')}
           linkText={t('recipeForm.formatHelpLink')}
           onLinkPress={() => setFormatHelpOpen(true)}
         >
