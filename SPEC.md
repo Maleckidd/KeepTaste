@@ -1,7 +1,7 @@
 # KeepTaste — Technical Specification (SDD)
 
 > Living document. Update it with every significant design decision.
-> Version: 1.8 | Date: 2026-06
+> Version: 1.9 | Date: 2026-10
 
 ---
 
@@ -57,7 +57,7 @@ app/
     shopping.tsx         ← Shopping tab root (§5.10)
   settings.tsx           ← app info, no-backup notice, import, delete all data
   cookbook/
-    [id].tsx             ← recipe list; id="all" → all recipes (+ title search)
+    [id].tsx             ← recipe list; id="all" → all recipes (+ title + ingredient search)
     new.tsx              ← modal: new cookbook
     edit.tsx             ← modal: edit cookbook
   recipe/
@@ -121,7 +121,7 @@ utils/
   cookbookForm.ts        ← cookbook form logic (normalize, dirty-check)
   recipeForm.ts          ← recipe form logic (mapping, dirty-check)
   numeric.ts             ← numeric field parsing (integer ≥ 1 or null)
-  search.ts              ← diacritics-safe title search
+  search.ts              ← diacritic-folding title + ingredient search
   shoppingList.ts        ← shopping list logic: partition, counts, input normalization
   ingredients.ts         ← pure parsers: ingredients Markdown → rendered lines (§5.4) / shopping item candidates (§5.12)
   recipeImport.ts        ← pure parsers: Recipe JSON-LD + pasted-text → RecipeFormData (§5.15)
@@ -219,8 +219,9 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Displays a **grid of cookbook tiles, 2 per row**, each tile = one cookbook
 - Tiles have rotating background colors from the palette (`cookbookColors` in theme)
 - If a cookbook has a cover (`cover_image_path`), the photo covers the background color with a slight dark overlay for title readability
-- Header (left): "KeepTaste" eyebrow + "Cookbooks" title; header (right): a **settings gear** (→ §5.7) and a **"+" button → new cookbook modal** (§5.2)
-- A fixed "All recipes" row above the grid — the **only entry point** to the `/cookbook/all` view
+- Header (left): "KeepTaste" eyebrow + "Cookbooks" title; header (right): a **"New cookbook" text button** (→ new cookbook modal, §5.2) and a **settings gear** (→ §5.7)
+- **The floating "+" button (FAB) creates a recipe**, not a cookbook: it opens `/recipe/new` with no cookbook pre-selected; the cookbook is chosen in the form (§5.5). The FAB is shown whether or not any cookbook exists
+- A fixed "All recipes" row above the grid — the **only entry point** to the `/cookbook/all` view; entering through it focuses the search field (§5.3)
 - Long-press on a tile (with a light haptic) → bottom **ActionSheet**: **Edit / Delete / Cancel**
   - **Edit** → opens the cookbook modal (§5.2) pre-filled with the current name and cover
   - **Delete** → confirmation Alert with the message: *"Recipes from this cookbook won't be deleted — you'll find them in 'All recipes'."*; on confirm the cookbook disappears behind a 5s **Undo** snackbar before the delete commits (§6)
@@ -230,6 +231,8 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Deleting a cookbook does not delete its recipes (see: DB schema)
 
 **Refreshing:** `useFocusEffect` — data is loaded every time the user returns to the screen (e.g. after adding a cookbook).
+
+**Why the FAB adds a recipe (persona testing, iteration 1 — `persona-lab/history/01-2026-10-23.md`, problem 2):** the first thing a new user wants to do is add a recipe. With the FAB creating a cookbook, 3 of 5 personas (5 of 9 runs) opened "New cookbook" on their first tap and had to back out. **Acceptance:** on a fresh install the first tap on the FAB opens the new-recipe form; a recipe can be created and placed in a cookbook without leaving the home screen first.
 
 **Search** lives in the "All recipes" view (see §5.3) — there is no search field on the home screen.
 
@@ -242,7 +245,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Optional: cover (image picker — gallery or camera). Entry point is a small icon-only camera button on the same row as the name field (right side); once a cover is picked, the button shows the cover as a thumbnail (tap to change/remove)
 
 **Entry points:**
-- Create: "+" button in the home-screen header → empty form
+- Create: "New cookbook" text button in the home-screen header (or the empty-state action) → empty form
 - Edit: long-press on a cookbook tile → "Edit" → form pre-filled with the current name and cover
 
 **On save:**
@@ -263,16 +266,26 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - URL `/cookbook/all` — all recipes from all cookbooks and unassigned ones
 - Recipes sorted descending by `updated_at` (most recently modified on top)
 - **To-try partition (§5.19):** recipes marked "to try" sink to a **"To try" section** at the bottom of the list, under an uppercase section header; within both parts the `updated_at` ordering is unchanged. The header renders only when the section is non-empty. Applies to both specific-cookbook and "All recipes" views
-- "+" button in the header → new recipe (with pre-filled `cookbook_id` when inside a specific cookbook)
-- **Share (PDF) icon in the header** → generates and shares the cookbook as a PDF (§5.14). Available only in a specific cookbook's view, not in "All recipes"
+- Floating "+" button (FAB) → new recipe (with the cookbook pre-selected in the form when inside a specific cookbook)
+- **Header "⋯" menu** (specific cookbook only): **Share as PDF** (§5.14) / **Edit** / **Delete**. There is **no separate share icon** in the header — an unlabeled share glyph was not recognized by a low-tech persona (iteration 1, problem 15), so the action lives in the menu with a text label (§6, "No unlabeled action icons"). PDF share stays unavailable in "All recipes"
 
 **Search (only in the `/cookbook/all` view):**
-- Text field above the list, filtering by recipe title across **all** cookbooks
-- Case-insensitive comparison, **correct for non-ASCII characters (e.g. Polish diacritics)** — filtering happens on the JS side via `title.toLowerCase().includes(query.toLowerCase())`, not via SQL `LIKE` (which is case-insensitive only for ASCII — searching "żurek" would not find "Żurek")
+- Text field above the list, placeholder *"Search by name or ingredient"*, searching **titles and ingredients** across **all** cookbooks
+- Pure matching in `utils/search.ts` (unit-tested), on the JS side — never SQL `LIKE` (case-insensitive only for ASCII — "żurek" would not find "Żurek"):
+  - **Normalization** of both query and text: `toLowerCase()` plus **diacritic folding** (`ą→a`, `ć→c`, `ę→e`, `ł→l`, `ń→n`, `ó→o`, `ś→s`, `ź/ż→z`), so "zurek", "żurek" and "Żurek" all match each other
+  - The query is split on whitespace; **every word must match** (AND), each one in the title or in the ingredients
+  - **Light inflection tolerance (Polish):** a query word of 5+ characters matches by its stem — the word minus its last character — as a substring ("cukinia" → "cukini" finds "2 cukinie"; "pomidor" → "pomido" finds "pomidory"). Shorter words match as typed. No dictionary, no AI
+  - Ingredients are searched as raw text (Markdown included)
+- **Order:** recipes whose **title** matches every word come first, then **ingredient-only** matches; within each group the usual `updated_at` order; the to-try partition (§5.19) still applies on top
+- An ingredient-only match shows a muted second line on its card: *"in ingredients: 2 cukinie"* — the first ingredient line that matched — so the user sees why it was found
+- **Clear button:** an "×" inside the field while the query is non-empty (works on Android — the iOS-only `clearButtonMode` is not relied on)
+- Entering the view from the home "All recipes" row **focuses the field** (keyboard up); scrolling the list dismisses the keyboard
 - Search runs on every text change (no "search" button); tapping a result opens the recipe view
 - **"To try" filter chip (§5.19)** below the search field: shown only when at least one to-try recipe exists, labeled with a live count ("To try (7)"). Active chip restricts the list to to-try recipes across all cookbooks; combines with the text query (AND). Session-only state — leaving the screen resets it
-- No results → grayed-out text *"No results"* (color `textMuted`)
+- No results → grayed-out text *"Nothing found in names or ingredients"* (color `textMuted`) — it says what was searched
 - The field is **not shown** in a specific cookbook's view — search is global by design
+
+**Why ingredients (iteration 1, problem 4):** "what can I cook with zucchini and feta" is a search over ingredients; title-only search with a silent "No results" ended that task for the persona in both runs. **Acceptance:** in the demo library, searching "cukinia" finds "Łosoś pieczony z warzywami" (ingredient "2 cukinie") with the "in ingredients" hint.
 
 **Edge cases:**
 - Empty cookbook → empty state with an icon and a "tap + to add" message
@@ -308,8 +321,8 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 **Navigation:**
 - Back button (arrow-back)
 - **Text zoom (A− / A+)** — two header buttons (left of Share) scale the recipe **content** read while cooking: ingredients, instructions, step numbers, in-content `#` headings and the Notes box. Title and metadata are unaffected. The scale runs 1×–1.8× in 0.2 steps; each button disables at its bound. The zoom is **ephemeral by design** — it lives in component state (no persistence, no `app_settings` key), so leaving the recipe resets it to 1× on the next open. Ionicons has no clean "A+/A−" glyph, so these are text buttons, not `IconButton`. This is a polish of the existing reading view, **not** the step-by-step cooking mode that stays out of scope (§7).
-- Share button (share-outline) → shares the recipe as plain text (§5.13)
 - "⋯" menu (ActionSheet, same pattern as the cookbook and shopping-list headers):
+  - **Share** → shares the recipe as plain text (§5.13). No separate share icon in the header (§6, "No unlabeled action icons")
   - **Edit** → opens `/recipe/edit?id=X`
   - **Delete** → confirmation Alert ("Delete \"{title}\"?"); on confirm goes back and the delete commits after a 5s **Undo** snackbar (§6)
 
@@ -326,6 +339,7 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | Title | TextInput | YES | Trimmed before saving |
+| Cookbook | Picker row | NO | Which cookbook the recipe belongs to, or "No cookbook" (see below) |
 | Prep | TextInput numeric | NO | Minutes as a positive integer |
 | Cook | TextInput numeric | NO | Minutes as a positive integer |
 | Servings | TextInput numeric | NO | Positive integer |
@@ -334,6 +348,10 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 | Ingredients | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Instructions | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Notes | TextInput multiline | NO | Exported together with the recipe (it's a cookbook, not a diary) |
+
+**Cookbook field:** a row right under the title — *"Cookbook: Breakfasts ▾"* — that opens an `ActionSheet` listing every cookbook plus **"No cookbook"** (the list scrolls when long). Pre-selected: the current cookbook when the form was opened from a specific cookbook's view, otherwise "No cookbook" (home FAB, "All recipes", Android share target). In **edit** it shows the recipe's current cookbook, and changing it **moves the recipe** — this is the only way to move a recipe between cookbooks. No schema change: it writes the existing `recipes.cookbook_id` (`createRecipe` / `updateRecipe` both take `cookbookId`; `null` = no cookbook). Moving is an edit-save, so `updated_at` changes as usual (§4).
+
+**Placeholders must not look like entered data (iteration 1, problem 3):** grey "15 / 45 / 4" in the numeric fields were read as already-filled values (Tom took "4" for servings detected by the import). Every example placeholder therefore starts with **"e.g."** / **"np."**: "e.g. 15" for the times and "e.g. 4" for servings, and the ingredient/instruction examples are prefixed the same way. The placeholder colour stays `textMuted` (WCAG AA) — the difference is carried by wording, not by lowering contrast. Under the Ingredients label a short permanent hint says **"One ingredient per line"** (a persona typed all ingredients on one line and got a single checklist item, problem 16).
 
 **Formatting help:** the average user doesn't know "Markdown". Under the Ingredients and Instructions fields a tappable text link ("See formatting tips", `recipeForm.formatHelpLink`, primary-colored) opens a bottom sheet (`components/ui/FormattingHelpSheet.tsx`, same overlay pattern as `ActionSheet`). The sheet is a plain-language "you type → you see" table (`# heading`, `**bold**`, `- bullet`) plus a note that a blank line starts a new section — never the word "Markdown" in the field UI.
 
@@ -351,8 +369,10 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 **Abandoning the form:** if the form has unsaved changes, closing the modal (gesture / back / cancel) → Alert *"Discard changes?"* with options Discard (destructive) / Keep editing.
 
 **New vs edit:**
-- `new.tsx` — starts with an empty form, optionally accepts `cookbookId` as a URL param
+- `new.tsx` — starts with an empty form, optionally accepts `cookbookId` as a URL param (pre-selects the Cookbook field)
 - `edit.tsx` — loads the recipe data from the database, fills the form, calls `updateRecipe` instead of `createRecipe` on save
+
+**Save confirmation (iteration 1, problem 6):** the modal closing silently left the user unsure the recipe was kept. After **creating** a recipe, a snackbar names where it went — *"Saved in „Cakes”"*, or *"Recipe saved"* with no cookbook — with a **"Show"** action that opens the new recipe (from the home screen the new recipe is otherwise out of sight). After an **edit that changed the cookbook**: *"Moved to „Cakes”"*. A plain edit needs no snackbar — it returns to the recipe view, which shows the result. Navigation-action snackbars last 8 s (§6). The snackbar must not mount in the same frame as a `LayoutAnimation` (§6).
 
 ---
 
@@ -515,6 +535,9 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 - "Add product" reveals an inline row with two inputs: **product name** (required, trimmed) and **quantity** (optional, free-form text — "2", "1 kg", "3 packs"; stored as TEXT, no numeric parsing so units stay possible)
 - Confirming adds the product to the list and clears the inputs so the next product can be typed immediately; the row stays open until dismissed
 - The "Add product" affordance remains available on a non-empty list (e.g. as the header "+" or a persistent row)
+- **Pasting a whole list into the add row (iteration 1, problem 9):** a persona pasted a multi-line message into the one-line name field, another typed seven products one by one — neither found "Paste products" in the "⋯" menu. So: (1) a **"Paste a whole list"** text link sits right under the add row and opens the `PasteListSheet` (§5.16); (2) if the name field receives text containing a **line break** (a paste — the field keeps line breaks, and Enter still confirms), the field is cleared and the `PasteListSheet` opens **directly on its Review step** with that text parsed. A paste that parses to zero products stays in the field as typed text
+
+**Duplicate grouping:** active items with the same name (trimmed, case-insensitive) render under one group header *"bananas (2)"* with the copies indented below it — **only when at least 2 copies are active**. A single active copy is a plain row even when another copy sits in "In cart" (iteration 1, problem 13: a header "bananas (1)" over one item read as a bug). Pure logic in `utils/shoppingList.ts` (`groupedNames` / `buildActiveRows`, unit-tested).
 
 **List items & the "In cart" flow:**
 - Each product renders as a row: name (+ quantity, muted, when present) with a **checkbox on the right**
@@ -602,7 +625,7 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 
 ### 5.13 Sharing a recipe as text
 
-**Trigger:** a share icon (`share-outline`) in the recipe view (§5.4) nav bar.
+**Trigger:** **"Share"** in the recipe view's "⋯" menu (§5.4).
 
 **Behavior:** builds a localized plain-text message via the pure `buildRecipeShareText(recipe, t)` (`utils/recipeShareText.ts`) and hands it to React Native's `Share.share({ message, title })`. Unlike the other share flows it uses **RN `Share`, not `expo-sharing`**, so the result is ready-to-send text for SMS, Messenger, email, etc. — not a file attachment.
 
@@ -610,7 +633,9 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 
 ### 5.14 Sharing a cookbook as PDF
 
-**Trigger:** the share icon in the `/cookbook/[id]` header (unavailable in "All recipes", same as before).
+**Trigger:** **"Share as PDF"** in the `/cookbook/[id]` header "⋯" menu (§5.3; unavailable in "All recipes", same as before).
+
+**File name (iteration 1, problem 11):** `expo-print` writes a random UUID name (`09a12d42-….pdf`), which is what the recipient saw — wrong for a gift. Before sharing, the file is moved (`moveAsync` from `expo-file-system/legacy`) inside `cacheDirectory` to **`{cookbook name} {YYYY-MM-DD}.pdf`** — e.g. `Christmas 2026-10-26.pdf` — the date telling apart editions sent at different times. The name comes from a pure `cookbookPdfFileName(name, date)` (unit-tested): characters invalid in file names (`/ \ : * ? " < > |` and control characters) removed, whitespace collapsed, trimmed, cut to 60 characters, falling back to the localized word "Cookbook" when nothing is left; diacritics are kept.
 
 **Behavior:** the pure `buildCookbookHtml(cookbook, recipes, t)` (`utils/cookbookPdfHtml.ts`) renders a full HTML document; `utils/cookbookPdf.ts` (`shareCookbookPdf`) turns it into a PDF via `expo-print` `printToFileAsync({ html })` and shares it via `Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle })`. On failure surfaces `Alert('Export failed', …)`.
 
@@ -650,6 +675,8 @@ This is distinct from the full-app Markdown **backup** import (§5.8), which res
   - **Metadata** (PL + EN labels) — `Czas przygotowania/szykowania` · `Prep`/`Preparation time` → prep; `Czas gotowania/pieczenia/smażenia/duszenia` · `Cook`/`Cooking`/`Bake`/`Total` → cook (hours+minutes summed, "1 godzina" / "20 mins"); `Liczba/ilość porcji` · `Porcje` · `Dla N osób` · `Serves`/`Servings`/`Makes`/`Yield` · a standalone `N sztuki/porcji` yield right after `Składniki` → servings. Matched label lines are removed from the body.
   - **Title** — first content line *unless* it is a section header, a metadata/`kcal` line, or starts with a number (then no title — e.g. a page that opens with the times block). A `Przepis … na:` marker takes the **next** line as the title (some portals print the dish name late, after the ingredients). A later line that merely repeats the title (a duplicated page heading) is dropped.
   - **Sections** — ingredient headers (`Składniki`/`Ingredients`, and `Składniki na X` → kept as a `# X` group heading); step headers (`Przygotowanie` / `Sposób przygotowania` / `Wykonanie` / `Instructions` / `Method` / …); **and**, when no step header exists, the **start of a step list** — the first item `1.`/`1)` (only `1`, so a stray `2./3.` nav list can't misfire) or a labeled `Krok N` / `Step N` — begins the instructions (the lines before it are the ingredient list). Trailing tip sections (`Wskazówki` / `Rady/porady` / `Porada` / `Uwagi` / `Tip(s)`) route to the **notes** field. Within ingredients, a long (>80-char) prose line not starting with a quantity is treated as the (header-less) start of the method.
+  - **Inline headers** — a section header followed by a colon **and content on the same line** (`Method: Soften the onion…`, `Ingredients: 2 eggs`, `Przygotowanie: Pokrój…`) switches the section like a header line and keeps the rest of the line as the section's first line (iteration 1, problem 8: the whole method landed in one block starting with "Method:").
+  - **Servings in the title** — a parenthetical yield in the title line — `(serves 2)`, `(makes 12)`, `(dla 4 osób)`, `(4 porcje)` — sets servings (when no other servings label was found) and is removed from the title (problem 8: "(serves 2)" stayed in the title and servings stayed empty).
   - **Intro drop** — when an ingredients header exists, everything between the title and it (tagline, breadcrumb, author intro) is dropped.
   - **Noise** — a conservative denylist removes UI chrome (`Udostępnij/Zapisz/Drukuj przepis`, `Skomentuj`, `Dodaj do ulubionych/notatkę/komentarz`, `Kopiuj`, `Ukryj/Pokaż zdjęcia`, `Komentarze`, `Video`, `Ilość lajków…`), nutrition lines (`kcal`, `Węglowodany`, `Białko`, `Tłuszcze`, `Dieta:`, `Nutrition…`), and rating lines (`Średnia 4.8 / 5 …`, `Oceń!`).
   - **Quantity merge** — a quantity-only line (`250 g`, `1 sztuka`) is merged onto the preceding ingredient name (`ryż do sushi – 250 g`) for portals that print name and amount on separate lines.
@@ -692,7 +719,7 @@ A convenience entry into §5.15's import flow: from any app's **Share** menu (a 
 
 - **Pure decision logic** lives in `utils/sharedUrl.ts` (unit-tested): `extractSharedUrl(text)` pulls the first `http(s)://` URL out of arbitrary shared text (stops at whitespace, strips trailing `) . , >` and wrapping angle brackets, preserves query strings, ignores `ftp:`/`mailto:`), and `toImportIntent(text)` maps it to `{mode:'link', url}` (URL only, not surrounding title text) or, when there's no URL but some non-whitespace content, a **never-stranded** `{mode:'paste', text}` fallback so the user always lands somewhere useful. Empty/whitespace/null → ignored.
 - **Delivery** (both **cold start** and **warm/foreground**) is consumed in `app/_layout.tsx` by a `ShareIntentHandler` child mounted inside `SnackbarProvider`, using `expo-share-intent`'s `useShareIntent()` (`hasShareIntent`, `shareIntent.webUrl`/`.text`, `resetShareIntent`). The intent is reset immediately after handling, and a last-handled-signature ref blocks double-delivery on re-render/foreground refresh. The cold-start push runs from an effect after mount, not synchronously.
-- **Form-busy guard:** if a recipe form modal is already open (`usePathname()` is `/recipe/new` or `/recipe/edit`), the share is **ignored and notified** via a snackbar (`share.formBusy`) rather than stacking a second modal or clobbering an in-progress edit. Otherwise it `router.push`es `/recipe/new` with a single `sharedText` param (raw string, so arbitrary text survives URL-encoding; `new.tsx` re-derives the intent via `toImportIntent`). Shares land with **no cookbook**.
+- **Form-busy guard:** if a recipe form modal is already open (`usePathname()` is `/recipe/new` or `/recipe/edit`), the share is **ignored and notified** via a snackbar (`share.formBusy`) rather than stacking a second modal or clobbering an in-progress edit. Otherwise it `router.push`es `/recipe/new` with a single `sharedText` param (raw string, so arbitrary text survives URL-encoding; `new.tsx` re-derives the intent via `toImportIntent`). Shares land with **no cookbook** pre-selected (the user can pick one in the form, §5.5).
 - **Pre-arm:** `RecipeForm` gains an `initialImport` prop that opens `ImportSheet` on mount (create/import mode only); the sheet's new `initialImport` prop seeds link/paste mode — a **link auto-runs the existing fetch** (same spinner + never-stranded paste fallback), a **paste just prefills** (no auto-submit). Consumed once per open; a manual reopen starts blank.
 - **Expo Go / web degradation:** `expo-share-intent`'s native module is absent in Expo Go and on web. `utils/shareIntent.ts` exposes `isShareIntentAvailable` (mirrors `isOcrAvailable`, gated on `requireOptionalNativeModule('ExpoShareIntentModule')`); the handler is only mounted when it's true, so Expo Go/web never call the hook and never throw. The share target is verified on a development/production build.
 
@@ -790,7 +817,7 @@ Restoring an archive made on a different schema version is a corruption vector, 
 
 **The round-trip is the point.** The shared text is built so the recipient can paste it straight back into a list via **"Paste products"** (§5.16): the format is line-based bullets that `parseIngredients` (§5.16/§5.12) strips on re-paste. Sender shares → recipient pastes → both have the list. One-way, manual, user-owned — not sync.
 
-**Entry point:** a **"Share list"** item (`share-outline`) in the "⋯" header menu of the list detail view, between "Paste products" and "Delete list" (`app/shopping/[id].tsx`).
+**Entry point:** a **"Send what's left (N)"** / **"Wyślij brakujące (N)"** item (`share-outline`) in the "⋯" header menu of the list detail view, between "Paste products" and "Delete list" (`app/shopping/[id].tsx`). N is the live count of active (not in cart) items. The label says what is sent: a persona believed the share sent "everything" with no way to choose (iteration 1, problem 10), while in fact it already sends only active items.
 
 **Content (`utils/shoppingListShareText.ts`, pure, unit-tested):** `buildShoppingListShareText(listName, items)` returns the list name, a blank line, then one `- {name}` bullet per item (`- {name} ({quantity})` when a quantity is set). **Only active items** are included — products already in the cart are omitted so the recipient starts from a clean list. A list with no active items shares just its name. No "—" placeholders, consistent with the rest of the app. Shared via React Native `Share.share` (like §5.13), localized dialog title (`shopping.shareDialogTitle`).
 
@@ -938,6 +965,10 @@ Editing & deleting (June 2026 iteration):
 - **Swipe-left reveals Edit/Delete** (`components/ui/SwipeableRow.tsx`, gesture-handler + Reanimated) on shopping items, shopping list cards and recipe cards; long-press menus remain as the discoverable alternative.
 - **Shopping list rename is inline** — tap the title on the list screen (also reachable via `?rename=1` from the lists tab). The `shopping/edit` modal route was removed.
 - **Form validation is inline** (error text under the field) instead of Alerts; "Added to list" feedback is a snackbar with a "View list" action. `Alert` remains only for: discard-changes, permissions, import/export dialogs and delete-all.
+- **Snackbar durations:** 5 s by default and for Undo (tied to the deferred delete, `utils/pendingDelete.ts`); **8 s for snackbars whose action navigates** ("View list", "Show") — 5 s is too short for someone holding the phone in one hand in a shop (iteration 1, problem 12).
+
+Persona testing, iteration 1 (October 2026):
+- **No unlabeled action icons.** Screen-specific actions are text — a text button or a labeled item in the "⋯" menu — never an icon-only button. Icon-only buttons are kept only for glyphs everyone reads: back, close, settings gear, "⋯", the FAB "+", and the add/confirm buttons of the shopping-list add row. The share icons in the cookbook and recipe headers were removed for this (§5.3, §5.4), and the home "New cookbook" action is a text button (§5.1).
 
 Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 
@@ -950,7 +981,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 | Cloud sync (two-way reconciliation, server, merge) | Complexity, infrastructure costs, privacy concerns. **Note:** the one-way `.zip` backup to the user's own cloud folder (§5.17) is *not* sync — the app writes a file, never reconciles or talks to a server |
 | Direct Google Drive / Dropbox API integration (OAuth, account sign-in, app folders) | Most work, needs provider app verification (OAuth), and breaks "no accounts" — for little gain over the system share sheet (§5.17.2). Online backup is achieved via the share sheet (Level 0) or a user-chosen synced folder (Level 1, SAF) |
 | User accounts | Same as above — the app is deliberately private and local |
-| Tags (recipe labels + filtering) | Removed from the MVP — title search is enough to start; may return in the future (see §8). The **to-try status (§5.19) is not tags**: it's a dedicated boolean the app can hang behavior on (bottom section, filter chip, badge), which free-form labels cannot provide |
+| Tags (recipe labels + filtering) | Removed from the MVP — title + ingredient search (§5.3) is enough to start; may return in the future (see §8). The **to-try status (§5.19) is not tags**: it's a dedicated boolean the app can hang behavior on (bottom section, filter chip, badge), which free-form labels cannot provide |
 | Ingredient scaling (servings multiplier) | Ingredients are text, not structured data — parsing would be brittle |
 | Cooking mode (step-by-step active screen) | Complexity, beyond MVP. The *reading-view* affordances a cook actually needs — keep-awake and in-recipe text zoom (A−/A+) — already ship on the recipe view (§5.4/§6); only the dedicated one-step-at-a-time screen stays out |
 | **In-app** AI / network "smart parsing" for recipe import | Breaks the local-first, no-backend philosophy (§1); per-call cost. Single-recipe import stays deterministic (§5.15). The **user-mediated Transcribe-with-AI handoff (T4)** *is* in scope — the app still ships no AI and makes no network call; it only copies a prompt and shares the photo to the user's own AI app |
@@ -988,6 +1019,16 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **Ingredient check-off while cooking** — §5.4: pure `parseIngredientLines` in `utils/ingredients.ts` (rendered lines: `#` headings kept, items carry an index that matches `parseIngredients` 1:1 — unit-tested), `components/recipe/IngredientChecklist.tsx` (checkbox row per ingredient, strike-through + muted when checked, per-line `Markdown` so inline bold survives, icon scales with the text zoom, `**` stripped from the a11y label, `lightTap`), ephemeral checked set in `app/recipe/[id].tsx` reset on ingredients change, "Clear" button in the INGREDIENTS header, EN+PL strings. No DB, no schema, no backup impact
 - [x] **Sample content on first launch** — §5.20: pure localized builder `utils/seedData.ts` (EN+PL "Breakfasts"/"Śniadania" cookbook + one photographed pancakes showcase recipe, unit-tested), one-shot seed `db/seed.ts` `seedSampleContentIfNeeded` guarded by `demo_seeded` + `isDatabaseEmpty()` inside `withAutoBackupSuppressed`, bundled photos (`assets/images/seed/pancakes.jpg` recipe photo, `assets/images/seed/breakfast.jpg` cookbook cover) resolved via `expo-asset` + copied into the doc dir through `persistImage` as separate files (best-effort, degrades to no image), `demo_seeded`/`user_edited` flag helpers in `db/settings.ts`, best-effort once-per-process `user_edited` mark on real mutations (`db/userEdited.ts`, skipped while suppressed), `shouldSilentReplace` (pure, unit-tested) + `canSilentReplace()` in `db/backup.ts` wired into the `.zip` restore path (silent 1:1 over a pristine seed), restore stamps both flags, home-screen mount seed after language resolution
 
+### Persona testing — iteration 1 fixes (October 2026)
+Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; acceptance = iteration 2 on the same personas (`run.sh --personas-file`). Ideas not taken now are parked in `UX_NOTES.md` ("Persona testing, iteration 1").
+- [x] **Swipe peek hint replays on every save** — fixed separately in PR #6 (pin the hint to one recipe id, `onPeekEnd`)
+- [ ] **A. First recipe** — FAB → new recipe, "New cookbook" text button in the home header (§5.1/§5.2); Cookbook picker in the form, which also moves recipes (§5.5); save snackbar with "Show" (§5.5); `updateRecipe` takes `cookbookId` (unit-tested)
+- [ ] **B. Search** — title + ingredient search with diacritic folding and stem matching, title matches first, "in ingredients" hint, "×" clear button, focus on entry, explicit no-results text (§5.3); pure helpers in `utils/search.ts` (unit-tested)
+- [ ] **C. Recipe form wording** — "e.g." placeholders, "One ingredient per line" hint (§5.5); EN+PL strings only
+- [ ] **D. Paste parser** — inline `Header: content` lines, servings from a parenthetical in the title (§5.15); `utils/recipeImport.ts` (unit-tested)
+- [ ] **E. Shopping list** — multi-line paste in the add row → Review step, "Paste a whole list" link (§5.10/§5.16), "Send what's left (N)" (§5.18), group header only for ≥2 active copies (§5.10, unit-tested), 8 s navigation snackbars (§6)
+- [ ] **F. Icons and PDF** — share icons out of the cookbook/recipe headers into "⋯" menus (§5.3/§5.4/§6); PDF named `{cookbook} {YYYY-MM-DD}.pdf` via pure `cookbookPdfFileName` (§5.14, unit-tested)
+
 ### Medium priority
 - [x] **Discard-changes confirmations** — "Discard changes?" Alert when closing dirty forms (recipe and cookbook forms)
 - [x] **Communicating the lack of backup** — onboarding / info in settings: data lives only on the device, .md export is the only backup
@@ -996,7 +1037,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 ### Low priority
 - [ ] **Transition animations** — Reanimated 4, especially when opening a recipe
 - [x] **Import from .md file** — parsing previously exported files (done — see §5.8)
-- [ ] **Tags** — possible return of the feature: global, free-form labels (lowercase + trim, deduplication) + tag filtering; design only once title search stops being enough
+- [ ] **Tags** — possible return of the feature: global, free-form labels (lowercase + trim, deduplication) + tag filtering; design only once title + ingredient search stops being enough
 
 ---
 
