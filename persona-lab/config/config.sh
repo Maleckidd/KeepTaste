@@ -46,8 +46,12 @@ reset_app() {
       # Clears data and restores the curated demo .zip through the app's own
       # Restore flow (and switches the in-app language for pl). Needs
       # assets/store/keeptaste-demo*.zip — npx tsx scripts/build-demo-backup.ts.
+      # The restore is driven by blind taps through Settings and the system
+      # picker, and now and then one doesn't land; the script detects that, so
+      # one retry turns a skipped run into a slower one.
       app_set_locale "$locale"
-      (cd "$APP_REPO" && bash scripts/reset-demo-library.sh "$lang" "$ANDROID_SERIAL") >&2
+      (cd "$APP_REPO" && bash scripts/reset-demo-library.sh "$lang" "$ANDROID_SERIAL") >&2 ||
+        (cd "$APP_REPO" && bash scripts/reset-demo-library.sh "$lang" "$ANDROID_SERIAL") >&2
       ;;
     *) return 1 ;;
   esac
