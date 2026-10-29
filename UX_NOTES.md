@@ -87,7 +87,9 @@ shows whether they still matter.
   today the cart/active split is the only selection.
 - **Snackbar over tappable rows** (problem 12) — the "added to list"
   snackbar covers the last checklist row of the recipe view; a tap meant for
-  the snackbar can tick an ingredient.
+  the snackbar can tick an ingredient. A late tap is now swallowed for 1 s
+  after the bar expires (SPEC.md §6); the bar still covers the row while it
+  is up.
 - **"New cookbook…" inside the form's Cookbook picker** — create the
   cookbook without leaving the recipe form (modal over modal; needs design).
 

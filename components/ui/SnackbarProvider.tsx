@@ -52,6 +52,13 @@ const DEFAULT_DURATION = 5000;
  */
 export const NAVIGATION_SNACKBAR_MS = 8000;
 
+/**
+ * After a bar expires, its spot keeps swallowing taps this long: a tap aimed
+ * at the action as it fades must not land on the row underneath (e.g. tick an
+ * ingredient on the recipe view, SPEC.md §6 "Snackbar tap guard").
+ */
+const TAP_GUARD_MS = 1000;
+
 export function SnackbarProvider({ children }: { children: React.ReactNode }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
@@ -65,6 +72,9 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const barRef = useRef<View>(null);
   const [barTop, setBarTop] = useState<number | null>(null);
+  const barHeight = useRef(0);
+  const guardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [guardHeight, setGuardHeight] = useState<number | null>(null);
 
   const clearTimer = () => {
     if (timer.current) {
@@ -73,22 +83,40 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const hide = useCallback(() => {
-    clearTimer();
-    currentRef.current = null;
-    Animated.timing(opacity, {
-      toValue: 0,
-      duration: Motion.duration.fast,
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrent(null);
-      setBarTop(null);
-    });
-  }, [opacity]);
+  const clearGuard = () => {
+    if (guardTimer.current) {
+      clearTimeout(guardTimer.current);
+      guardTimer.current = null;
+    }
+    setGuardHeight(null);
+  };
 
+  const hide = useCallback(
+    (guard = false) => {
+      clearTimer();
+      currentRef.current = null;
+      if (guard) {
+        clearGuard();
+        setGuardHeight(barHeight.current);
+        guardTimer.current = setTimeout(clearGuard, Motion.duration.fast + TAP_GUARD_MS);
+      }
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: Motion.duration.fast,
+        useNativeDriver: true,
+      }).start(() => {
+        setCurrent(null);
+        setBarTop(null);
+      });
+    },
+    [opacity]
+  );
+
+  // Only an expiry arms the guard — the user didn't choose to close the bar,
+  // so a tap may still be on its way to it.
   const expire = useCallback(() => {
     const entry = currentRef.current;
-    hide();
+    hide(true);
     entry?.onTimeout?.();
   }, [hide]);
 
@@ -100,6 +128,7 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
       clearTimer();
       previous?.onTimeout?.();
 
+      clearGuard();
       currentRef.current = options;
       setCurrent(options);
       Animated.timing(opacity, {
@@ -111,6 +140,8 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
     },
     [expire, opacity]
   );
+
+  const barBottom = insets.bottom + Spacing.xxl + Spacing.xxl;
 
   const handleAction = () => {
     const entry = currentRef.current;
@@ -124,14 +155,15 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
       {current ? (
         <Animated.View
           ref={barRef}
-          onLayout={() =>
-            barRef.current?.measureInWindow((_x, y) => setBarTop(y))
-          }
+          onLayout={(e) => {
+            barHeight.current = e.nativeEvent.layout.height;
+            barRef.current?.measureInWindow((_x, y) => setBarTop(y));
+          }}
           style={[
             styles.bar,
             {
               backgroundColor: c.text,
-              bottom: insets.bottom + Spacing.xxl + Spacing.xxl,
+              bottom: barBottom,
               opacity,
             },
           ]}
@@ -157,6 +189,15 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
             </Pressable>
           ) : null}
         </Animated.View>
+      ) : null}
+      {guardHeight !== null && !current ? (
+        // Invisible, touch-absorbing stand-in for the bar that just expired.
+        <View
+          style={[styles.guard, { bottom: barBottom, height: guardHeight }]}
+          onStartShouldSetResponder={() => true}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        />
       ) : null}
     </SnackbarContext.Provider>
   );
@@ -212,6 +253,11 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: Radius.md,
     ...Shadow.lg,
+  },
+  guard: {
+    position: 'absolute',
+    left: Spacing.base,
+    right: Spacing.base,
   },
   message: {
     flex: 1,
