@@ -11,6 +11,11 @@ import type { Cookbook } from '../db/schema';
 import type { Translator } from './i18n';
 import { buildCookbookHtml } from './cookbookPdfHtml';
 import { cookbookPdfFileName } from './cookbookPdfFileName';
+import { raceRetries } from './raceRetries';
+
+// The first render after launch can stall for good on Android while a second
+// one goes straight through, so a slow render gets company (§5.14).
+const PRINT_RETRY = { retryAfterMs: 5000, maxAttempts: 3, giveUpMs: 45000 };
 
 // `onReady` fires once the PDF is on disk, right before the share sheet opens —
 // rendering can take seconds, so the caller shows progress until then. Throws
@@ -24,7 +29,13 @@ export async function shareCookbookPdf(
   const recipes = await getRecipesByCookbook(cookbook.id);
   const html = buildCookbookHtml(cookbook, recipes, t);
 
-  const { uri } = await Print.printToFileAsync({ html });
+  const { uri } = await raceRetries(() => Print.printToFileAsync({ html }), {
+    ...PRINT_RETRY,
+    // A render that finishes after another won leaves an orphan in the cache.
+    discard: (late) => {
+      FileSystem.deleteAsync(late.uri, { idempotent: true }).catch(() => {});
+    },
+  });
 
   // expo-print names the file with a random UUID; move it to a readable name
   // in the cache. If the rename fails, share the UUID file rather than nothing.
