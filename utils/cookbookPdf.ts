@@ -55,6 +55,12 @@ export async function shareCookbookPdf(
   const canShare = await Sharing.isAvailableAsync();
   if (!canShare) throw new Error('Sharing is not available on this device');
   onReady?.();
+  // Let the caller's progress UI leave the screen first: the share sheet is
+  // another activity, and the view under it doesn't redraw while it is up —
+  // shared in the same tick, "Preparing PDF…" stayed visible behind the sheet.
+  await new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))
+  );
   await Sharing.shareAsync(shareUri, {
     mimeType: 'application/pdf',
     dialogTitle,
