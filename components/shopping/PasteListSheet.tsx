@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  TextInput,
   View,
   Text,
   Pressable,
@@ -69,6 +70,7 @@ export default function PasteListSheet({
   const [rendered, setRendered] = useState(visible);
   const [sheetHeight, setSheetHeight] = useState(420);
   const progress = useRef(new Animated.Value(0)).current;
+  const inputRef = useRef<TextInput>(null);
 
   const [step, setStep] = useState<Step>('paste');
   const [text, setText] = useState('');
@@ -102,11 +104,19 @@ export default function PasteListSheet({
       setSaving(false);
       setKeyboardHeight(0);
       setRendered(true);
+      const opensOnPaste = !initialProducts?.length;
       Animated.timing(progress, {
         toValue: 1,
         duration: Motion.duration.base,
         useNativeDriver: true,
-      }).start();
+      }).start(({ finished }) => {
+        // Focus the field so the keyboard is up and typing lands somewhere
+        // (iteration 3: a persona typed into a sheet with nothing focused).
+        // After the open, not with autoFocus — by then the keyboardHeight
+        // listeners below are registered, which Keyboard.dismiss() above
+        // relies on.
+        if (finished && opensOnPaste) inputRef.current?.focus();
+      });
       return;
     }
     Animated.timing(progress, {
@@ -220,6 +230,7 @@ export default function PasteListSheet({
         {step === 'paste' ? (
           <View style={styles.body}>
             <Input
+              ref={inputRef}
               style={[styles.pasteInput, { maxHeight: contentMaxHeight }]}
               placeholder={t('pasteList.placeholder')}
               value={text}
