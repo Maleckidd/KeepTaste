@@ -12,10 +12,14 @@ import type { Translator } from './i18n';
 import { buildCookbookHtml } from './cookbookPdfHtml';
 import { cookbookPdfFileName } from './cookbookPdfFileName';
 
+// `onReady` fires once the PDF is on disk, right before the share sheet opens —
+// rendering can take seconds, so the caller shows progress until then. Throws
+// when the device has no share target, so that never fails silently.
 export async function shareCookbookPdf(
   cookbook: Cookbook,
   t: Translator,
-  dialogTitle: string
+  dialogTitle: string,
+  onReady?: () => void
 ): Promise<void> {
   const recipes = await getRecipesByCookbook(cookbook.id);
   const html = buildCookbookHtml(cookbook, recipes, t);
@@ -38,10 +42,10 @@ export async function shareCookbookPdf(
   }
 
   const canShare = await Sharing.isAvailableAsync();
-  if (canShare) {
-    await Sharing.shareAsync(shareUri, {
-      mimeType: 'application/pdf',
-      dialogTitle,
-    });
-  }
+  if (!canShare) throw new Error('Sharing is not available on this device');
+  onReady?.();
+  await Sharing.shareAsync(shareUri, {
+    mimeType: 'application/pdf',
+    dialogTitle,
+  });
 }

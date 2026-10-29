@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -185,6 +186,9 @@ export default function CookbookScreen() {
   const searchInputRef = useRef<TextInput>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
+  // §5.14: rendering the PDF takes seconds with nothing else on screen.
+  const [pdfPreparing, setPdfPreparing] = useState(false);
+  const pdfBusy = useRef(false);
   const [recipeMenu, setRecipeMenu] = useState<Recipe | null>(null);
   const [peekRecipeId, setPeekRecipeId] = useState<number | null>(null);
   // §5.19 filter chip: session-only, "All recipes" view only.
@@ -289,14 +293,22 @@ export default function CookbookScreen() {
   };
 
   const handleExport = async () => {
-    if (!cookbook) return;
+    // Busy until the share sheet returns, so a second tap can't start another.
+    if (!cookbook || pdfBusy.current) return;
+    pdfBusy.current = true;
+    setPdfPreparing(true);
     try {
-      await shareCookbookPdf(cookbook, t, t('cookbook.sharePdfTitle'));
+      await shareCookbookPdf(cookbook, t, t('cookbook.sharePdfTitle'), () =>
+        setPdfPreparing(false)
+      );
     } catch (e) {
+      setPdfPreparing(false);
       Alert.alert(
         t('cookbook.exportFailedTitle'),
         t('cookbook.exportFailedMessage')
       );
+    } finally {
+      pdfBusy.current = false;
     }
   };
 
@@ -534,6 +546,17 @@ export default function CookbookScreen() {
             : []
         }
       />
+
+      {pdfPreparing ? (
+        // Blocks the screen while the PDF renders — the menu has already
+        // closed, so without this the tap looked like it did nothing.
+        <View style={styles.pdfOverlay} accessibilityViewIsModal>
+          <View style={styles.pdfCard} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={c.primary} />
+            <Text style={styles.pdfLabel}>{t('cookbook.pdfPreparing')}</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -542,6 +565,26 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.background,
+  },
+  pdfOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.base,
+    borderRadius: Radius.lg,
+    backgroundColor: c.surface,
+    ...Shadow.lg,
+  },
+  pdfLabel: {
+    fontSize: Typography.size.base,
+    color: c.text,
   },
   searchBar: {
     flexDirection: 'row',
