@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Text, Pressable, StyleSheet, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ReanimatedSwipeable, {
@@ -15,8 +15,9 @@ type Props = {
   /** Label override for the edit action (e.g. "Rename"). */
   editLabel?: string;
   /**
-   * One-time affordance: briefly slide the actions open and closed to teach
-   * the swipe gesture exists. Flip to true once, on the first row only.
+   * One-time affordance: briefly slide the row open and closed to teach the
+   * swipe gesture exists. Flip to true once, on the first row only. Only Edit
+   * is revealed — a red Delete appearing on its own reads as a threat.
    */
   peek?: boolean;
   /** Called after the peek has closed again, so the caller can drop the flag. */
@@ -76,6 +77,9 @@ export default function SwipeableRow({
   // True while the open is programmatic (the hint), so we skip the haptic that
   // would otherwise fire as if the user swiped.
   const peeking = useRef(false);
+  // Renders just the Edit action while the hint plays, so the programmatic
+  // open slides out only that one button.
+  const [peekOnly, setPeekOnly] = useState(false);
 
   const runAction = (action: () => void) => {
     ref.current?.close();
@@ -84,6 +88,7 @@ export default function SwipeableRow({
 
   useEffect(() => {
     if (!peek) return;
+    if (onEdit) setPeekOnly(true);
     const open = setTimeout(() => {
       peeking.current = true;
       ref.current?.openRight();
@@ -92,10 +97,14 @@ export default function SwipeableRow({
       ref.current?.close();
       peeking.current = false;
       onPeekEnd?.();
-    }, 1650);
+    }, 1350);
+    // Fallback for onSwipeableClose below, which restores Delete once the
+    // close has settled (swapping the actions mid-slide would jump).
+    const restore = setTimeout(() => setPeekOnly(false), 1950);
     return () => {
       clearTimeout(open);
       clearTimeout(close);
+      clearTimeout(restore);
     };
   }, [peek]);
 
@@ -112,16 +121,19 @@ export default function SwipeableRow({
       }}
       onSwipeableClose={() => {
         if (openRow === ref.current) openRow = null;
+        if (!peeking.current) setPeekOnly(false);
       }}
       renderRightActions={() => (
         <View style={styles.actionsContainer}>
-          <ActionButton
-            icon="trash-outline"
-            label={t('common.delete')}
-            color={c.onPrimary}
-            background={c.error}
-            onPress={() => runAction(onDelete)}
-          />
+          {peekOnly ? null : (
+            <ActionButton
+              icon="trash-outline"
+              label={t('common.delete')}
+              color={c.onPrimary}
+              background={c.error}
+              onPress={() => runAction(onDelete)}
+            />
+          )}
           {onEdit ? (
             <ActionButton
               icon="create-outline"
