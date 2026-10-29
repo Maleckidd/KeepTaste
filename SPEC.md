@@ -114,6 +114,7 @@ utils/
   cookbookPdfHtml.ts     ← pure localized cookbook → HTML builder (§5.14)
   cookbookPdfFileName.ts ← pure readable PDF file name `{name} {YYYY-MM-DD}.pdf` (§5.14)
   cookbookPdf.ts         ← native: HTML → PDF via expo-print, rename, share (§5.14)
+  raceRetries.ts         ← pure retry-alongside for a native call that may never settle (§5.14)
   imageStorage.ts        ← persisting picked images into documentDirectory + cleanup
   imageDownscale.ts      ← caps newly picked photos (1280px / JPEG 0.7) to bound storage + backup size
   seedData.ts            ← pure: localized sample cookbook + showcase recipe builder (§5.20)
@@ -640,7 +641,7 @@ If parsing yields zero candidates (e.g. ingredients contain only headings), the 
 
 **Behavior:** the pure `buildCookbookHtml(cookbook, recipes, t)` (`utils/cookbookPdfHtml.ts`) renders a full HTML document; `utils/cookbookPdf.ts` (`shareCookbookPdf`) turns it into a PDF via `expo-print` `printToFileAsync({ html })`, renames it (above) and shares the renamed file via `Sharing.shareAsync(target, { mimeType: 'application/pdf', dialogTitle })`. On failure — including a device with no share target — surfaces `Alert('Export failed', …)`.
 
-**Progress (iteration 3):** rendering takes seconds, and the "⋯" menu has already closed by then, so a persona saw nothing happen and tapped again. From the tap until the share sheet opens, a dimmed overlay with a spinner and *"Preparing PDF…"* covers the cookbook view; a second "Share as PDF" is ignored until the share sheet has returned.
+**Progress (iteration 3):** rendering takes seconds, and the "⋯" menu has already closed by then, so a persona saw nothing happen and tapped again. From the tap until the share sheet opens, a dimmed overlay with a spinner and *"Preparing PDF…"* covers the cookbook view; a second "Share as PDF" is ignored until the share sheet has returned. The progress was also hiding a real stall: on Android the **first** `printToFileAsync` after launch can never settle (probably because expo-print starts writing without waiting for its WebView's layout callback — not confirmed), while a second call goes straight through. So the render runs through the pure `raceRetries` (`utils/raceRetries.ts`, unit-tested): if nothing has resolved after 5 s, another attempt starts **alongside** — the first is not cancelled, it may just be slow — up to 3 attempts; the first to resolve wins and late results are deleted from the cache; after 45 s with nothing, the "Export failed" alert.
 
 **Content/styling:** cookbook name as the document title, then each recipe (title, optional metadata, then Ingredients / Instructions / Notes). All labels are **localized** (current UI language). User content is **HTML-escaped** (`&`, `<`, `>`) and newlines become `<br>`; missing metadata/sections are omitted (no `—`). Print styling uses values consistent with `constants/theme.ts` (light palette).
 
