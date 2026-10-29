@@ -19,6 +19,8 @@ type Props = {
    * the swipe gesture exists. Flip to true once, on the first row only.
    */
   peek?: boolean;
+  /** Called after the peek has closed again, so the caller can drop the flag. */
+  onPeekEnd?: () => void;
 };
 
 // Only one row may stay open at a time (iOS Mail behavior).
@@ -66,6 +68,7 @@ export default function SwipeableRow({
   onEdit,
   editLabel,
   peek,
+  onPeekEnd,
 }: Props) {
   const c = useTheme();
   const t = useT();
@@ -88,6 +91,7 @@ export default function SwipeableRow({
     const close = setTimeout(() => {
       ref.current?.close();
       peeking.current = false;
+      onPeekEnd?.();
     }, 1650);
     return () => {
       clearTimeout(open);
