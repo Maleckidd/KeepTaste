@@ -119,6 +119,10 @@ export const dictionary = {
     en: 'Could not export the cookbook.',
     pl: 'Nie udało się wyeksportować książki kucharskiej.',
   },
+  'cookbook.pdfPreparing': {
+    en: 'Preparing PDF…',
+    pl: 'Tworzę PDF…',
+  },
   'cookbook.sharePdfTitle': {
     en: 'Share cookbook (PDF)',
     pl: 'Udostępnij książkę (PDF)',
