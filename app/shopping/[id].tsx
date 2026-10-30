@@ -54,6 +54,7 @@ import Fab from '@/components/ui/Fab';
 import ActionSheet from '@/components/ui/ActionSheet';
 import SwipeableRow from '@/components/ui/SwipeableRow';
 import PasteListSheet from '@/components/shopping/PasteListSheet';
+import SendListSheet from '@/components/shopping/SendListSheet';
 import { buildShoppingListShareText } from '@/utils/shoppingListShareText';
 import type { ShoppingList, ShoppingItem } from '@/db/schema';
 import type { TranslationKey } from '@/i18n/dictionary';
@@ -93,6 +94,7 @@ export default function ShoppingListScreen() {
   const [pasteOpen, setPasteOpen] = useState(false);
   // Products parsed from a paste into the add row; the sheet opens on Review.
   const [pasteProducts, setPasteProducts] = useState<string[] | null>(null);
+  const [sendOpen, setSendOpen] = useState(false);
   // Inline title rename (replaces the old "Rename list" modal).
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -174,11 +176,11 @@ export default function ShoppingListScreen() {
     router.back();
   };
 
-  const handleShareList = async () => {
+  const handleShareList = async (selected: ShoppingItem[]) => {
     if (!list) return;
     try {
       await Share.share({
-        message: buildShoppingListShareText(list.name, items),
+        message: buildShoppingListShareText(list.name, selected),
         title: t('shopping.shareDialogTitle'),
       });
     } catch {
@@ -561,7 +563,9 @@ export default function ShoppingListScreen() {
           {
             label: t('shopping.shareList', { count: active.length }),
             icon: 'share-outline',
-            onPress: handleShareList,
+            onPress: () =>
+              // Nothing to choose from: only the list name goes out (§5.18).
+              active.length > 0 ? setSendOpen(true) : handleShareList(active),
           },
           {
             label: t('shopping.deleteList'),
@@ -592,6 +596,14 @@ export default function ShoppingListScreen() {
             }),
           });
         }}
+      />
+
+      {/* Choose what goes out before the share sheet (§5.18) */}
+      <SendListSheet
+        visible={sendOpen}
+        items={active}
+        onClose={() => setSendOpen(false)}
+        onSend={handleShareList}
       />
     </KeyboardAvoidingView>
   );

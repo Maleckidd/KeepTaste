@@ -142,7 +142,7 @@ describe('utils/i18n — createTranslator', () => {
 
   it('interpolates the share label count in Polish (shopping.shareList)', () => {
     expect(pl('shopping.shareList' as TranslationKey, { count: 3 })).toBe(
-      'Wyślij brakujące (3)'
+      'Wyślij pozostałe (3)'
     );
   });
 
