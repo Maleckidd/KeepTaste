@@ -32,6 +32,17 @@ describe('buildShoppingListShareText', () => {
     expect(text).toContain('- Apples (1kg)');
   });
 
+  it('sends only the items it is given, in that order (the send sheet passes its selection)', () => {
+    const all = [
+      item({ id: 1, name: 'Milk' }),
+      item({ id: 2, name: 'Bread' }),
+      item({ id: 3, name: 'Bananas' }),
+    ];
+    expect(buildShoppingListShareText('Weekend', [all[1], all[2]])).toBe(
+      'Weekend\n\n- Bread\n- Bananas'
+    );
+  });
+
   it('omits items already in the cart (checked)', () => {
     const text = buildShoppingListShareText('Weekend', [
       item({ id: 1, name: 'Milk', checked: 0 }),

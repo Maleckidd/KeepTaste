@@ -83,8 +83,6 @@ shows whether they still matter.
   in a single paragraph could be split on sentence ends.
 - **"Already on the list" notice** (Kasia) — a snackbar when a product being
   added is already active on the list.
-- **Choose what to send** (Kasia) — pick items before "Send what's left";
-  today the cart/active split is the only selection.
 - **Snackbar over tappable rows** (problem 12) — the "added to list"
   snackbar covers the last checklist row of the recipe view; a tap meant for
   the snackbar can tick an ingredient. A late tap is now swallowed for 1 s

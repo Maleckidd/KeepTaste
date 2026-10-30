@@ -422,7 +422,23 @@ export const dictionary = {
   'shopping.rename': { en: 'Rename', pl: 'Zmień nazwę' },
   'shopping.shareList': {
     en: "Send what's left ({count})",
-    pl: 'Wyślij brakujące ({count})',
+    pl: 'Wyślij pozostałe ({count})',
+  },
+  'shopping.sendTitle': {
+    en: "Send what's left",
+    pl: 'Wyślij pozostałe',
+  },
+  'shopping.send.one': {
+    en: 'Send {count} product',
+    pl: 'Wyślij {count} produkt',
+  },
+  'shopping.send.few': {
+    en: 'Send {count} products',
+    pl: 'Wyślij {count} produkty',
+  },
+  'shopping.send.many': {
+    en: 'Send {count} products',
+    pl: 'Wyślij {count} produktów',
   },
   'shopping.shareDialogTitle': {
     en: 'Shopping list',

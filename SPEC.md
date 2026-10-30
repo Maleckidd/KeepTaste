@@ -78,6 +78,7 @@ components/
     IngredientChecklist.tsx ← ingredients as tap-to-check rows for cooking (§5.4)
   shopping/
     PasteListSheet.tsx   ← bulk-paste products into a shopping list (§5.16)
+    SendListSheet.tsx    ← choose which active products to send (§5.18)
   ui/                    ← base components (§6): Button, IconButton, Input,
                            Card-level pieces, ScreenHeader, ModalHeader, Fab,
                            EmptyState, ActionSheet, SwipeableRow, SnackbarProvider,
@@ -825,15 +826,17 @@ Restoring an archive made on a different schema version is a corruption vector, 
 
 **The round-trip is the point.** The shared text is built so the recipient can paste it straight back into a list via **"Paste products"** (§5.16): the format is line-based bullets that `parseIngredients` (§5.16/§5.12) strips on re-paste. Sender shares → recipient pastes → both have the list. One-way, manual, user-owned — not sync.
 
-**Entry point:** a **"Send what's left (N)"** / **"Wyślij brakujące (N)"** item (`share-outline`) in the "⋯" header menu of the list detail view, between "Paste products" and "Delete list" (`app/shopping/[id].tsx`). N is the live count of active (not in cart) items. The label says what is sent: a persona believed the share sent "everything" with no way to choose (iteration 1, problem 10), while in fact it already sends only active items.
+**Entry point:** a **"Send what's left (N)"** / **"Wyślij pozostałe (N)"** item (`share-outline`) in the "⋯" header menu of the list detail view, between "Paste products" and "Delete list" (`app/shopping/[id].tsx`). N is the live count of active (not in cart) items. The label says what is sent: a persona believed the share sent "everything" with no way to choose (iteration 1, problem 10), while in fact it already sends only active items. The Polish label was "Wyślij brakujące" until iteration 6: "brakujące" promised "what the shop didn't have", which is not what the action does.
 
-**Content (`utils/shoppingListShareText.ts`, pure, unit-tested):** `buildShoppingListShareText(listName, items)` returns the list name, a blank line, then one `- {name}` bullet per item (`- {name} ({quantity})` when a quantity is set). **Only active items** are included — products already in the cart are omitted so the recipient starts from a clean list. A list with no active items shares just its name. No "—" placeholders, consistent with the rest of the app. Shared via React Native `Share.share` (like §5.13), localized dialog title (`shopping.shareDialogTitle`).
+**Choosing what goes out (`components/shopping/SendListSheet.tsx`, iteration 6, problem 1):** the menu item opens a bottom sheet (same overlay pattern as `PasteListSheet`, §5.16) with a checklist of the active items, **all selected**, a "Select none / Select all" toggle and a **"Send N products"** button (disabled with "Select products" at zero). A shopper who wants to send two things out of twenty-two no longer has to tick the other twenty: "Select none" plus two taps. It doubles as a preview of what will be sent. The selection is ephemeral: nothing is stored, and items left out stay active on the list. After the sheet has finished closing, `Share.share` opens the system chooser. With no active items there is nothing to choose, so the sheet is skipped and the list name is shared directly, as before.
+
+**Content (`utils/shoppingListShareText.ts`, pure, unit-tested):** `buildShoppingListShareText(listName, items)` returns the list name, a blank line, then one `- {name}` bullet per item (`- {name} ({quantity})` when a quantity is set). **Only active items** are included — products already in the cart are omitted so the recipient starts from a clean list; the caller passes just what stayed selected in the sheet. A list with no active items shares just its name. No "—" placeholders, consistent with the rest of the app. Shared via React Native `Share.share` (like §5.13), localized dialog title (`shopping.shareDialogTitle`).
 
 **Scope / fidelity:** lossy and deliberately so — on re-paste a quantity stays embedded in the item name (the `quantity` column isn't repopulated), matching §5.10/§5.12, which never parse quantities. The share is **not** the backup path (that's the `.md`/`.zip`, §5.6/§5.17) and is **not importable** as structured data.
 
-**i18n:** `shopping.shareList` (menu label) and `shopping.shareDialogTitle` get EN+PL entries (§5.11).
+**i18n:** `shopping.shareList` (menu label), `shopping.sendTitle` (sheet title), `shopping.send.one/few/many` (button) and `shopping.shareDialogTitle` get EN+PL entries (§5.11).
 
-**Testing:** the builder is pure → covered in `__tests__/shoppingListShareText.test.ts` (name + bullets, quantity in parens, checked items omitted, empty list, and a round-trip assertion through `parseIngredients`); the menu action is verified by running the app.
+**Testing:** the builder is pure → covered in `__tests__/shoppingListShareText.test.ts` (name + bullets, quantity in parens, a selected subset, checked items omitted, empty list, and a round-trip assertion through `parseIngredients`); the menu action and the sheet are verified by running the app.
 
 ---
 
