@@ -145,13 +145,29 @@ export default function ShoppingListScreen() {
     lightTap();
     await setItemChecked(item.id, !item.checked);
     loadData();
+    if (!item.checked) announceInCart(item.name, [item.id]);
   };
 
   // Tapping a group header checks all its remaining active children at once.
-  const handleToggleGroup = async (childIds: number[]) => {
+  const handleToggleGroup = async (name: string, childIds: number[]) => {
     lightTap();
     await Promise.all(childIds.map((id) => setItemChecked(id, true)));
     loadData();
+    announceInCart(`${name} (${childIds.length})`, childIds);
+  };
+
+  // A checked row jumps to "In cart" at the bottom, often far below the fold,
+  // so without a word it reads as deleted (iteration 4, problem 1). Unchecking
+  // stays silent: the user is looking at the cart and chose to move it back.
+  const announceInCart = (label: string, ids: number[]) => {
+    showSnackbar({
+      message: t('shoppingList.movedToCart', { name: label }),
+      actionLabel: t('undo.action'),
+      onAction: async () => {
+        await Promise.all(ids.map((id) => setItemChecked(id, false)));
+        loadData();
+      },
+    });
   };
 
   // No animateLayout() here: LayoutAnimation.configureNext is global and
@@ -291,7 +307,7 @@ export default function ShoppingListScreen() {
   }) => (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() => handleToggleGroup(row.childIds)}
+      onPress={() => handleToggleGroup(row.name, row.childIds)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: false }}
       accessibilityLabel={t('a11y.checkAllInGroup', {

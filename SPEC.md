@@ -545,7 +545,8 @@ A second product area: simple, offline shopping lists. Same philosophy as recipe
 - Each product renders as a row: name (+ quantity, muted, when present) with a **checkbox on the right**
 - Unchecked items appear at the top, newest first — a just-added product shows up at the top of the list, not below the fold
 - Tapping the checkbox: it becomes checked, the row is **grayed out** (muted text/checkbox) and **moves to the bottom of the list**, under an "In cart" section header (the header appears only when at least one item is checked)
-- Unchecking moves the item back to the unchecked group
+- Checking also shows a 5 s snackbar **"milk 2l" moved to "In cart" below** with **Undo** (unchecks it again); checking a group header names the group with its count ("bananas (2)") and Undo unchecks all of them. On a long list the "In cart" section sits far below the fold, and a row that silently left the top read as deleted: the persona never scrolled down to the cart and stopped trusting "Send what's left" (iteration 4, problem 1)
+- Unchecking moves the item back to the unchecked group, without a snackbar (the user is looking at the cart and chose to move it back)
 - Item edits update the parent list's `updated_at` (so active lists float to the top of the Shopping tab)
 - Long-press an item (light haptic) → bottom **ActionSheet**: **Edit / Delete / Cancel**; swipe-left reveals the same actions. Delete removes the item behind a 5s **Undo** snackbar, no confirmation. Edit reuses the inline row in edit mode: inputs pre-filled with the item's name/quantity, the confirm button shows a checkmark, and saving updates the item in place (clearing quantity stores NULL); editing touches the parent list's `updated_at`
 

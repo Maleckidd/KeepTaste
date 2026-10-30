@@ -456,6 +456,10 @@ export const dictionary = {
   },
   'shoppingList.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
   'shoppingList.inCartHeader': { en: 'In cart', pl: 'W koszyku' },
+  'shoppingList.movedToCart': {
+    en: '"{name}" moved to "In cart" below',
+    pl: '„{name}” przeniesiono niżej, do „W koszyku”',
+  },
   'shoppingList.productNamePlaceholder': {
     en: 'Product name...',
     pl: 'Nazwa produktu...',
