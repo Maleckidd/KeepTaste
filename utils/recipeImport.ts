@@ -26,6 +26,7 @@ export interface ParsedRecipe {
   servings?: number | null;
   ingredients?: string;
   instructions?: string;
+  notes?: string;
 }
 
 type JsonLdNode = Record<string, unknown>;
@@ -58,28 +59,21 @@ function collectCandidates(parsed: unknown): JsonLdNode[] {
 }
 
 function mapInstructions(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (!Array.isArray(value)) return '';
   const lines: string[] = [];
-  for (const item of value) {
+  // Sites wrap steps in every combination: a string, a list of strings or
+  // HowToSteps, a single object, HowToSections, even a list inside a list.
+  const visit = (item: unknown) => {
     if (typeof item === 'string') {
       lines.push(item);
-      continue;
+    } else if (Array.isArray(item)) {
+      item.forEach(visit);
+    } else if (item && typeof item === 'object') {
+      const node = item as JsonLdNode;
+      if (node.itemListElement !== undefined) visit(node.itemListElement);
+      else if (typeof node.text === 'string') lines.push(node.text);
     }
-    if (!item || typeof item !== 'object') continue;
-    const node = item as JsonLdNode;
-    if (Array.isArray(node.itemListElement)) {
-      // HowToSection — flatten its steps.
-      for (const step of node.itemListElement as unknown[]) {
-        if (step && typeof step === 'object') {
-          const text = (step as JsonLdNode).text;
-          if (typeof text === 'string') lines.push(text);
-        }
-      }
-      continue;
-    }
-    if (typeof node.text === 'string') lines.push(node.text);
-  }
+  };
+  visit(value);
   return lines.join('\n');
 }
 
@@ -132,6 +126,173 @@ export function parseRecipeJsonLd(html: string): ParsedRecipe | null {
   return null;
 }
 
+// ----- Microdata (SPEC §5.15) -----
+//
+// Sites without a JSON-LD Recipe often mark it up in the HTML itself. Fully, as
+// on aniagotuje.pl, or only the name and description, as on kwestiasmaku.com
+// and mojewypieki.com: there the Recipe element is still the part of the page
+// that holds the recipe, so its text goes through parsePastedRecipe.
+
+interface HtmlElement {
+  tag: string;
+  attrs: string;
+  contentStart: number;
+  contentEnd: number;
+  parent: HtmlElement | null;
+  isItem: boolean;
+  props: string[];
+}
+
+const VOID_TAGS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param',
+  'source', 'track', 'wbr',
+]);
+
+function htmlAttr(attrs: string, name: string): string | null {
+  const m = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs);
+  return m ? (m[1] ?? m[2] ?? m[3]) : null;
+}
+
+/**
+ * Elements in document order with their parents. Tolerant, since real pages
+ * leave <li> and <p> unclosed: a closing tag also closes whatever is still open
+ * inside it, and one with no matching open tag is ignored.
+ */
+function scanHtmlElements(html: string): HtmlElement[] {
+  const out: HtmlElement[] = [];
+  const stack: HtmlElement[] = [];
+  const tagRe = /<(\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+  let m: RegExpExecArray | null;
+  while ((m = tagRe.exec(html)) !== null) {
+    const tag = m[2].toLowerCase();
+    if (m[1]) {
+      let open = stack.length - 1;
+      while (open >= 0 && stack[open].tag !== tag) open--;
+      if (open < 0) continue;
+      for (let k = open; k < stack.length; k++) stack[k].contentEnd = m.index;
+      stack.length = open;
+      continue;
+    }
+    const attrs = m[3];
+    const el: HtmlElement = {
+      tag,
+      attrs,
+      contentStart: tagRe.lastIndex,
+      contentEnd: html.length,
+      parent: stack[stack.length - 1] ?? null,
+      isItem: /(?:^|\s)itemscope(?:[\s=/]|$)/i.test(attrs),
+      props: (htmlAttr(attrs, 'itemprop') ?? '').split(/\s+/).filter(Boolean),
+    };
+    out.push(el);
+    if (!VOID_TAGS.has(tag) && !attrs.trimEnd().endsWith('/')) stack.push(el);
+  }
+  return out;
+}
+
+const HTML_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', deg: '°', frac12: '½',
+  frac14: '¼', frac34: '¾', ndash: '–', mdash: '—', hellip: '…', oacute: 'ó', Oacute: 'Ó',
+};
+
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(\w+));/gi, (whole, dec, hex, name) => {
+    if (name) return HTML_ENTITIES[name] ?? whole;
+    const code = dec ? parseInt(dec, 10) : parseInt(hex, 16);
+    return code >= 1 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  });
+}
+
+function htmlToText(html: string): string {
+  const breaks =
+    /<(?:br|\/?(?:p|div|li|ul|ol|h[1-6]|tr|table|section|article|aside|header|footer|blockquote|dl|dt|dd))\b[^>]*>/gi;
+  return decodeHtmlEntities(html.replace(breaks, '\n').replace(/<[^>]*>/g, ''))
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function isRecipeItem(el: HtmlElement): boolean {
+  const type = el.isItem ? htmlAttr(el.attrs, 'itemtype') : null;
+  return !!type && type.split(/\s+/).some((t) => /^https?:\/\/schema\.org\/Recipe\/?$/i.test(t));
+}
+
+function nearestItem(el: HtmlElement): HtmlElement | null {
+  let parent = el.parent;
+  while (parent && !parent.isItem) parent = parent.parent;
+  return parent;
+}
+
+/** The property values of one item: its own, not those of the items nested in it. */
+function itemProperties(
+  html: string,
+  elements: HtmlElement[],
+  item: HtmlElement
+): Record<string, unknown[]> {
+  const props: Record<string, unknown[]> = {};
+  for (const el of elements) {
+    if (el.props.length === 0 || nearestItem(el) !== item) continue;
+    let value: unknown;
+    if (el.isItem) {
+      const nested = itemProperties(html, elements, el);
+      value = { text: nested.text?.[0], itemListElement: nested.itemListElement };
+    } else {
+      const raw =
+        htmlAttr(el.attrs, 'content') ??
+        htmlAttr(el.attrs, 'datetime') ??
+        html.slice(el.contentStart, el.contentEnd);
+      value = htmlToText(raw);
+    }
+    for (const prop of el.props) (props[prop] ??= []).push(value);
+  }
+  return props;
+}
+
+/**
+ * Extracts the first Schema.org Recipe from a page's microdata. When the item
+ * marks up neither ingredients nor steps, the text of its element is read as a
+ * pasted recipe instead. That has to yield both, otherwise → null.
+ */
+export function parseRecipeMicrodata(html: string): ParsedRecipe | null {
+  if (!html) return null;
+  const clean = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1\s*>/gi, '');
+  const elements = scanHtmlElements(clean).filter((el) => el.isItem || el.props.length > 0);
+  const recipe = elements.find(isRecipeItem);
+  if (!recipe) return null;
+
+  const props = itemProperties(clean, elements, recipe);
+  const parsed = mapRecipe({
+    name: props.name?.[0],
+    recipeIngredient: [...(props.recipeIngredient ?? []), ...(props.ingredients ?? [])],
+    recipeInstructions: props.recipeInstructions,
+    prepTime: props.prepTime?.[0],
+    cookTime: props.cookTime?.[0],
+    recipeYield: props.recipeYield,
+  });
+  if (parsed.ingredients || parsed.instructions) return parsed;
+
+  // The name goes first so that its repeats in the text count as the title.
+  const body = htmlToText(clean.slice(recipe.contentStart, recipe.contentEnd));
+  const text = parsePastedRecipe(parsed.title ? `${parsed.title}\n${body}` : body);
+  if (!text.ingredients || !text.instructions) return null;
+  return {
+    title: parsed.title ?? text.title,
+    prepTime: parsed.prepTime ?? text.prepTime,
+    cookTime: parsed.cookTime ?? text.cookTime,
+    servings: parsed.servings ?? text.servings,
+    ingredients: text.ingredients,
+    instructions: text.instructions,
+    notes: text.notes,
+  };
+}
+
+/** A page's structured Recipe: JSON-LD first, then microdata. */
+export function parseRecipeHtml(html: string): ParsedRecipe | null {
+  return parseRecipeJsonLd(html) ?? parseRecipeMicrodata(html);
+}
+
 // ----- Pasted-text parsing (SPEC §5.15) -----
 //
 // Real copied blog text is far messier than a clean header-delimited recipe:
@@ -163,16 +324,43 @@ const NOISE_EXACT = new Set([
   'video', 'wideo', 'wartość energetyczna', 'wartosc energetyczna', 'wartość odżywcza',
   'węglowodany', 'weglowodany', 'białko', 'bialko', 'tłuszcze', 'tluszcze',
   'w tym cukry', 'w 100 g', 'w 100g', 'dowiedz się więcej', 'dowiedz sie wiecej',
+  'reklama', 'advertisement', 'sponsored', 'ad', 'udostępnij', 'udostepnij', 'share', 'print',
+  'print recipe', 'save', 'save recipe',
 ]);
 const NOISE_PREFIX = [
   'ilość lajków', 'ilosc lajkow', 'dieta:', 'hity kwestii smaku', 'średnia ', 'srednia ',
-  'nutrition', 'wartość energetyczna', 'wartosc energetyczna',
+  'nutrition', 'wartość energetyczna', 'wartosc energetyczna', 'wartości odżywcze',
+  'wartosci odzywcze', 'zapisz się do', 'zapisz sie do', 'ten wpis zawiera', 'this post contains',
+  'jump to recipe', 'przejdź do przepisu', 'przejdz do przepisu',
 ];
+
+// Where a copied page stops being the recipe: everything below is related
+// recipes and comments. Ends the recipe once it has steps (see the main walk).
+const PAGE_TAIL_HEADERS = new Set([
+  'zobacz też', 'zobacz tez', 'zobacz także', 'zobacz takze', 'podobne przepisy',
+  'polecane przepisy', 'inne przepisy', 'przeczytaj też', 'przeczytaj tez', 'czytaj też',
+  'czytaj tez', 'czytaj także', 'czytaj takze', 'komentarze', 'wasze komentarze',
+  'dodaj komentarz', 'you may also like', 'you might also like', 'related recipes',
+  'related posts', 'more recipes', 'comments', 'leave a comment', 'leave a reply', 'tagi', 'tags',
+  'kategoria', 'kategorie', 'categories', 'przeglądaj wpisy po składnikach',
+]);
+
+function isPageTail(line: string): boolean {
+  const n = line.toLowerCase().replace(/[:!]+$/, '').replace(/\s*\(\d+\)$/, '').trim();
+  return PAGE_TAIL_HEADERS.has(n) || /^(view all )?\d+ (comments?|komentarz\p{L}*)$/u.test(n);
+}
+
+// A nutrition table row. Not noise among the ingredients: "białko 30 g" is one.
+const NUTRIENT_VALUE =
+  /^(białko|bialko|tłuszcze?|tluszcze?|węglowodany|weglowodany|błonnik|blonnik|cukry|kalorie|protein|fat|carbs|carbohydrates?|fib(er|re)|calories)\s*:?\s*\d+([.,]\d+)?\s*(g|mg|kcal)?$/i;
 
 function isNoise(line: string): boolean {
   const n = line.toLowerCase().replace(/[:!]+$/, '').trim();
   if (NOISE_EXACT.has(n)) return true;
   if (NOISE_PREFIX.some((p) => n.startsWith(p))) return true;
+  if (isPageTail(line)) return true;
+  if (/^(#\S+\s*)+$/.test(n)) return true; // hashtags; "# Ciasto" is a group heading
+  if (/\b(follow|obserwuj)\s+@\S|^save this\b|\blink (in|w) bio\b/.test(n)) return true;
   if (/^[0-9]+([.,][0-9]+)?\s*kcal$/.test(n)) return true; // "186 kcal"
   if (/^[0-9]+([.,][0-9]+)?\s*\/\s*[0-9]+/.test(n)) return true; // rating "4.8 / 5 (…)"
   if (/\s[>›»]$/.test(n)) return true; // a button/link label: "EMAIL >", "STERUJ GŁOSEM ›"
@@ -218,12 +406,13 @@ function extractMinutes(s: string): number | null {
 // "Składniki", also OCR-mangled ("Sktadniki": ł read as t) and carrying the
 // yield ("SKŁADNIKI / 4 PORCJE", "Składniki (4 porcje)").
 const PASTE_INGREDIENT_MAIN =
-  /^(?:sk[łlt]adniki|ingredients)(?:\s*[/(–\-:|·]\s*(\d+)\s*(?:porcj\p{L}*|os\p{L}*|sztuk\p{L}*|servings?|portions?)\)?)?$/u;
+  /^(?:sk[łlt]adniki|ingredients|(?:what )?you(?:['’]ll| will)? need|potrzebujesz|b[ęe]dziesz potrzebowa[ćc]|potrzebne sk[łl]adniki)(?:\s*[/(–\-:|·]\s*(\d+)\s*(?:porcj\p{L}*|os\p{L}*|sztuk\p{L}*|servings?|portions?)\)?)?$/u;
 const PASTE_STEP_HEADERS = new Set([
   'przygotowanie', 'sposób przygotowania', 'sposob przygotowania', 'sposób wykonania',
   'sposob wykonania', 'wykonanie', 'sposób przyrządzania', 'instrukcje', 'kroki',
   'instructions', 'method', 'steps', 'directions', 'preparation', 'przygotowanie krok po kroku',
-  'krok po kroku',
+  'krok po kroku', 'how', 'how to', 'how to make', 'how to make it', 'what to do', 'jak zrobić',
+  'jak zrobic', 'jak to zrobić', 'jak to zrobic', 'jak przygotować', 'jak przygotowac',
 ]);
 const PASTE_NOTES_HEADERS = new Set([
   'wskazówki', 'wskazowki', 'wskazówka', 'rady/porady', 'rady i porady', 'porada',
@@ -319,6 +508,61 @@ export function extractTitleServings(title: string): { title: string; servings: 
     }
   }
   return { title, servings: null };
+}
+
+const EMOJI = '\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}';
+const EMOJI_RE = new RegExp(`[${EMOJI}]`, 'u');
+const LEADING_EMOJI_RE = new RegExp(`^[${EMOJI}\\uFE0F\\u200D\\s]+`, 'u');
+
+// Lines that sit above a dish name on a copied page or a scanned book page.
+const TITLE_CHROME = new Set([
+  'strona główna', 'strona glowna', 'home', 'start', 'menu', 'szukaj', 'search', 'blog',
+  'przepisy', 'recipes', 'obiady', 'zupy', 'desery', 'ciasta', 'wypieki', 'śniadania',
+  'sniadania', 'kolacje', 'przystawki', 'sałatki', 'salatki', 'napoje', 'dania główne',
+  'dania glowne', 'dania mięsne', 'dania miesne', 'breakfast', 'lunch', 'dinner', 'desserts',
+  'soups', 'salads', 'drinks', 'starters', 'main courses',
+]);
+
+function isTitleChrome(line: string): boolean {
+  if (TITLE_CHROME.has(line.toLowerCase())) return true;
+  if (/[·•]\s*\d+\s*(s|m|min|h|d|w|g|godz\.?|dni|tyg\.?)$/i.test(line)) return true; // "name · 2d"
+  if (/^@?[\w.]*[._][\w.]*$/.test(line) || /^@\S+$/.test(line)) return true; // an account name
+  return /^[^›»>]+(\s[›»>]\s[^›»>]+)+$/.test(line); // "Home > Recipes > Dinner"
+}
+
+function isSentence(line: string): boolean {
+  const words = line.split(/\s+/).length;
+  return (
+    /[.?…]$/.test(line) ||
+    (line.endsWith('!') && words >= 5) ||
+    (line.includes(',') && words >= 8) ||
+    line.length > 80
+  );
+}
+
+const isTitleData = (line: string) =>
+  new RegExp(`^[${FRACTION}]`).test(line) ||
+  isPureQuantity(line) ||
+  /czas\s+\w+|liczba\s+porcji|^porcje\b|kcal/i.test(line);
+
+const isSectionStart = (line: string) =>
+  classifyPasteHeader(line) !== null || splitInlineHeader(line) !== null;
+
+// A short capitals line over an ordinary one is a book's chapter name.
+function isRunningHead(line: string, next: string | undefined): boolean {
+  if (line !== line.toUpperCase() || line === line.toLowerCase()) return false;
+  if (next === undefined || line.split(/\s+/).length > 4) return false;
+  if (isSectionStart(next) || isTitleData(next) || isSentence(next)) return false;
+  return /^\p{Lu}/u.test(next) && next !== next.toUpperCase();
+}
+
+// The title part of a line, cut at its first emoji: what a caption's opening
+// looks like. `rest` is the remainder, so an unstructured text loses nothing.
+function splitTitleLine(line: string): { title: string; rest: string } {
+  const body = line.replace(LEADING_EMOJI_RE, '');
+  const cut = body.search(EMOJI_RE);
+  if (cut < 0) return { title: body.trim(), rest: '' };
+  return { title: body.slice(0, cut).trim(), rest: body.slice(cut).replace(LEADING_EMOJI_RE, '') };
 }
 
 const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -421,16 +665,43 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
 
   // --- title detection ---
   let title: string | undefined;
-  const firstIdx = nextContent(0);
-  if (firstIdx >= 0) {
-    const t = lines[firstIdx].trim();
-    const looksData =
-      new RegExp(`^[${FRACTION}]`).test(t) ||
-      isPureQuantity(t) ||
-      /czas\s+\w+|liczba\s+porcji|^porcje\b|kcal/i.test(t);
-    if (classifyPasteHeader(t) === null && splitInlineHeader(t) === null && !looksData) {
-      title = t;
-      consumed[firstIdx] = true;
+  const takeTitle = (index: number): boolean => {
+    const { title: candidate, rest } = splitTitleLine(lines[index].trim());
+    if (!candidate || isSentence(candidate)) return false;
+    title = candidate;
+    if (rest) lines[index] = rest;
+    else consumed[index] = true;
+    return true;
+  };
+
+  // A page prints its heading twice more often than it opens with it, so a line
+  // repeated before the first section header wins over the first line.
+  const seen = new Map<string, number>();
+  let repeated = -1;
+  for (let k = 0; k < lines.length; k++) {
+    const t = lines[k].trim();
+    if (consumed[k] || !t || isNoise(t)) continue;
+    if (isSectionStart(t)) {
+      if (repeated >= 0) takeTitle(repeated);
+      break;
+    }
+    if (isTitleData(t) || isTitleChrome(t)) continue;
+    const first = seen.get(t.toLowerCase());
+    if (first === undefined) seen.set(t.toLowerCase(), k);
+    else if (repeated < 0) repeated = first;
+  }
+
+  if (title === undefined) {
+    for (let k = nextContent(0); k >= 0; k = nextContent(k + 1)) {
+      const t = lines[k].trim();
+      if (isSectionStart(t) || isTitleData(t)) break;
+      const nextIdx = nextContent(k + 1);
+      if (isTitleChrome(t) || isRunningHead(t, nextIdx >= 0 ? lines[nextIdx].trim() : undefined)) {
+        consumed[k] = true;
+        continue;
+      }
+      takeTitle(k);
+      break;
     }
   }
 
@@ -451,7 +722,9 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       else if (current === 'notes') noteLines.push('');
       continue;
     }
+    if (isPageTail(line) && instructionLines.some((l) => l.trim())) break;
     if (isNoise(line)) continue;
+    if (current !== 'ingredients' && NUTRIENT_VALUE.test(line)) continue;
     // A line repeating the title (a duplicated page heading) is chrome — drop it.
     if (title && line.toLowerCase() === title.toLowerCase()) continue;
 
@@ -475,7 +748,9 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
           // Peek for a standalone yield line right after "Składniki" (e.g. "2 sztuki").
           const y = nextContent(i + 1);
           if (servings === null && y >= 0) {
-            const ym = /^(\d+)\s*(porcj\w*|sztuk\w*|os\w*)$/.exec(lines[y].trim().toLowerCase());
+            const ym = /^(\d+)(?:\s*[-–]\s*\d+)?\s*(porcj\p{L}*|sztuk\p{L}*|os\p{L}*)$/u.exec(
+              lines[y].trim().toLowerCase()
+            );
             if (ym) { servings = parsePositiveInt(ym[1]); consumed[y] = true; }
           }
         }
@@ -547,6 +822,11 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     } else {
       noteLines.push(line);
     }
+  }
+
+  // A lone number after the last step is a scanned page's number.
+  while (instructionLines.length && /^\d{0,4}$/.test(instructionLines[instructionLines.length - 1])) {
+    instructionLines.pop();
   }
 
   // No structure found at all → body is the instructions (fallback dump).

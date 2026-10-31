@@ -34,7 +34,7 @@ import Button from '@/components/ui/Button';
 import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import type { RecipeFormData } from '@/utils/recipeForm';
 import {
-  parseRecipeJsonLd,
+  parseRecipeHtml,
   parsePastedRecipe,
   type ParsedRecipe,
 } from '@/utils/recipeImport';
@@ -238,9 +238,9 @@ export default function ImportSheet({
       ingredients: parsed.ingredients ?? '',
       instructions: parsed.instructions ?? '',
     };
-    if (sourceUrl) {
-      partial.notes = t('import.sourcePrefix', { url: sourceUrl });
-    }
+    const source = sourceUrl ? t('import.sourcePrefix', { url: sourceUrl }) : '';
+    const notes = [parsed.notes, source].filter(Boolean).join('\n\n');
+    if (notes) partial.notes = notes;
     return partial;
   };
 
@@ -262,7 +262,7 @@ export default function ImportSheet({
         }
         return;
       }
-      const parsed = parseRecipeJsonLd(res.html);
+      const parsed = parseRecipeHtml(res.html);
       if (!parsed) {
         // Reached the page but it has no structured data — paste instead.
         setError(t('import.noStructuredData'));

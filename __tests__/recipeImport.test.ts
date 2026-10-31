@@ -9,6 +9,10 @@ import {
 // Package D (SPEC.md §5.15): inline headers + servings in the title.
 import { extractTitleServings } from '@/utils/recipeImport';
 import { cleanAiResponse } from '@/utils/aiTranscribe';
+// Iteration 7 of persona-lab (SPEC.md §5.15): real-world paste and link fixes.
+import { parseRecipeHtml, parseRecipeMicrodata } from '@/utils/recipeImport';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Wraps a single JSON-LD object in a <script> tag, as it appears in page HTML.
 function ldScript(obj: unknown): string {
@@ -888,5 +892,374 @@ describe('extractTitleServings', () => {
     ['Plain title'],
   ])('no yield bracket: %s -> unchanged, servings null', (input) => {
     expect(extractTitleServings(input)).toEqual({ title: input, servings: null });
+  });
+});
+
+// The exact texts the personas had on the clipboard in the import study.
+function clipboard(file: string): string {
+  return readFileSync(
+    join(__dirname, '..', 'persona-lab', 'config-import', 'clipboard', file),
+    'utf8'
+  );
+}
+
+describe('parsePastedRecipe on the persona-lab import materials', () => {
+  describe('blog-cala-strona.txt (a whole copied page)', () => {
+    const r = parsePastedRecipe(clipboard('blog-cala-strona.txt'));
+
+    it('finds the dish name behind the breadcrumb', () => {
+      expect(r.title).toBe('Zupa krem z dyni z mleczkiem kokosowym');
+    });
+
+    it('keeps the labeled times and servings', () => {
+      expect(r.prepTime).toBe(15);
+      expect(r.cookTime).toBe(30);
+      expect(r.servings).toBe(4);
+    });
+
+    it('reads the 10 ingredients, without the ad line', () => {
+      const lines = r.ingredients.split('\n');
+      expect(lines).toHaveLength(10);
+      expect(lines[0]).toBe('1 dynia hokkaido (ok. 1 kg)');
+      expect(lines[9]).toBe('pestki dyni do posypania');
+    });
+
+    it('ends the steps where the recipe ends', () => {
+      const lines = r.instructions.split('\n');
+      expect(lines).toHaveLength(6);
+      expect(lines[5]).toBe('Podawaj z prażonymi pestkami dyni.');
+    });
+
+    it('sends the tip to notes and nothing after it', () => {
+      expect(r.notes).toBe('zupa świetnie się mrozi, wytrzymuje w zamrażarce do 3 miesięcy.');
+    });
+  });
+
+  describe('insta-caption.txt', () => {
+    const r = parsePastedRecipe(clipboard('insta-caption.txt'));
+
+    it('skips the account line and cuts the title at the first emoji', () => {
+      expect(r.title).toBe('the 20 min miso butter noodles everyone keeps asking for');
+    });
+
+    it('treats "you need:" as the ingredients header', () => {
+      const lines = r.ingredients.split('\n');
+      expect(lines).toHaveLength(8);
+      expect(lines[0]).toBe('200g egg noodles');
+      expect(lines[7]).toBe('chilli crisp to finish 🌶️');
+    });
+
+    it('treats "how:" as the method header and drops the caption tail', () => {
+      expect(r.instructions.split('\n')).toHaveLength(1);
+      expect(r.instructions).toMatch(/^boil noodles, keep a mug of the water\./);
+      expect(r.instructions).not.toMatch(/SAVE this|#noodles|View all/);
+    });
+  });
+
+  describe('wiadomosc-od-mamy.txt (a chat message, no headers)', () => {
+    const r = parsePastedRecipe(clipboard('wiadomosc-od-mamy.txt'));
+
+    it('leaves the title empty rather than using the greeting', () => {
+      expect(r.title).toBeUndefined();
+    });
+
+    it('loses no text: with no structure it all stays in instructions', () => {
+      expect(r.instructions).toMatch(/^Basiu to ten piernik/);
+      expect(r.instructions).toMatch(/buziaki$/);
+    });
+  });
+});
+
+describe('parsePastedRecipe title detection', () => {
+  const titleOf = (...lines: string[]) => parsePastedRecipe(lines.join('\n')).title;
+
+  it('a line repeated before the ingredients is the title', () => {
+    expect(titleOf('Mój blog', 'Bigos', 'Bigos', 'Składniki', 'kapusta')).toBe('Bigos');
+  });
+
+  it('a repeat after the ingredients header does not count', () => {
+    expect(titleOf('Bigos', 'Składniki', 'kapusta', 'kapusta')).toBe('Bigos');
+  });
+
+  it('skips breadcrumb and category lines', () => {
+    expect(titleOf('Home', 'Recipes', 'Banana bread', 'Ingredients', 'bananas')).toBe('Banana bread');
+    expect(titleOf('Strona główna', 'Desery', 'Sernik', 'Składniki', 'twaróg')).toBe('Sernik');
+  });
+
+  it('skips a capitals running head above an ordinary line', () => {
+    expect(titleOf('DANIA MIĘSNE', 'Gołąbki w sosie pomidorowym', 'Składniki', 'kapusta')).toBe(
+      'Gołąbki w sosie pomidorowym'
+    );
+  });
+
+  it('keeps a capitals title above a header, a tagline or a sentence', () => {
+    expect(titleOf('PIEROGI RUSKIE', 'Składniki', 'mąka')).toBe('PIEROGI RUSKIE');
+    expect(titleOf('PIEROGI RUSKIE', 'z cebulką i twarogiem', 'Składniki', 'mąka')).toBe('PIEROGI RUSKIE');
+    expect(titleOf('PIEROGI RUSKIE', 'Najlepsze na świecie.', 'Składniki', 'mąka')).toBe('PIEROGI RUSKIE');
+  });
+
+  it('a whole sentence is not a title', () => {
+    expect(titleOf('Dziś robimy coś pysznego na obiad!', 'Składniki', 'mąka')).toBeUndefined();
+    expect(titleOf('Hej, wysyłam ci ten przepis co obiecałam wczoraj wieczorem', 'Składniki', 'mąka')).toBeUndefined();
+  });
+
+  it('a title with a comma or a closing emoji stays a title', () => {
+    expect(titleOf('Kurczak z ryżem, szybki', 'Składniki', 'kurczak')).toBe('Kurczak z ryżem, szybki');
+    expect(titleOf('Zupa dyniowa 🎃', 'Składniki', 'dynia')).toBe('Zupa dyniowa');
+    expect(titleOf('🎃 Zupa dyniowa', 'Składniki', 'dynia')).toBe('Zupa dyniowa');
+  });
+});
+
+describe('parsePastedRecipe more section headers', () => {
+  it.each(["You'll need", 'You need', 'What you need', 'Potrzebujesz', 'Będziesz potrzebować', 'Bedziesz potrzebowac'])(
+    '%s starts the ingredients',
+    (header) => {
+      const r = parsePastedRecipe(['Bułki', `${header}:`, '2 jajka', 'Method', 'Mix.'].join('\n'));
+      expect(r.ingredients).toBe('2 jajka');
+    }
+  );
+
+  it.each(['How', 'How to make it', 'Jak zrobić', 'Jak to zrobić'])('%s starts the method', (header) => {
+    const r = parsePastedRecipe(['Bułki', 'Ingredients', '2 jajka', `${header}:`, 'Mix.'].join('\n'));
+    expect(r.ingredients).toBe('2 jajka');
+    expect(r.instructions).toBe('Mix.');
+  });
+
+  it('works as an inline header', () => {
+    const r = parsePastedRecipe(['Bułki', 'You need: 2 eggs', 'how: mix them'].join('\n'));
+    expect(r.ingredients).toBe('2 eggs');
+    expect(r.instructions).toBe('mix them');
+  });
+
+  it('a sentence starting with the same word stays an ordinary line', () => {
+    const r = parsePastedRecipe(['Bułki', 'Ingredients', '2 jajka', 'How long it bakes: an hour'].join('\n'));
+    expect(r.ingredients).toBe('2 jajka\nHow long it bakes: an hour');
+  });
+});
+
+describe('parsePastedRecipe page and caption noise', () => {
+  it('drops ad and share labels', () => {
+    const r = parsePastedRecipe(
+      ['Bułki', 'Składniki', 'mąka', 'Reklama', 'Advertisement', 'Przygotowanie', 'Mieszaj.', 'Udostępnij', 'Share'].join('\n')
+    );
+    expect(r.ingredients).toBe('mąka');
+    expect(r.instructions).toBe('Mieszaj.');
+  });
+
+  it('drops hashtag lines and follow prompts but keeps a # group heading', () => {
+    const r = parsePastedRecipe(
+      ['Bułki', 'Składniki', '# Ciasto', 'mąka', 'Przygotowanie', 'Mieszaj.', '#obiad #szybko', 'Follow @kucharz for more'].join('\n')
+    );
+    expect(r.ingredients).toBe('# Ciasto\nmąka');
+    expect(r.instructions).toBe('Mieszaj.');
+  });
+
+  it('a nutrition value is noise after the ingredients, an ingredient inside them', () => {
+    const r = parsePastedRecipe(
+      ['Bułki', 'Składniki', 'białko 30 g', 'Przygotowanie', 'Mieszaj.', 'Białko 4 g', 'Tłuszcze: 18 g'].join('\n')
+    );
+    expect(r.ingredients).toBe('białko 30 g');
+    expect(r.instructions).toBe('Mieszaj.');
+  });
+
+  it.each(['Zobacz też', 'Podobne przepisy', 'Komentarze', 'Komentarze (47)', '47 komentarzy', 'You may also like', 'Comments', 'View all 212 comments'])(
+    '%s ends the recipe once there are steps',
+    (tail) => {
+      const r = parsePastedRecipe(
+        ['Bułki', 'Składniki', 'mąka', 'Przygotowanie', 'Mieszaj.', tail, 'Rosół jak u babci', 'Ania: pyszne!'].join('\n')
+      );
+      expect(r.instructions).toBe('Mieszaj.');
+      expect(r.notes).toBe('');
+    }
+  );
+
+  it('a yield range after the ingredients header sets servings', () => {
+    const r = parsePastedRecipe(['Naleśniki', 'Składniki', '16 - 17 sztuk', 'mąka', 'Przygotowanie', 'Smaż.'].join('\n'));
+    expect(r.servings).toBe(16);
+    expect(r.ingredients).toBe('mąka');
+  });
+
+  it('a tab bar above the steps does not end the recipe', () => {
+    const r = parsePastedRecipe(
+      ['Bułki', 'Składniki', 'Przygotowanie', 'Komentarze', 'Składniki', 'mąka', 'Przygotowanie', 'Mieszaj.'].join('\n')
+    );
+    expect(r.ingredients).toBe('mąka');
+    expect(r.instructions).toBe('Mieszaj.');
+  });
+
+  it('a lone page number after the last step is dropped', () => {
+    const r = parsePastedRecipe(['Bułki', 'Składniki', 'mąka', 'Przygotowanie', 'Mieszaj.', '127'].join('\n'));
+    expect(r.instructions).toBe('Mieszaj.');
+  });
+});
+
+describe('recipeInstructions shapes', () => {
+  const steps = (recipeInstructions: unknown) =>
+    parseRecipeJsonLd(ldScript({ '@type': 'Recipe', name: 'X', recipeInstructions }))!.instructions;
+  const section = {
+    '@type': 'HowToSection',
+    name: 'Jak przygotować?',
+    itemListElement: [
+      { '@type': 'HowToStep', text: 'Zagotuj mleko.' },
+      { '@type': 'HowToStep', text: 'Wsyp makaron.' },
+    ],
+  };
+
+  it('reads sections nested in an extra array (doradcasmaku.pl)', () => {
+    expect(steps([[section]])).toBe('Zagotuj mleko.\nWsyp makaron.');
+  });
+
+  it('reads a single section or step that is not in an array', () => {
+    expect(steps(section)).toBe('Zagotuj mleko.\nWsyp makaron.');
+    expect(steps({ '@type': 'HowToStep', text: 'Zagotuj mleko.' })).toBe('Zagotuj mleko.');
+  });
+
+  it('reads plain strings inside a section', () => {
+    expect(steps([{ '@type': 'HowToSection', itemListElement: ['Zagotuj mleko.'] }])).toBe('Zagotuj mleko.');
+  });
+});
+
+describe('parseRecipeMicrodata', () => {
+  // The shape of aniagotuje.pl: everything marked up, unrelated items nested inside.
+  const full = `
+    <article itemscope="itemscope" itemtype="https://schema.org/Recipe">
+      <div itemprop="author" itemscope itemtype="https://schema.org/Person"><meta itemprop="name" content="Ania"></div>
+      <h1 itemprop="name">Szarlotka &amp; lody</h1>
+      <meta itemprop="prepTime" content="PT0H30M">
+      <meta itemprop="cookTime" content="PT2H10M">
+      <meta itemprop="recipeYield" content="12 porcji">
+      <li><span itemprop="recipeIngredient"><span>jabłka</span><span> 1,5 kg</span></span></li>
+      <li><span itemprop="recipeIngredient">mąka&nbsp;320 g</span></li>
+      <div itemprop="recipeInstructions" itemscope itemtype="https://schema.org/HowToStep">
+        <span itemprop="name">Ciasto</span>
+        <div itemprop="text"><p>Zagnieć ciasto.</p><p>Schłodź.</p></div>
+      </div>
+      <div itemprop="recipeInstructions" itemscope itemtype="https://schema.org/HowToStep">
+        <div itemprop="text">Piecz.</div>
+      </div>
+      <div itemscope itemtype="https://schema.org/FAQPage">
+        <div itemprop="mainEntity" itemscope itemtype="https://schema.org/Question">
+          <div itemprop="text">Czy można zamrozić?</div>
+        </div>
+      </div>
+    </article>`;
+
+  it('maps a fully marked-up Recipe', () => {
+    const r = parseRecipeMicrodata(full)!;
+    expect(r.title).toBe('Szarlotka & lody');
+    expect(r.prepTime).toBe(30);
+    expect(r.cookTime).toBe(130);
+    expect(r.servings).toBe(12);
+    expect(r.ingredients).toBe('jabłka 1,5 kg\nmąka 320 g');
+    expect(r.instructions).toBe('Zagnieć ciasto.\nSchłodź.\nPiecz.');
+  });
+
+  it('reads the older "ingredients" property and a plain instructions list', () => {
+    const r = parseRecipeMicrodata(`
+      <div itemscope itemtype="http://schema.org/Recipe">
+        <h1 itemprop=name>Placki</h1>
+        <li itemprop="ingredients">2 jajka</li>
+        <time itemprop="prepTime" datetime="PT15M">15 minut</time>
+        <ol itemprop="recipeInstructions"><li>Wymieszaj.</li><li>Usmaż.</li></ol>
+      </div>`)!;
+    expect(r.title).toBe('Placki');
+    expect(r.prepTime).toBe(15);
+    expect(r.ingredients).toBe('2 jajka');
+    expect(r.instructions).toBe('Wymieszaj.\nUsmaż.');
+  });
+
+  it('survives unclosed list items and tag-like text in scripts and comments', () => {
+    const r = parseRecipeMicrodata(`
+      <div itemscope itemtype="https://schema.org/Recipe">
+        <span itemprop="name">Placki</span>
+        <!-- </div> -->
+        <script>document.write("</div>")</script>
+        <ul><li><span itemprop="recipeIngredient">2 jajka</span><li><span itemprop="recipeIngredient">mąka</span></ul>
+        <div itemprop="recipeInstructions">Usmaż.</div>
+      </div>`)!;
+    expect(r.ingredients).toBe('2 jajka\nmąka');
+    expect(r.instructions).toBe('Usmaż.');
+  });
+
+  // The shape of kwestiasmaku.com and mojewypieki.com: only the name and the
+  // description are marked up, the rest is ordinary text inside the element.
+  const nameOnly = `
+    <nav>Strona główna Przepisy</nav>
+    <div itemscope itemtype="https://schema.org/Recipe">
+      <span itemprop="description">Pyszny sernik na kruchym spodzie.</span>
+      <div itemprop=name><h1>Sernik z rosą</h1></div>
+      <h3><span>Składniki</span></h3>
+      <div>24 porcje</div>
+      <ul><li> 250 g mąki</li><li> 1 jajko</li></ul>
+      <h3>Przygotowanie</h3>
+      <ul><li> Zagnieść ciasto.</li><li> Piec 10 minut.</li></ul>
+    </div>
+    <footer>Polecane przepisy</footer>`;
+
+  it('reads the text of the Recipe element when only the name is marked up', () => {
+    const r = parseRecipeMicrodata(nameOnly)!;
+    expect(r.title).toBe('Sernik z rosą');
+    expect(r.servings).toBe(24);
+    expect(r.ingredients).toBe('250 g mąki\n1 jajko');
+    expect(r.instructions).toBe('Zagnieść ciasto.\nPiec 10 minut.');
+  });
+
+  it('a repeat of the name below the steps is not a step, a tip goes to notes', () => {
+    const r = parseRecipeMicrodata(`
+      <div itemscope itemtype="https://schema.org/Recipe">
+        <div itemprop=name><h1>Sernik</h1></div>
+        <h3>Składniki</h3><ul><li>twaróg</li></ul>
+        <h3>Przygotowanie</h3><ul><li>Upiecz.</li></ul>
+        <h3>Wskazówki</h3><p>Najlepszy na drugi dzień.</p>
+        <div>Sernik</div>
+      </div>`)!;
+    expect(r.instructions).toBe('Upiecz.');
+    expect(r.notes).toBe('Najlepszy na drugi dzień.');
+  });
+
+  it('stops at the site index printed inside the Recipe element', () => {
+    const r = parseRecipeMicrodata(`
+      <article itemscope itemtype="http://schema.org/Recipe">
+        <meta itemprop="name" content="Sernik">
+        <h3>Składniki</h3><ul><li>twaróg</li></ul>
+        <h3>Przygotowanie</h3><p>Upiecz.</p>
+        <h3>Przeglądaj wpisy po składnikach:</h3><ul><li>rodzynki</li><li>mak</li></ul>
+      </article>`)!;
+    expect(r.instructions).toBe('Upiecz.');
+  });
+
+  it('gives up when the element text has no ingredients or no steps', () => {
+    expect(
+      parseRecipeMicrodata(`<div itemscope itemtype="https://schema.org/Recipe">
+        <span itemprop="name">Sernik</span><p>Opis bez przepisu.</p></div>`)
+    ).toBeNull();
+  });
+
+  it('no Recipe item -> null', () => {
+    expect(parseRecipeMicrodata('')).toBeNull();
+    expect(parseRecipeMicrodata('<p>Tylko tekst</p>')).toBeNull();
+    expect(
+      parseRecipeMicrodata(`<div itemscope itemtype="https://schema.org/Article"><span itemprop="name">Nie</span></div>`)
+    ).toBeNull();
+  });
+});
+
+describe('parseRecipeHtml', () => {
+  it('prefers JSON-LD', () => {
+    const html = `${ldScript({ '@type': 'Recipe', name: 'Z JSON-LD' })}
+      <div itemscope itemtype="https://schema.org/Recipe"><span itemprop="name">Z microdata</span>
+      <span itemprop="recipeIngredient">mąka</span></div>`;
+    expect(parseRecipeHtml(html)!.title).toBe('Z JSON-LD');
+  });
+
+  it('falls back to microdata', () => {
+    const html = `${ldScript({ '@type': 'WebSite', name: 'Blog' })}
+      <div itemscope itemtype="https://schema.org/Recipe"><span itemprop="name">Z microdata</span>
+      <span itemprop="recipeIngredient">mąka</span></div>`;
+    expect(parseRecipeHtml(html)!.title).toBe('Z microdata');
+  });
+
+  it('nothing structured -> null', () => {
+    expect(parseRecipeHtml('<html><body><h1>Przepis</h1></body></html>')).toBeNull();
   });
 });
