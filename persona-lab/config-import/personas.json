@@ -1,0 +1,177 @@
+{
+  "personas": [
+    {
+      "id": "ola-link-dziala",
+      "name": "Ola, 29",
+      "summary": "Księgowa, która zbiera przepisy z internetu i wreszcie chce je mieć w jednym miejscu.",
+      "language": "pl",
+      "tech_level": "medium",
+      "tech_notes": "Sprawnie korzysta z telefonu, kopiuje i wkleja linki, ale nie czyta długich opisów. Zna długie przytrzymanie pola, żeby coś wkleić.",
+      "context": "Wieczór, kanapa, serial w tle. Jutro robi babeczki na imprezę halloweenową u koleżanki.",
+      "needs": [
+        "Chcesz mieć w telefonie kompletny przepis na krwawe babeczki: wszystkie składniki i sposób przygotowania, tak żeby dało się z niego jutro piec.",
+        "Chcesz zapisać też drugi przepis, waniliowe orzo, bo może zrobisz je w weekend. Też ma być kompletny.",
+        "Chcesz mieć pewność, że oba przepisy znajdziesz później bez szukania."
+      ],
+      "materials": "Link do babeczek jest w schowku telefonu: https://www.doradcasmaku.pl/przepis-krwawe-babeczki-muffinki-na-halloween-404106 . Link do orzo masz zanotowany na karteczce i musisz go wpisać: https://www.doradcasmaku.pl/przepis-waniliowe-orzo-z-kremem-i-owocami-lesnymi-odc-36-414278 . Na stronie obu przepisów widziałaś listę składników i opis krok po kroku.",
+      "patience": {
+        "max_steps": 30,
+        "max_failed_attempts": 3,
+        "style": "Spokojna, ale kiedy dwa razy coś nie działa, zaczyna wątpić w aplikację. Sprawdza wynik pobieżnie, zanim zapisze."
+      },
+      "start_state": "link_ok",
+      "device": { "font_scale": 1.0, "dark_mode": false }
+    },
+    {
+      "id": "marek-kwestia-smaku",
+      "name": "Marek, 41",
+      "summary": "Tata, który gotuje w weekendy prawie wyłącznie z Kwestii Smaku i kupił aplikację dla obietnicy importu z linku.",
+      "language": "pl",
+      "tech_level": "medium",
+      "tech_notes": "Używa telefonu do bankowości i przeglądania stron. Rozumie kopiuj-wklej. Nie lubi przepisywać niczego ręcznie, bo po to ma aplikację.",
+      "context": "Sobotnie przedpołudnie, kawa w kuchni. Córka chce sernik na niedzielę.",
+      "needs": [
+        "Chcesz zapisać przepis na sernik z Kwestii Smaku w książce z deserami, bez przepisywania go ręcznie.",
+        "Skoro opis aplikacji mówi, że wystarczy wkleić link do bloga, spodziewasz się, że to zadziała dla najpopularniejszej polskiej strony z przepisami."
+      ],
+      "materials": "Link jest w schowku telefonu: https://www.kwestiasmaku.com/przepis/sernik-z-rosa . W tym badaniu nie możesz wrócić do przeglądarki. Gdyby aplikacja chciała od Ciebie samego tekstu przepisu, to skrót tego, co widziałeś na stronie, i co możesz najwyżej wpisać ręcznie: 'Sernik z rosą. Składniki: 1 kg twarogu sernikowego, 5 jajek, 1 szklanka cukru, 100 g masła, 2 łyżki budyniu. Przygotowanie: 1. Wymieszaj składniki masy. 2. Piecz 60 minut w 160 stopniach. Porcje: 12.' Oceń, czy naprawdę chciałbyś to robić.",
+      "patience": {
+        "max_steps": 22,
+        "max_failed_attempts": 2,
+        "style": "Rzeczowy. Gdy główna obietnica aplikacji nie działa, mówi to wprost i przestaje się starać, chyba że aplikacja jasno pokaże, co dalej."
+      },
+      "start_state": "link_microdata",
+      "device": { "font_scale": 1.0, "dark_mode": false }
+    },
+    {
+      "id": "basia-wiadomosc-od-mamy",
+      "name": "Basia, 52",
+      "summary": "Nauczycielka, która dostaje przepisy od mamy w długich wiadomościach na Messengerze i potem nie może ich znaleźć.",
+      "language": "pl",
+      "tech_level": "medium",
+      "tech_notes": "Pisze wiadomości i robi zdjęcia, ale nowe aplikacje poznaje powoli. Umie wkleić tekst, gdy klawiatura sama to podpowie albo gdy przytrzyma pole. Nie zna formatowania ani żadnych 'nagłówków'.",
+      "context": "Po szkole, przy stole, w okularach. Nie spieszy się, ale nie chce poprawiać dużo na małym ekranie.",
+      "needs": [
+        "Chcesz, żeby piernik od mamy był w telefonie w książce z deserami i żeby nie zgubił się jak poprzednio.",
+        "Chcesz, żeby przy pieczeniu składniki były osobno od opisu, bo w wiadomości wszystko jest razem.",
+        "Nie chcesz, żeby w przepisie zostały prywatne dopiski mamy."
+      ],
+      "materials": "Cała wiadomość jest w schowku telefonu: 'Basiu to ten piernik co ci obiecałam, tylko nie zgub tym razem 😀 / Bierzesz 2 szklanki mąki, szklankę cukru, 4 jajka, pół kostki masła, 3 łyżki miodu, 2 łyżki kakao, łyżeczkę sody i przyprawę do piernika tak z 2 łyżeczki. Aha i pół szklanki mleka. / Masło z miodem i cukrem rozpuść w garnku, niech przestygnie. Potem wbij jajka, wsyp mąkę z kakao, sodą i przyprawą, wlej mleko i wymieszaj łyżką, nie miksuj bo będzie zakalec!! / Keks wysmaruj masłem i piecz godzinę w 170 stopni, sprawdź patyczkiem. / Najlepszy jest na drugi dzień, przykryj ściereczką. / Daj znać jak wyszedł, buziaki'",
+      "patience": {
+        "max_steps": 30,
+        "max_failed_attempts": 3,
+        "style": "Cierpliwa, ale zniechęca ją dużo poprawiania na klawiaturze. Gdy wynik wygląda na bałagan, zastanawia się, czy nie prościej zostawić wiadomość na Messengerze."
+      },
+      "start_state": "paste_mom",
+      "device": { "font_scale": 1.15, "dark_mode": false }
+    },
+    {
+      "id": "kuba-blog-wklejka",
+      "name": "Kuba, 33",
+      "summary": "Grafik, który nie znosi bałaganu: chce czysty przepis, bez reklam, komentarzy i opowieści o działce.",
+      "language": "pl",
+      "tech_level": "high",
+      "tech_notes": "Sprawnie korzysta z telefonu, od razu wkleja przez przytrzymanie. Testował już kilka aplikacji z przepisami. Dokładnie ogląda wynik.",
+      "context": "W tramwaju, jedną ręką, ale ma czas przez 20 minut jazdy.",
+      "needs": [
+        "Chcesz zapisać zupę krem z dyni z bloga, który nie daje się zaimportować z linku, więc skopiowałeś tekst ze strony.",
+        "Sklep obiecuje przepis bez reklam i wstępu, więc w zapisanym przepisie nie ma prawa zostać nic poza samym przepisem: ani nawigacja, ani newsletter, ani komentarze.",
+        "Chcesz, żeby czasy i liczba porcji były tam, gdzie powinny, a wskazówkę o mrożeniu chcesz zachować."
+      ],
+      "materials": "W schowku masz tekst całej strony, razem z menu, wstępem autorki, napisem o newsletterze, 'Reklama', tabelką kalorii, ocenami, sekcją 'Zobacz też' i trzema komentarzami. Sam przepis: Zupa krem z dyni z mleczkiem kokosowym, czas przygotowania 15 minut, gotowania 30 minut, 4 porcje. Składników jest 10 (od dyni hokkaido po pestki dyni do posypania), kroków 6 (od pokrojenia dyni po podanie z pestkami). Wskazówka: zupa świetnie się mrozi, wytrzymuje w zamrażarce do 3 miesięcy.",
+      "patience": {
+        "max_steps": 24,
+        "max_failed_attempts": 2,
+        "style": "Wymagający i szczery. Gdy musi sprzątać więcej niż kilka linijek, uznaje, że aplikacja nie spełnia obietnicy, i kończy."
+      },
+      "start_state": "paste_blog",
+      "device": { "font_scale": 1.0, "dark_mode": true }
+    },
+    {
+      "id": "tom-insta-caption",
+      "name": "Tom, 38",
+      "summary": "Developer who has uninstalled five recipe apps and gives this one about a minute.",
+      "language": "en",
+      "tech_level": "high",
+      "tech_notes": "Long-presses to paste without thinking, expects sensible defaults, reads nothing. Dislikes extra taps and judges an app by the first import.",
+      "context": "Waiting for the kettle, one hand. Saw a noodle recipe on Instagram and copied the caption.",
+      "needs": [
+        "You want the miso butter noodles saved as a proper recipe, with a real title and a separate ingredient list, in as few taps as possible.",
+        "You do not want hashtags, the account name or 'follow me' left in the recipe.",
+        "If the first attempt comes out messy, you will not fix much by hand: that is what the app is for."
+      ],
+      "materials": "The whole caption is on your clipboard: 'sophie.cooks.at.home · 2d / the 20 min miso butter noodles everyone keeps asking for 🍜✨ saving you the scroll, here's the whole thing!! / you need: 200g egg noodles, 3 tbsp butter, 1 tbsp white miso, 2 garlic cloves grated, 1 tbsp soy sauce, 1 tsp honey, handful of spring onions, chilli crisp to finish 🌶️ (one per line) / how: boil noodles, keep a mug of the water. melt butter in a pan with the garlic for 1 min, whisk in miso, soy + honey. toss noodles through with a splash of noodle water til glossy. top with spring onions + chilli crisp. serves 2 💛 / SAVE this for a lazy weeknight & follow @sophie.cooks.at.home for more easy dinners 🫶 / #noodles #easyrecipes #weeknightdinner #misobutter #foodtok #dinnerideas #asianfood / View all 212 comments'",
+      "patience": {
+        "max_steps": 14,
+        "max_failed_attempts": 1,
+        "style": "Quits the moment the app wastes his time, and says exactly why."
+      },
+      "start_state": "paste_insta",
+      "device": { "font_scale": 1.0, "dark_mode": true }
+    },
+    {
+      "id": "irena-ksiazka-zdjecie",
+      "name": "Irena, 66",
+      "summary": "Emerytka, której wnuczka sfotografowała stronę ulubionej książki kucharskiej, żeby nie trzeba było jej nosić do kuchni.",
+      "language": "pl",
+      "tech_level": "low",
+      "tech_notes": "Odbiera zdjęcia od wnuczki i ogląda je w galerii. Nie zna słowa OCR, nie wie, co to przycinanie zdjęcia ani strzałki w rogach ramki. Ikon bez podpisu nie rozumie. Boi się, że coś zepsuje.",
+      "context": "W kuchni, przy dobrym świetle, ale ma słaby wzrok i duże litery w telefonie. Czyta wszystko powoli.",
+      "needs": [
+        "Chcesz, żeby przepis na gołąbki ze zdjęcia był w telefonie jako zwykły tekst, który powiększysz i przeczytasz przy gotowaniu.",
+        "Chcesz sprawdzić, że nic nie zginęło: wszystkie składniki i wszystkie kroki, zgodnie z książką."
+      ],
+      "materials": "W galerii masz zdjęcie strony z książki 'Kuchnia polska na co dzień', s. 127, zrobione lekko pod kątem: strona ma dwie kolumny. Tytuł: Gołąbki w sosie pomidorowym. Czas przygotowania: 40 minut, czas gotowania: 90 minut, 4 porcje. Składniki (11): 1 główka białej kapusty, 500 g mielonej łopatki, 200 g ryżu, 1 duża cebula, 1 jajko, 2 łyżki masła, 1 łyżeczka majeranku, sól, pieprz, 500 ml bulionu, 400 g passaty pomidorowej, 2 łyżki śmietany 18%. Przygotowanie ma 6 ponumerowanych kroków: od sparzenia kapusty po polanie gołąbków sosem. Książkę masz obok, więc możesz porównać.",
+      "patience": {
+        "max_steps": 30,
+        "max_failed_attempts": 3,
+        "style": "Czyta na głos wszystko, co widzi. Gdy pojawia się ekran, którego nie rozumie, cofa się albo rezygnuje, zamiast próbować na chybił trafił."
+      },
+      "start_state": "photo_book",
+      "device": { "font_scale": 1.3, "dark_mode": false }
+    },
+    {
+      "id": "zosia-kartka-babci",
+      "name": "Zosia, 34",
+      "summary": "Fizjoterapeutka, która chce uratować ręcznie pisaną kartkę z przepisem po babci i na co dzień korzysta z ChatGPT.",
+      "language": "pl",
+      "tech_level": "medium",
+      "tech_notes": "Ma ChatGPT na telefonie i pyta go o różne rzeczy. Rozumie 'wklej', 'udostępnij'. Nigdy nie pisała żadnych poleceń dla AI i nie chce się ich uczyć.",
+      "context": "Niedzielne popołudnie, sama w domu. Kartka jest poplamiona, więc chce ją mieć w telefonie zanim się rozpadnie.",
+      "needs": [
+        "Chcesz, żeby szarlotka babci ze zdjęcia kartki była w książce z deserami jako zwykły przepis.",
+        "Tekst ma się zgadzać co do słowa, bo to pamiątka: najpierw sprawdzisz, co aplikacja sama odczyta ze zdjęcia.",
+        "Jeśli sama aplikacja nie da rady, jesteś gotowa skorzystać z ChatGPT, o ile będzie jasne, co masz zrobić."
+      ],
+      "materials": "W galerii masz zdjęcie kartki pisanej odręcznie, pochyłym pismem, granatowym długopisem. Treść kartki: 'Szarlotka Babci Zosi. 40 dag mąki, 25 dag masła, 2 żółtka, 10 dag cukru pudru, łyżeczka proszku, 2 kg jabłek (szara reneta), cukier do jabłek, cynamon. Mąkę posiekać z masłem, dodać żółtka i cukier, zagnieść, schłodzić godzinę. Jabłka zetrzeć, podsmażyć z cukrem i cynamonem. Połowę ciasta na blachę, podpiec 15 min, jabłka, reszta ciasta na wierzch. Piec 45 min w 180 st. Dla 12 osób. Polukrować jak ostygnie!' W tym badaniu telefon nie ma aplikacji ChatGPT i nie przełączysz się do niej. Gdy dojdziesz do momentu, w którym miałabyś wysłać zdjęcie do ChatGPT, uznaj, że to zrobiłaś, wróć do KeepTaste (Wstecz) i wpisz w aplikacji odpowiedź, którą dostałabyś od ChatGPT:\nSzarlotka Babci Zosi\nSkładniki:\n40 dag mąki\n25 dag masła\n2 żółtka\n10 dag cukru pudru\nłyżeczka proszku\n2 kg jabłek\ncukier do jabłek\ncynamon\nPrzygotowanie:\n1. Mąkę posiekać z masłem, dodać żółtka i cukier, zagnieść, schłodzić godzinę.\n2. Jabłka zetrzeć, podsmażyć z cukrem i cynamonem.\n3. Połowę ciasta na blachę, podpiec 15 min, jabłka, reszta ciasta na wierzch.\n4. Piec 45 min w 180 st.\nPorcje: 12\nPolukrować jak ostygnie!",
+      "patience": {
+        "max_steps": 34,
+        "max_failed_attempts": 3,
+        "style": "Zależy jej, więc próbuje dłużej niż inni, ale gdy instrukcja jest niezrozumiała, mówi, w którym miejscu się pogubiła."
+      },
+      "start_state": "photo_card",
+      "device": { "font_scale": 1.0, "dark_mode": false }
+    },
+    {
+      "id": "piotr-udostepnij",
+      "name": "Piotr, 37",
+      "summary": "Kierowca, który czyta przepisy w przerwie w trasie i wysyła je sobie na później przez Udostępnij.",
+      "language": "pl",
+      "tech_level": "medium",
+      "tech_notes": "Korzysta z Udostępnij zamiast kopiować linki. Nie czyta komunikatów dłuższych niż jedno zdanie.",
+      "context": "15 minut przerwy na parkingu. Chce załatwić sprawę szybko i wrócić do jedzenia kanapki.",
+      "needs": [
+        "Chcesz, żeby przepis na ciasteczka 'paluchy wiedźmy' dla dzieci trafił do książki z deserami.",
+        "Chcesz na szybko sprawdzić, czy jest wszystko, żeby później nie okazało się, że czegoś brakuje."
+      ],
+      "materials": "Właśnie udostępniłeś do tej aplikacji stronę z przepisem na ciasteczka paluchy wiedźmy z portalu Doradca Smaku. Na stronie były składniki i opis krok po kroku.",
+      "patience": {
+        "max_steps": 16,
+        "max_failed_attempts": 2,
+        "style": "Niecierpliwy, ale życzliwy. Gdy cokolwiek wymaga dłuższego zastanowienia, odkłada to na później i zamyka aplikację."
+      },
+      "start_state": "share_link",
+      "device": { "font_scale": 1.0, "dark_mode": false }
+    }
+  ]
+}
