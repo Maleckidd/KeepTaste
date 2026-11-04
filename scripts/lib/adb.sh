@@ -60,6 +60,24 @@ drag() { adb shell input swipe "$1" "$2" "$3" "$4" "${5:-900}"; }
 # back — the system back gesture.
 back() { adb shell input keyevent KEYCODE_BACK; }
 
+# tap_ui <text> — taps the element with exactly this text or content description;
+# fails when the screen has none. For system screens, which unlike the app can be
+# read: their layout depends on how they were last used, so a landmark won't do.
+tap_ui() {
+  local at
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  at="$(adb shell cat /sdcard/ui.xml | perl -e '
+    my $want = shift; local $/; my $xml = <STDIN>;
+    for my $node ($xml =~ /<node [^>]*>/g) {
+      next unless $node =~ /(?:text|content-desc)="\Q$want\E"/;
+      next unless $node =~ /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/;
+      printf "%d %d", ($1 + $3) / 2, ($2 + $4) / 2;
+      exit;
+    }' "$1")"
+  [ -n "$at" ] || return 1
+  tap "$at"
+}
+
 # --- reading the screen ------------------------------------------------------
 
 # pixel <landmark> — that screen pixel as "rrggbb". Roughly 1 s per call.
