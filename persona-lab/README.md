@@ -83,6 +83,28 @@ typing goes through `adb shell input text`, which can't do Polish
 diacritics (they are typed without accents); the rig can't take photos or
 switch apps.
 
+What a persona already has on the phone is set up by the config, not typed:
+`clipboard_set <file>` (full Unicode, through a one-button page in Chrome on
+the emulator; it also turns off Chrome's first-run screens) and
+`gallery_add <image>`. The optional `state_ready` hook runs after the last cold
+restart, for anything that restart would lose, like a share intent.
+
+### Focused studies
+
+A study of one feature gets its own config directory next to `config/` that
+sources the base one and overrides what differs: see `config-import/`. Personas
+there are written by hand, because each one has to match the materials on the
+device, and `SYNTHESIS_FOCUS` adds an instruction to the synthesis.
+
+```bash
+caffeinate -i bash persona-lab/engine/run.sh persona-lab/config-import \
+  --personas-file persona-lab/config-import/personas.json
+```
+
+`caffeinate` doesn't stop the sleep of a closed MacBook lid. A session pauses
+there and resumes on wake, and a network call right after waking can fail, so
+keep the lid open (it cost one false "couldn't load the page" in iteration 7).
+
 ### Patience and cost
 
 A persona has its own patience budget (`patience.max_steps`,
