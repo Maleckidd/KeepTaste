@@ -57,3 +57,6 @@ assets/store/play/
 # (scripts/record-promo-clips.sh). The storyboard copy is the source and lives
 # in assets/store/promo-script.json.
 assets/store/promo/
+
+# persona-lab session output (screenshots, videos, transcripts)
+/persona-lab/runs/
