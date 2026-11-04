@@ -109,17 +109,13 @@ archive and then set Settings → Language → Polski.
 
 `scripts/reset-demo-library.sh` automates all of that, but its coordinates
 (`scripts/lib/screen.sh`) are calibrated for a 1080x2400 phone with **gesture
-navigation** and a file picker in **list** view. Two things break it on a fresh
-emulator, and both fail quietly:
+navigation**. *Three-button navigation* lifts the tab bar above the pixel the
+script polls to detect the home screen, so it gives up with "the app never
+reached the home screen". Fix: `adb shell cmd overlay enable
+com.android.internal.systemui.navbar.gestural`.
 
-- *Three-button navigation* lifts the tab bar above the pixel the script polls
-  to detect the home screen, so it gives up with "the app never reached the
-  home screen". Fix: `adb shell cmd overlay enable
-  com.android.internal.systemui.navbar.gestural`.
-- *A picker in grid view* puts the archive somewhere other than the first row,
-  so the blind tap selects nothing and the script stops at "restore did not
-  take". Fix: open the picker by hand once and switch it to list view, or drive
-  the restore manually.
+The file picker is read, not tapped blind: the script finds the archive by name,
+going through Downloads when the picker remembers another folder.
 
 For a tablet, run the restore at phone geometry (where these coordinates hold),
 then switch to `wm size 1600x2560` / `wm density 320` before capturing — the

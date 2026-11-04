@@ -11,10 +11,8 @@
 # through the UI — the app is not debuggable, so there is no way to push a
 # database in over adb.
 #
-# The one fragile step is the system file picker: this assumes it opens on
-# Downloads in list view, which is where it stays once used. On an emulator that
-# has never opened it, finish that step by hand (Downloads → the .zip) and
-# re-run; from then on the script is reliable.
+# The system file picker opens wherever it was last used, in the view it was last
+# left in, so the archive is found by name and through Downloads when needed.
 #
 # adb plumbing is in lib/adb.sh; every coordinate is in lib/screen.sh.
 set -euo pipefail
@@ -61,7 +59,16 @@ sleep 2
 tap "$SETTINGS_RESTORE"
 sleep 6 # the system file picker needs ~3.5 s to appear; tapping early lands on
         # the Settings screen still underneath it
-tap "$PICKER_ROW1" # the archive we just pushed — newest, so first
+tap_ui "$ZIP" || {
+  tap_ui "Show roots"
+  sleep 1.5
+  tap_ui "Downloads"
+  sleep 2
+  tap_ui "$ZIP"
+} || {
+  echo "the file picker has no $ZIP" >&2
+  exit 1
+}
 echo "  restoring (this takes ~15 s)…"
 sleep 20
 tap "$DIALOG_OK"

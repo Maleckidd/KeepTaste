@@ -62,13 +62,6 @@ LANGUAGE_PL="540 2119"
 # "OK" on the "Backup restored" dialog.
 DIALOG_OK="893 1332"
 
-# --- system file picker ------------------------------------------------------
-
-# First row of the picker, which lists Downloads newest first — so the archive
-# just pushed is the one there, as long as it is the only one. Assumes the
-# picker is in **list** view; in grid view this taps nothing at all.
-PICKER_ROW1="540 668"
-
 # --- cookbook ----------------------------------------------------------------
 
 # The "+" inside a cookbook — lower than the home one, which sits above the tab
