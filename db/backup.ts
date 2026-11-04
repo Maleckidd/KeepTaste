@@ -18,6 +18,7 @@ import {
   markDemoSeeded,
   markUserEdited,
 } from './settings';
+import { isExcludedFromBackup, isSkippedOnRestore } from './settingKeys';
 import type { BackupContent } from '../utils/backupArchive';
 
 /** Gathers the whole library for export (every table, in id order). */
@@ -34,7 +35,10 @@ export async function getFullBackupData(): Promise<BackupContent> {
     recipes: rec,
     shoppingLists: lists,
     shoppingItems: items,
-    settings: settings.map((s) => ({ key: s.key, value: s.value })),
+    // Running timers are device state, not library data (SPEC.md §5.21).
+    settings: settings
+      .filter((s) => !isExcludedFromBackup(s.key))
+      .map((s) => ({ key: s.key, value: s.value })),
   };
 }
 
@@ -84,7 +88,8 @@ export async function canSilentReplace(): Promise<boolean> {
  * Inserts a parsed backup, preserving created_at/updated_at and remapping
  * cookbook/list ids. Image paths must already be absolute device URIs (the
  * native wrapper restores the files first). Settings are upserted, except
- * device-specific backup_* keys (e.g. a SAF folder URI from another device).
+ * device-specific backup_* keys (e.g. a SAF folder URI from another device)
+ * and active_timers (see db/settingKeys.ts).
  * Caller is responsible for wiping first when doing a Replace restore.
  */
 export async function restoreFullBackup(content: BackupContent): Promise<void> {
@@ -146,7 +151,7 @@ export async function restoreFullBackup(content: BackupContent): Promise<void> {
   }
 
   for (const s of content.settings) {
-    if (s.key.startsWith('backup_')) continue; // device-specific, don't restore
+    if (isSkippedOnRestore(s.key)) continue; // device state, don't restore
     await setSetting(s.key, s.value);
   }
 

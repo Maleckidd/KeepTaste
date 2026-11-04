@@ -76,6 +76,11 @@ components/
     RecipeForm.tsx       ← shared recipe form (new + edit)
     ImportSheet.tsx      ← single-recipe import: link / paste-text / photo / AI-transcribe mode picker (§5.15)
     IngredientChecklist.tsx ← ingredients as tap-to-check rows for cooking (§5.4)
+  timers/
+    TimerProvider.tsx    ← running timers context, persistence, foreground alarm, bar layout offsets (§5.21)
+    TimerBar.tsx         ← bottom bar with active timers and their controls (§5.21)
+    TimerChip.tsx        ← inline timer chip for a duration in the instructions (§5.21)
+    timerMarkdownRules.tsx ← markdown-display `text` rule that renders TimerChips (§5.21)
   shopping/
     PasteListSheet.tsx   ← bulk-paste products into a shopping list (§5.16)
     SendListSheet.tsx    ← choose which active products to send (§5.18)
@@ -97,7 +102,8 @@ db/
   recipes.ts             ← queries: recipe CRUD, search, delete-all-data
   import.ts              ← writes a parsed Markdown import (cookbook + recipes)
   shoppingLists.ts       ← queries: shopping list/item CRUD, check/uncheck (§5.10)
-  settings.ts            ← key-value app settings (language, seed + backup flags, §5.11/§5.17.3/§5.20)
+  settings.ts            ← key-value app settings (language, seed + backup flags, active timers, §5.11/§5.17.3/§5.20/§5.21)
+  settingKeys.ts         ← dependency-free key rules: ACTIVE_TIMERS_KEY, isExcludedFromBackup, isSkippedOnRestore (§5.21)
   backup.ts              ← full-backup read/restore: getFullBackupData, isDatabaseEmpty, restoreFullBackup (§5.17.1)
   seed.ts                ← one-shot sample-content seed on an empty library (§5.20)
   userEdited.ts          ← marks the library as user-touched on the first real mutation (§5.20)
@@ -138,8 +144,11 @@ utils/
   appReady.ts            ← one-shot "first screen loaded" signal for the splash gate (§5.20)
   pendingDelete.ts       ← deferred-delete registry behind the Undo snackbar (§6)
   motion.ts              ← animateLayout + prefersReducedMotion (reduce-motion aware)
-  haptics.ts             ← lightTap wrapper
+  haptics.ts             ← lightTap wrapper + timerDoneAlert (vibration pattern, §5.21)
   keepAwake.ts           ← keeps the screen on in the recipe view; web-safe (§5.4)
+  durations.ts           ← pure parser: durations in instruction text → timer candidates (§5.21)
+  timers.ts              ← pure timer model: reducer, remaining time, ordering, (de)serialization, formatting (§5.21)
+  timerMarkdown.ts       ← pure: step number + stable chip key from the markdown-display AST (§5.21)
 
 constants/
   theme.ts               ← design tokens: light/dark palettes + useTheme(), typography, spacing, shadows
@@ -186,7 +195,7 @@ recipes (
 )
 
 app_settings (                                   -- key-value preferences (§5.11)
-  key             TEXT PRIMARY KEY NOT NULL,      -- e.g. 'language', 'demo_seeded', 'user_edited' (§5.20), backup_* (§5.17.3)
+  key             TEXT PRIMARY KEY NOT NULL,      -- e.g. 'language', 'demo_seeded', 'user_edited' (§5.20), backup_* (§5.17.3), 'active_timers' (§5.21)
   value           TEXT NOT NULL                   -- e.g. 'system' | 'en' | 'pl'
 )
 ```
@@ -311,6 +320,8 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - **Ephemeral by design**, exactly like the text zoom below: the checked set lives in the recipe screen's state — no `app_settings` key, no column, nothing in the backup. Leaving the recipe clears it, and so does an ingredients edit (the indices would point at reordered lines)
 - A **"Clear"** text button appears next to the INGREDIENTS header while at least one ingredient is checked
 - The checkbox scales with the text zoom; ingredients that parse into no items at all (e.g. only headings) fall back to plain Markdown rendering
+
+**Timers in instructions:** durations written in the instructions ("bake for 30 min") render as tappable timer chips that start a countdown; running timers live in a bar that follows the cook across screens. Full design in §5.21.
 
 **Markdown in ingredients and instructions:**
 
@@ -912,6 +923,66 @@ Changing any splash color or size requires a **native rebuild** — the Android 
 
 ---
 
+### 5.21 Cooking timers
+
+**Problem:** recipes are full of waits — "let the dough rise for 1 h", "bake for 30 min". Today the cook retypes each number into the phone's clock app, or forgets. KeepTaste turns the durations already written in the instructions into one-tap timers. This belongs to the reading view (§5.4), next to keep-awake, text zoom and ingredient check-off. It is **not** the step-by-step cooking mode, which stays out of scope (§7).
+
+**No new recipe data: durations are detected in the text.** Steps live in one Markdown field (§7), so timers are not a form field or a column. Nothing changes in the schema, the form or the `.md`/`.zip` recipe format, so the export round-trip (§5.6) is untouched. Every existing, imported and seeded recipe gets timers for free.
+
+**Duration parser:** pure `parseDurations(text)` in `utils/durations.ts` (unit-tested). For each match it returns the character range, the source text and the duration in seconds.
+- Units are recognised in **EN and PL regardless of the UI language**, so a Polish recipe still gets timers in an English UI: seconds (`s`, `sec`, `sek.`, `sekund…`), minutes (`min`, `minute(s)`, `minut`, `minuty`, `minutę`), hours (`h`, `hr`, `hour(s)`, `godz.`, `godzina` / `godzinę` / `godziny` / `godzin`).
+- Decimal comma or dot (`1,5 h`, `1.5 h`), compound durations (`1 h 30 min`, `1 godz. 15 min`), and the phrases `pół godziny`, `półtorej godziny`, `half an hour`.
+- **Ranges** (`20–25 min`, `20-25 minut`, `20 to 25 minutes`, `20 do 25 min`) start the timer at the **lower bound**: time can always be added with +1 min, an overbaked loaf cannot be undone. The chip still shows the whole range.
+- Not matched: temperatures (`220°C`), quantities (`250 g`), bare numbers, days and "overnight" / "przez noc" (too long and vague for a timer), and anything over 24 h. **False negatives beat false positives**: a missed timer costs one manual phone timer, a bogus chip costs trust.
+
+**Recipe view (§5.4):** in the Instructions section, every detected duration renders as an inline **timer chip** (timer icon + the original text, in the primary color). It is implemented as a custom text rule for `react-native-markdown-display`, so the rest of the Markdown renders unchanged. The chip scales with the text zoom and reaches the `Touch` minimum through `hitSlop`.
+- Only the instructions get chips. Ingredients, notes and the prep/cook-time metadata do not (decided: no timers on metadata).
+- Tapping an idle chip **starts the timer at once** (no confirmation sheet) with a light haptic; the chip then shows the remaining time.
+- Tapping a running chip opens that timer's controls (the same as tapping it in the timer bar).
+
+**Timer label:** "{recipe title} · step {n}", where n is the numbered list item or paragraph that holds the chip; if there is none, the recipe title alone. The label tells two concurrent timers apart (dough rising + filling simmering).
+
+**Running timers — `TimerProvider`:** a React context at the root layout, like `SnackbarProvider` (a context, not a state library, §3). Timers outlive the recipe screen, because the cook leaves the recipe during an hour of rising.
+- Each timer holds `{ id, recipeId, sourceKey, title, step, durationSec, state: running | paused | done, endsAt (ISO, while running), remainingSec (while paused) }` (see the stage 1 decisions below). The countdown is **derived from `endsAt`** and never decremented per tick, so it stays correct after the app was in the background or the JS thread was busy.
+- Several timers can run at once. Controls per timer: pause / resume, **+1 min**, stop. Stop needs no Undo, because a timer is cheap to restart.
+- **Timer bar:** while any timer exists, a compact bar sits at the bottom of every screen (above the tab bar). It shows the timer that ends soonest (label + remaining time) and "+N" for the others. Tapping it expands the list with controls; tapping a timer's label opens its recipe. The snackbar stacks above the bar, and the FAB moves up to clear it.
+- Deleting a recipe (once its Undo window closes, §6) stops its timers; "delete all data" stops all of them.
+
+**When a timer ends:**
+- **App in the foreground:** the chip and the bar switch to a "done" state, with a vibration pattern (RN `Vibration`) and a haptic. The done state stays until dismissed.
+- **App in the background or screen locked:** a **local scheduled notification** (`expo-notifications`) fires at `endsAt` with the timer label. It is scheduled on start, resume and +1 min, and cancelled on pause and stop. It has its own Android notification channel ("Timers", high importance, alarm-like sound). Tapping it opens the recipe. There is no push token, no server and no network call (§1).
+- **Notification permission** (Android 13+) is requested on the **first timer start**, not at app launch. If it is denied, timers still work in the foreground and a one-time snackbar explains that the alarm won't sound while the app is closed.
+- **Exact-alarm caveat (verify on a device):** on Android 14+ exact alarms are denied by default, and an inexact notification can arrive late under Doze. Measure the real delay with the screen locked before deciding whether exact alarms are needed; Play restricts `USE_EXACT_ALARM` to apps whose core function is an alarm or timer, so check that policy before adding it.
+
+**Persistence (decided: timers survive process death).** Unlike the check-off and the zoom, active timers are persisted: losing an hour-long proofing timer because Android killed the app is a real failure. `TimerProvider` writes the timer list as JSON to the `app_settings` key `active_timers` on every change and reads it on startup. A timer whose `endsAt` has already passed loads as done. The notification scheduled with the OS fires whatever the app's state.
+- **Not part of backups:** `active_timers` is left out of `backup.json` (§5.17.1) and skipped on restore, like the device-specific `backup_*` keys. A restored timer would be stale.
+
+**i18n:** new EN+PL strings in `dictionary.ts`: the chip's accessibility label ("Start timer, {duration}"), the bar and its controls, the step label, the notification title ("Time's up") and body, the channel name, and the permission-denied snackbar. Durations are formatted with the Polish plural rules from `utils/i18n.ts`.
+
+**Web:** timers work in the foreground only (no notifications); web is a test platform (§2).
+
+**Build order:**
+1. Parser (`utils/durations.ts`, TDD), chips, `TimerProvider`, timer bar, foreground alarm and `active_timers` persistence. No native module, so it runs in Expo Go.
+2. Background alarm with `expo-notifications`: a native module, so it needs a dev build and a `versionCode` bump. Verify on a device with the screen locked.
+
+**Stage 1 — resolved decisions (November 2026):**
+- **Timer record:** `{ id, recipeId, sourceKey, title, step, durationSec, state, endsAt?, remainingSec? }` (`utils/timers.ts`). The label is not stored: `title` + `step` are formatted at render time in the current UI language. `sourceKey` (the chip's AST index path + match offset, `utils/timerMarkdown.ts`) links a chip to its timer. Editing the instructions while a timer runs may re-key the chips: the chip then shows idle and the timer stays in the bar.
+- **Step numbering:** inside an ordered list, the displayed item number (honouring the list's `start`; the outermost ordered list wins for nested lists). A top-level paragraph is numbered by its position among top-level paragraphs, but only with at least two of them and no top-level ordered list. Bullets, headings and a single paragraph get no step (label = title).
+- **Chip states:** idle → timer icon + the text as written; running/paused → live countdown (pause icon when paused), tap opens the bar's controls with that row highlighted; done → "Time's up" on the filled primary color, tap dismisses. A duration split by a soft line break is not detected (markdown-it keeps it as two text nodes) — accepted false negative.
+- **+1 min on a done timer** restarts it for 60 s. Starting a chip that already has a running or paused timer is a no-op; a done one is replaced.
+- **Alarm:** the vibration pattern plays once (plus a warning haptic and a screen-reader announcement); the done state stays until dismissed. Timers that ended while the app was gone load as done **silently** — no alarm at launch. A timer that ends while the app is in the background alerts when the app returns to the foreground (stage 2 adds the notification).
+- **"Every screen"** means the tab and card screens. The bar is hidden on the modal forms (`/recipe/new`, `/recipe/edit`, `/recipe/add-to-list`, `/shopping/new`, `/cookbook/new`, `/cookbook/edit`) and while the keyboard is up; timers keep running while it is hidden. On tab routes it floats above the tab bar (a custom `tabBar` reports the bar's height); on stack screens above the bottom inset. Scrolling screens add the bar's height to their bottom padding so their last row stays reachable; the snackbar and the backup banner sit above the bar; the FAB lifts above whichever of snackbar/bar is higher.
+- **Expanded list:** ordered done → running (soonest end first) → paused (least remaining first). Each row: the label (tap → opens the recipe, unless already on it), the countdown, and text buttons — Pause/Resume, +1 min, Stop; a done row has +1 min and Dismiss. Tapping outside or Android back collapses it.
+- **Delete paths:** a recipe delete stops that recipe's timers only once its Undo window closes. "Delete all data" stops all timers. A **Replace** restore stops all timers (recipe ids are reassigned) — also when the restore fails part-way, since the wipe may already have happened; an Add restore keeps them. Deleting a cookbook stops none (its recipes survive).
+- **Backup:** `active_timers` is excluded from export and skipped on restore (`db/settingKeys.ts`); `backup_*` keys are unchanged (exported, skipped on restore). Timer writes don't trigger an auto-backup.
+- **Parser details:** exactly two bare digits (00–59) right after an hour unit, followed only by optional whitespace and the end of the text or sentence punctuation (`. , ; ! ? )`), mean minutes — `1h30`, `1h05`, `1 h 30`, `1 godz. 30` = 1 h + minutes. Anything else after the digits (a letter, digit, `%`, `°`, `/`, `:`, a dash) means a quantity or a range, so the match is only the hour part: `1 h 30 g mąki`, `1 h 2 jajka`, `1 h 30%` → `1 h`; `1 h 30–35 min` is two timers. `1h30 potem studź` → `1h` is an accepted false negative. A compound whose total exceeds 24 h (`24 h 30 min`) yields no match at all, never a tail fragment. Fractions are not matched: `1/2 godziny`, `3/4 h`, `1 1/2 hours` give no chip (their denominator must not read as a duration).
+- **Persistence failure:** if reading `active_timers` at startup fails, timers still work in memory for the session but nothing is written back, so a failed read never overwrites the stored timers. Timers started before the stored ones load are merged in, except duplicates of a stored running/paused timer for the same chip.
+- **Not matched in stage 1:** bare-unit phrases without a number ("an hour", "przez godzinę", "kwadrans").
+
+**Out of scope for this feature:** timers on the prep/cook-time metadata, timers added by hand that are not in the text, changing a timer's duration before it starts, home-screen widgets and lock-screen live countdowns, and the step-by-step cooking mode (§7).
+
+---
+
 
 ## 6. Design system
 
@@ -1001,13 +1072,13 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 | User accounts | Same as above — the app is deliberately private and local |
 | Tags (recipe labels + filtering) | Removed from the MVP — title + ingredient search (§5.3) is enough to start; may return in the future (see §8). The **to-try status (§5.19) is not tags**: it's a dedicated boolean the app can hang behavior on (bottom section, filter chip, badge), which free-form labels cannot provide |
 | Ingredient scaling (servings multiplier) | Ingredients are text, not structured data — parsing would be brittle |
-| Cooking mode (step-by-step active screen) | Complexity, beyond MVP. The *reading-view* affordances a cook actually needs — keep-awake and in-recipe text zoom (A−/A+) — already ship on the recipe view (§5.4/§6); only the dedicated one-step-at-a-time screen stays out |
+| Cooking mode (step-by-step active screen) | Complexity, beyond MVP. The *reading-view* affordances a cook actually needs — keep-awake and in-recipe text zoom (A−/A+) — already ship on the recipe view (§5.4/§6), and so do timers from the instruction text (§5.21); only the dedicated one-step-at-a-time screen stays out |
 | **In-app** AI / network "smart parsing" for recipe import | Breaks the local-first, no-backend philosophy (§1); per-call cost. Single-recipe import stays deterministic (§5.15). The **user-mediated Transcribe-with-AI handoff (T4)** *is* in scope — the app still ships no AI and makes no network call; it only copies a prompt and shares the photo to the user's own AI app |
 | Scraping raw HTML when a page has no structured data | Brittle, garbage-prone. Link import (§5.15) reads Schema.org `Recipe` JSON-LD or microdata, including the text inside a microdata `Recipe` element; a page without either falls back to paste-text |
 | Importing recipes from video / transcripts (YouTube, Reels, TikTok video) | Needs transcription + AI; out of scope. Captions can be pasted as text (§5.15) |
 | Sharing recipes between users | Requires a backend |
 | Drag & drop step reordering | Steps live in one text field, not separate records |
-| Notifications / timers | Out of scope |
+| Push / remote notifications, reminders | Out of scope. **Note:** cooking timers with a *local* scheduled alarm notification are in scope (§5.21) — no push token, no server |
 | App language selection | **User-approved exception** to the no-extra-settings rule (§5.11). The UI is bilingual EN/PL; the Markdown export/import data format stays English-only |
 | Theme override (System / Light / Dark) | **User-approved exception** to the no-extra-settings rule (Settings → Appearance; §6). Defaults to "System" |
 
@@ -1036,6 +1107,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [x] **To-try recipe status** — §5.19: `to_try` column (DDL + `schema.ts` + migration-ladder `ALTER TABLE`), form switch, card badge, recipe-view badge + "Tried it ✓" (bumps `updated_at` — approved exception, §4), bottom "To try" section in recipe lists (pure partition helper, unit-tested), "To try (N)" filter chip in "All recipes" search, `**Status:** to try` round-trip in `.md` (§5.6/§5.8), `to_try` in `backup.json` + `schemaVersion` bump (§5.17.1/§5.17.4), EN+PL strings
 - [x] **Ingredient check-off while cooking** — §5.4: pure `parseIngredientLines` in `utils/ingredients.ts` (rendered lines: `#` headings kept, items carry an index that matches `parseIngredients` 1:1 — unit-tested), `components/recipe/IngredientChecklist.tsx` (checkbox row per ingredient, strike-through + muted when checked, per-line `Markdown` so inline bold survives, icon scales with the text zoom, `**` stripped from the a11y label, `lightTap`), ephemeral checked set in `app/recipe/[id].tsx` reset on ingredients change, "Clear" button in the INGREDIENTS header, EN+PL strings. No DB, no schema, no backup impact
 - [x] **Sample content on first launch** — §5.20: pure localized builder `utils/seedData.ts` (EN+PL "Breakfasts"/"Śniadania" cookbook + one photographed pancakes showcase recipe, unit-tested), one-shot seed `db/seed.ts` `seedSampleContentIfNeeded` guarded by `demo_seeded` + `isDatabaseEmpty()` inside `withAutoBackupSuppressed`, bundled photos (`assets/images/seed/pancakes.jpg` recipe photo, `assets/images/seed/breakfast.jpg` cookbook cover) resolved via `expo-asset` + copied into the doc dir through `persistImage` as separate files (best-effort, degrades to no image), `demo_seeded`/`user_edited` flag helpers in `db/settings.ts`, best-effort once-per-process `user_edited` mark on real mutations (`db/userEdited.ts`, skipped while suppressed), `shouldSilentReplace` (pure, unit-tested) + `canSilentReplace()` in `db/backup.ts` wired into the `.zip` restore path (silent 1:1 over a pristine seed), restore stamps both flags, home-screen mount seed after language resolution
+- [ ] **Cooking timers** — §5.21 (stage 1 implemented November 2026; stage 2 open): stage 1 = pure `parseDurations` in `utils/durations.ts` (unit-tested: EN+PL units, compound, decimal, ranges → lower bound, no temperatures/quantities), inline timer chips in the instructions (custom `react-native-markdown-display` text rule), `TimerProvider` + `TimerBar` (endsAt-derived countdown, pause/resume/+1 min/stop, several at once), foreground alarm, `active_timers` persistence excluded from backup/restore; stage 2 = `expo-notifications` background alarm (dev build, `versionCode` bump, device check with the screen locked)
 
 ### Persona testing — iteration 1 fixes (October 2026)
 Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; acceptance = iteration 2 on the same personas (`run.sh --personas-file`). Ideas not taken now are parked in `UX_NOTES.md` ("Persona testing, iteration 1").

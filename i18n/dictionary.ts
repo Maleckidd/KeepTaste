@@ -806,6 +806,53 @@ export const dictionary = {
     en: 'Delete everything',
     pl: 'Usuń wszystko',
   },
+
+  // --- Cooking timers (SPEC.md §5.21) ---
+  'timer.chipA11y': {
+    en: 'Start timer, {duration}',
+    pl: 'Uruchom minutnik, {duration}',
+  },
+  'timer.chipRunningA11y': {
+    en: 'Timer running, {remaining} left. Show controls',
+    pl: 'Minutnik działa, pozostały czas: {remaining}. Pokaż sterowanie',
+  },
+  'timer.chipPausedA11y': {
+    en: 'Timer paused, {remaining} left. Show controls',
+    pl: 'Minutnik wstrzymany, pozostały czas: {remaining}. Pokaż sterowanie',
+  },
+  'timer.chipDoneA11y': {
+    en: "Time's up. Dismiss timer",
+    pl: 'Czas minął. Wyłącz minutnik',
+  },
+  'timer.stepLabel': { en: '{title} · step {step}', pl: '{title} · krok {step}' },
+  'timer.more': { en: '+{count}', pl: '+{count}' },
+  'timer.done': { en: "Time's up", pl: 'Czas minął' },
+  'timer.paused': { en: 'Paused', pl: 'Wstrzymany' },
+  'timer.pause': { en: 'Pause', pl: 'Wstrzymaj' },
+  'timer.resume': { en: 'Resume', pl: 'Wznów' },
+  'timer.addMinute': { en: '+1 min', pl: '+1 min' },
+  'timer.stop': { en: 'Stop', pl: 'Zatrzymaj' },
+  'timer.dismiss': { en: 'Dismiss', pl: 'Wyłącz' },
+  'timer.listTitle': { en: 'Timers', pl: 'Minutniki' },
+  'timer.barA11y': {
+    en: 'Timers: {label}, {remaining}. Show all',
+    pl: 'Minutniki: {label}, {remaining}. Pokaż wszystkie',
+  },
+  'timer.collapseA11y': { en: 'Hide timers', pl: 'Ukryj minutniki' },
+  'timer.openRecipeA11y': {
+    en: 'Open recipe {title}',
+    pl: 'Otwórz przepis {title}',
+  },
+  'timer.doneAnnounce': { en: "Time's up: {label}", pl: 'Czas minął: {label}' },
+  'timer.unit.hour.one': { en: '{count} hour', pl: '{count} godzina' },
+  'timer.unit.hour.few': { en: '{count} hours', pl: '{count} godziny' },
+  'timer.unit.hour.many': { en: '{count} hours', pl: '{count} godzin' },
+  'timer.unit.minute.one': { en: '{count} minute', pl: '{count} minuta' },
+  'timer.unit.minute.few': { en: '{count} minutes', pl: '{count} minuty' },
+  'timer.unit.minute.many': { en: '{count} minutes', pl: '{count} minut' },
+  'timer.unit.second.one': { en: '{count} second', pl: '{count} sekunda' },
+  'timer.unit.second.few': { en: '{count} seconds', pl: '{count} sekundy' },
+  'timer.unit.second.many': { en: '{count} seconds', pl: '{count} sekund' },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

@@ -28,12 +28,14 @@ import {
 import { useT } from '@/i18n/LanguageProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import Fab from '@/components/ui/Fab';
+import { useTimerBarClearance } from '@/components/timers/TimerProvider';
 import ActionSheet from '@/components/ui/ActionSheet';
 import SwipeableRow from '@/components/ui/SwipeableRow';
 
 export default function ShoppingScreen() {
   const router = useRouter();
   const c = useTheme();
+  const timerClearance = useTimerBarClearance();
   const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
 
@@ -136,7 +138,10 @@ export default function ShoppingScreen() {
               </SwipeableRow>
             );
           }}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: Spacing.xxxl * 2 + timerClearance },
+          ]}
           showsVerticalScrollIndicator={false}
         />
       )}

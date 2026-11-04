@@ -30,6 +30,7 @@ import { markAppReady } from '@/utils/appReady';
 import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
 import Fab from '@/components/ui/Fab';
+import { useTimerBarClearance } from '@/components/timers/TimerProvider';
 import ActionSheet from '@/components/ui/ActionSheet';
 import type { Cookbook } from '@/db/schema';
 
@@ -88,6 +89,7 @@ function CookbookTile({
 export default function HomeScreen() {
   const router = useRouter();
   const c = useTheme();
+  const timerClearance = useTimerBarClearance();
   const t = useT();
   const { language } = useLanguage();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -259,7 +261,10 @@ export default function HomeScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => String(item.id)}
           numColumns={2}
-          contentContainerStyle={styles.grid}
+          contentContainerStyle={[
+            styles.grid,
+            { paddingBottom: Spacing.xxxl * 2 + timerClearance },
+          ]}
           columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
         />

@@ -142,6 +142,7 @@ export const Typography = {
 };
 
 export const Spacing = {
+  xxs: 2,   // hairline insets: inline chips and pills inside running text
   xs: 4,
   sm: 8,
   md: 12,

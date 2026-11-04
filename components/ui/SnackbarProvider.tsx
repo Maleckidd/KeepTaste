@@ -18,6 +18,7 @@ import {
   Motion,
 } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
+import { useTimerBarWindowInset } from '@/components/timers/TimerProvider';
 import {
   schedulePendingDelete,
   cancelPendingDelete,
@@ -62,6 +63,7 @@ const TAP_GUARD_MS = 1000;
 export function SnackbarProvider({ children }: { children: React.ReactNode }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
+  const timerBarInset = useTimerBarWindowInset();
   // The bar uses inverted colors (c.text as background), so the accent comes
   // from the opposite palette to keep contrast.
   const accent = c === darkColors ? lightColors.primary : darkColors.primary;
@@ -141,7 +143,12 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
     [expire, opacity]
   );
 
-  const barBottom = insets.bottom + Spacing.xxl + Spacing.xxl;
+  // Never over the cooking-timer bar (SPEC.md §5.21): sit above it when shown.
+  const defaultBottom = insets.bottom + Spacing.xxl + Spacing.xxl;
+  const barBottom =
+    timerBarInset !== null
+      ? Math.max(defaultBottom, timerBarInset + Spacing.sm)
+      : defaultBottom;
 
   const handleAction = () => {
     const entry = currentRef.current;

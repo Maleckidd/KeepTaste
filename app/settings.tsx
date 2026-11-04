@@ -52,6 +52,7 @@ import {
 } from '@/constants/theme';
 import { useT, useLanguage } from '@/i18n/LanguageProvider';
 import { pluralPl } from '@/utils/i18n';
+import { useTimers, useTimerBarClearance } from '@/components/timers/TimerProvider';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -61,6 +62,8 @@ export default function SettingsScreen() {
   const { preference: themePreference, setPreference: setThemePreference } =
     useThemePreference();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { stopAllTimers } = useTimers();
+  const timerClearance = useTimerBarClearance();
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
   const [languageMenuOpen, setLanguageMenuOpen] = React.useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
@@ -177,6 +180,8 @@ export default function SettingsScreen() {
 
   const performDelete = async () => {
     const paths = await deleteAllData();
+    // Every recipe is gone — so are its timers (SPEC.md §5.21).
+    stopAllTimers();
     await Promise.all(paths.map(deleteStoredImage));
     router.back();
   };
@@ -317,6 +322,10 @@ export default function SettingsScreen() {
         t('settings.importFailedSaving')
       );
     } finally {
+      // Replace wipes and re-inserts with new recipe ids — running timers would
+      // point at the wrong (or no) recipe. Stopped even when the restore fails
+      // part-way, since the wipe may already have happened (SPEC.md §5.21).
+      if (mode === 'replace') stopAllTimers();
       setBusyMessage(null);
     }
   };
@@ -481,7 +490,10 @@ export default function SettingsScreen() {
       <ScreenHeader title={t('settings.title')} back />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Spacing.xxxl + timerClearance },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* App info */}

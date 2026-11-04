@@ -51,6 +51,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import IconButton from '@/components/ui/IconButton';
 import Input from '@/components/ui/Input';
 import Fab from '@/components/ui/Fab';
+import { useTimerBarClearance } from '@/components/timers/TimerProvider';
 import ActionSheet from '@/components/ui/ActionSheet';
 import SwipeableRow from '@/components/ui/SwipeableRow';
 import PasteListSheet from '@/components/shopping/PasteListSheet';
@@ -78,6 +79,7 @@ export default function ShoppingListScreen() {
   const c = useTheme();
   const t = useT();
   const insets = useSafeAreaInsets();
+  const timerClearance = useTimerBarClearance();
   const styles = useMemo(() => makeStyles(c), [c]);
   const nameInputRef = useRef<TextInput>(null);
   const titleInputRef = useRef<TextInput>(null);
@@ -457,7 +459,7 @@ export default function ShoppingListScreen() {
           contentContainerStyle={[
             styles.list,
             // Keep the last rows reachable above the FAB.
-            { paddingBottom: Spacing.xxxl + Touch.list + insets.bottom },
+            { paddingBottom: Spacing.xxxl + Touch.list + insets.bottom + timerClearance },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -475,7 +477,8 @@ export default function ShoppingListScreen() {
         <View
           style={[
             styles.addPanel,
-            { paddingBottom: Spacing.md + insets.bottom },
+            // Lifted clear of the timer bar (SPEC.md §5.21).
+            { paddingBottom: Spacing.md + insets.bottom + timerClearance },
           ]}
         >
           <View style={styles.addRow}>

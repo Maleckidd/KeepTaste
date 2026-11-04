@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, Spacing, Radius, Shadow, Motion } from '@/constants/theme';
 import { useSnackbarTop } from '@/components/ui/SnackbarProvider';
+import { useTimerBarTop } from '@/components/timers/TimerProvider';
 
 type Props = {
   /** Required — the FAB is icon-only. */
@@ -18,8 +19,9 @@ type Props = {
 };
 
 // Floating action button — the screen's primary action, pinned bottom-right
-// in the thumb zone. While a snackbar is up it slides above it, so neither
-// covers the other's action (SPEC.md §6).
+// in the thumb zone. While a snackbar or the cooking-timer bar is up it slides
+// above the higher of the two, so neither covers the other's action (SPEC.md
+// §6, §5.21).
 export default function Fab({
   accessibilityLabel,
   onPress,
@@ -29,6 +31,9 @@ export default function Fab({
   const c = useTheme();
   const insets = useSafeAreaInsets();
   const snackbarTop = useSnackbarTop();
+  const timerBarTop = useTimerBarTop();
+  const obstacles = [snackbarTop, timerBarTop].filter((y): y is number => y !== null);
+  const obstacleTop = obstacles.length ? Math.min(...obstacles) : null;
   const ref = useRef<View>(null);
   // Window y of the FAB's resting bottom edge. Measured on layout only, when
   // the FAB is not lifted, so the lift never feeds back into the measurement.
@@ -36,8 +41,8 @@ export default function Fab({
   const lift = useRef(new Animated.Value(0)).current;
 
   const overlap =
-    snackbarTop !== null && restingBottom !== null
-      ? Math.max(0, restingBottom - snackbarTop + Spacing.sm)
+    obstacleTop !== null && restingBottom !== null
+      ? Math.max(0, restingBottom - obstacleTop + Spacing.sm)
       : 0;
 
   // JS driver on purpose: with the native driver Fabric still hit-tests the

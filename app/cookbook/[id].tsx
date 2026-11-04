@@ -28,6 +28,7 @@ import {
   subscribePendingDeletes,
 } from '@/utils/pendingDelete';
 import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { useTimers, useTimerBarClearance } from '@/components/timers/TimerProvider';
 import { partitionToTry, countToTry } from '@/utils/toTry';
 import { matchRecipes } from '@/utils/search';
 import {
@@ -194,6 +195,8 @@ export default function CookbookScreen() {
   // §5.19 filter chip: session-only, "All recipes" view only.
   const [toTryOnly, setToTryOnly] = useState(false);
   const showUndoDelete = useUndoDelete();
+  const { stopTimersForRecipe } = useTimers();
+  const timerClearance = useTimerBarClearance();
 
   const loadData = useCallback(async () => {
     if (isAll) {
@@ -260,6 +263,9 @@ export default function CookbookScreen() {
             async () => {
               await deleteRecipe(recipe.id);
               await deleteStoredImage(recipe.imagePath ?? null);
+              // After the Undo window only (SPEC.md §5.21). Deleting a
+              // cookbook stops none — its recipes survive.
+              stopTimersForRecipe(recipe.id);
             }
           ),
       },
@@ -481,7 +487,10 @@ export default function CookbookScreen() {
               </SwipeableRow>
             );
           }}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: Spacing.xxxl * 2 + timerClearance },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
