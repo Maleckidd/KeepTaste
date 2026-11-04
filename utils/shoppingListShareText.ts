@@ -4,8 +4,10 @@
 // list round-trips between phones with no backend (the app stays local-only).
 //
 // Only active (not-yet-in-cart) items are included: the recipient starts their
-// shopping from scratch. Each item is a "- " bullet so parseIngredients (§5.16)
-// strips the marker on re-paste; an optional quantity is appended in parens.
+// shopping from scratch. The caller may pass a subset — what the user kept
+// selected in the send sheet. Each item is a "- " bullet so parseIngredients
+// (§5.16) strips the marker on re-paste; an optional quantity is appended in
+// parens.
 import type { ShoppingItem } from '../db/schema';
 
 export function buildShoppingListShareText(

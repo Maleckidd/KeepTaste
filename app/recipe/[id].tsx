@@ -36,6 +36,8 @@ import IconButton from '@/components/ui/IconButton';
 import Button from '@/components/ui/Button';
 import ActionSheet from '@/components/ui/ActionSheet';
 import type { Translator } from '@/utils/i18n';
+import { useTimers, useTimerBarClearance } from '@/components/timers/TimerProvider';
+import { makeInstructionRules } from '@/components/timers/timerMarkdownRules';
 import type { Recipe } from '@/db/schema';
 
 function formatTime(
@@ -141,6 +143,19 @@ export default function RecipeScreen() {
 
   const showUndoDelete = useUndoDelete();
   const { showSnackbar } = useSnackbar();
+  const { stopTimersForRecipe } = useTimers();
+  const timerClearance = useTimerBarClearance();
+
+  // Duration chips in the Instructions (SPEC.md §5.21).
+  const recipeId = recipe?.id;
+  const recipeTitle = recipe?.title;
+  const instructionRules = useMemo(
+    () =>
+      recipeId == null
+        ? undefined
+        : makeInstructionRules({ recipeId, title: recipeTitle ?? '', fontScale }),
+    [recipeId, recipeTitle, fontScale]
+  );
 
   const loadData = useCallback(async () => {
     const r = await getRecipeById(Number(id));
@@ -169,6 +184,8 @@ export default function RecipeScreen() {
             async () => {
               await deleteRecipe(recipe.id);
               await deleteStoredImage(recipe.imagePath ?? null);
+              // After the Undo window only — an undone delete keeps its timers.
+              stopTimersForRecipe(recipe.id);
             }
           );
           router.back();
@@ -234,11 +251,6 @@ export default function RecipeScreen() {
             styles={styles}
           />
           <IconButton
-            icon="share-outline"
-            accessibilityLabel={t('a11y.shareRecipe')}
-            onPress={handleShare}
-          />
-          <IconButton
             icon="ellipsis-horizontal"
             accessibilityLabel={t('a11y.moreActions')}
             onPress={() => setMenuOpen(true)}
@@ -252,6 +264,11 @@ export default function RecipeScreen() {
         title={recipe.title}
         onClose={() => setMenuOpen(false)}
         actions={[
+          {
+            label: t('recipe.menuShare'),
+            icon: 'share-outline',
+            onPress: handleShare,
+          },
           {
             label: t('common.edit'),
             icon: 'create-outline',
@@ -271,7 +288,7 @@ export default function RecipeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: Spacing.xxxl + insets.bottom },
+          { paddingBottom: Spacing.xxxl + insets.bottom + timerClearance },
         ]}
       >
         {/* Photo or placeholder */}
@@ -411,7 +428,9 @@ export default function RecipeScreen() {
               <Text style={styles.sectionTitle} accessibilityRole="header">
                 {t('recipe.instructions')}
               </Text>
-              <Markdown style={markdownStyles}>{recipe.instructions}</Markdown>
+              <Markdown style={markdownStyles} rules={instructionRules}>
+                {recipe.instructions}
+              </Markdown>
             </View>
           ) : null}
 

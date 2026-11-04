@@ -14,7 +14,10 @@ import { Ionicons } from '@expo/vector-icons';
 import ModalHeader from '@/components/ui/ModalHeader';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { useSnackbar } from '@/components/ui/SnackbarProvider';
+import {
+  useSnackbar,
+  NAVIGATION_SNACKBAR_MS,
+} from '@/components/ui/SnackbarProvider';
 import { getRecipeById } from '@/db/recipes';
 import {
   getShoppingLists,
@@ -118,6 +121,7 @@ export default function AddToShoppingListScreen() {
         }),
         actionLabel: t('addToList.viewList'),
         onAction: () => router.push(`/shopping/${listId}`),
+        durationMs: NAVIGATION_SNACKBAR_MS,
       });
     } finally {
       setIsSaving(false);

@@ -3,10 +3,12 @@ import {
   View,
   Text,
   Pressable,
+  ScrollView,
   StyleSheet,
   Animated,
   BackHandler,
   Keyboard,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +27,8 @@ export type ActionSheetAction = {
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
   destructive?: boolean;
+  /** Marks the current choice in a picker-style sheet (trailing checkmark). */
+  selected?: boolean;
   onPress: () => void;
 };
 
@@ -46,6 +50,7 @@ export default function ActionSheet({ visible, title, actions, onClose }: Props)
   const c = useTheme();
   const t = useT();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
 
   // Stays mounted while the exit animation plays out.
   const [rendered, setRendered] = useState(visible);
@@ -137,34 +142,55 @@ export default function ActionSheet({ visible, title, actions, onClose }: Props)
             {title}
           </Text>
         ) : null}
-        {actions.map((action, index) => (
-          <Pressable
-            key={index}
-            onPress={() => run(action)}
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
-            style={({ pressed }) => [
-              styles.action,
-              pressed && { backgroundColor: c.surfaceAlt },
-            ]}
-          >
-            {action.icon ? (
-              <Ionicons
-                name={action.icon}
-                size={22}
-                color={action.destructive ? c.error : c.text}
-              />
-            ) : null}
-            <Text
-              style={[
-                styles.actionLabel,
-                { color: action.destructive ? c.error : c.text },
+        {/* Long lists (e.g. the cookbook picker) scroll; title and Cancel stay
+            fixed. Short sheets keep their natural height. */}
+        <ScrollView
+          style={[styles.list, { maxHeight: windowHeight * 0.6 }]}
+          alwaysBounceVertical={false}
+          showsVerticalScrollIndicator={false}
+        >
+          {actions.map((action, index) => (
+            <Pressable
+              key={index}
+              onPress={() => run(action)}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              accessibilityState={
+                action.selected !== undefined
+                  ? { selected: action.selected }
+                  : undefined
+              }
+              style={({ pressed }) => [
+                styles.action,
+                pressed && { backgroundColor: c.surfaceAlt },
               ]}
             >
-              {action.label}
-            </Text>
-          </Pressable>
-        ))}
+              {action.icon ? (
+                <Ionicons
+                  name={action.icon}
+                  size={22}
+                  color={action.destructive ? c.error : c.text}
+                />
+              ) : null}
+              <Text
+                style={[
+                  styles.actionLabel,
+                  { color: action.destructive ? c.error : c.text },
+                ]}
+              >
+                {action.label}
+              </Text>
+              {action.selected ? (
+                <Ionicons
+                  name="checkmark"
+                  size={22}
+                  color={c.primary}
+                  style={styles.checkmark}
+                />
+              ) : null}
+            </Pressable>
+          ))}
+        </ScrollView>
         <Pressable
           onPress={onClose}
           accessibilityRole="button"
@@ -215,6 +241,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: Spacing.sm,
   },
+  list: {
+    flexGrow: 0,
+  },
   action: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -224,8 +253,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   actionLabel: {
+    flexShrink: 1,
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.medium,
+  },
+  checkmark: {
+    marginLeft: 'auto',
   },
   cancel: {
     alignItems: 'center',

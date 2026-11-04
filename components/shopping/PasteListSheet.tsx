@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  TextInput,
   View,
   Text,
   Pressable,
@@ -36,6 +37,9 @@ type Props = {
   onClose: () => void;
   // Fired after a successful bulk insert; parent reloads + shows a snackbar.
   onAdded: (count: number) => void;
+  // Products already parsed from a paste into the add row (§5.10): the sheet
+  // opens straight on Review with them all checked. null/empty → Paste step.
+  initialProducts?: string[] | null;
 };
 
 type Step = 'paste' | 'review';
@@ -55,6 +59,7 @@ export default function PasteListSheet({
   listId,
   onClose,
   onAdded,
+  initialProducts,
 }: Props) {
   const c = useTheme();
   const t = useT();
@@ -65,6 +70,7 @@ export default function PasteListSheet({
   const [rendered, setRendered] = useState(visible);
   const [sheetHeight, setSheetHeight] = useState(420);
   const progress = useRef(new Animated.Value(0)).current;
+  const inputRef = useRef<TextInput>(null);
 
   const [step, setStep] = useState<Step>('paste');
   const [text, setText] = useState('');
@@ -81,20 +87,36 @@ export default function PasteListSheet({
       // `visible`), so the sheet would sit under the keys with no layout
       // fallback under edge-to-edge.
       Keyboard.dismiss();
-      // Reset transient state each time the sheet opens.
-      setStep('paste');
-      setText('');
-      setCandidates([]);
-      setChecked([]);
+      // Reset transient state each time the sheet opens. A paste into the add
+      // row hands its parsed products over and skips straight to Review.
+      if (initialProducts?.length) {
+        setStep('review');
+        setText('');
+        setCandidates(initialProducts);
+        setChecked(initialProducts.map(() => true));
+      } else {
+        setStep('paste');
+        setText('');
+        setCandidates([]);
+        setChecked([]);
+      }
       setError(null);
       setSaving(false);
       setKeyboardHeight(0);
       setRendered(true);
+      const opensOnPaste = !initialProducts?.length;
       Animated.timing(progress, {
         toValue: 1,
         duration: Motion.duration.base,
         useNativeDriver: true,
-      }).start();
+      }).start(({ finished }) => {
+        // Focus the field so the keyboard is up and typing lands somewhere
+        // (iteration 3: a persona typed into a sheet with nothing focused).
+        // After the open, not with autoFocus — by then the keyboardHeight
+        // listeners below are registered, which Keyboard.dismiss() above
+        // relies on.
+        if (finished && opensOnPaste) inputRef.current?.focus();
+      });
       return;
     }
     Animated.timing(progress, {
@@ -104,6 +126,9 @@ export default function PasteListSheet({
     }).start();
     const timer = setTimeout(() => setRendered(false), Motion.duration.fast + 50);
     return () => clearTimeout(timer);
+    // initialProducts is deliberately not a dependency: the parent sets it in
+    // the same batch as `visible`, so it is current when the sheet opens, and
+    // a later change must not reset an open sheet.
   }, [visible, progress]);
 
   useEffect(() => {
@@ -205,6 +230,7 @@ export default function PasteListSheet({
         {step === 'paste' ? (
           <View style={styles.body}>
             <Input
+              ref={inputRef}
               style={[styles.pasteInput, { maxHeight: contentMaxHeight }]}
               placeholder={t('pasteList.placeholder')}
               value={text}

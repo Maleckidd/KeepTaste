@@ -24,6 +24,7 @@ export const dictionary = {
   },
   'common.keepEditing': { en: 'Keep editing', pl: 'Kontynuuj edycję' },
   'common.discard': { en: 'Discard', pl: 'Odrzuć' },
+  'common.show': { en: 'Show', pl: 'Pokaż' },
   'common.gallery': { en: 'Gallery', pl: 'Galeria' },
   'common.camera': { en: 'Camera', pl: 'Aparat' },
   'common.removePhoto': { en: 'Remove photo', pl: 'Usuń zdjęcie' },
@@ -49,14 +50,12 @@ export const dictionary = {
   'a11y.back': { en: 'Go back', pl: 'Wstecz' },
   'a11y.close': { en: 'Close', pl: 'Zamknij' },
   'a11y.settings': { en: 'Settings', pl: 'Ustawienia' },
-  'a11y.addCookbook': { en: 'Add cookbook', pl: 'Dodaj książkę kucharską' },
   'a11y.addRecipe': { en: 'Add recipe', pl: 'Dodaj przepis' },
   'a11y.addList': { en: 'New shopping list', pl: 'Nowa lista zakupów' },
   'a11y.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
-  'a11y.shareRecipe': { en: 'Share recipe', pl: 'Udostępnij przepis' },
   'a11y.increaseFont': { en: 'Increase text size', pl: 'Zwiększ rozmiar tekstu' },
   'a11y.decreaseFont': { en: 'Decrease text size', pl: 'Zmniejsz rozmiar tekstu' },
-  'a11y.shareCookbook': { en: 'Share cookbook', pl: 'Udostępnij książkę' },
+  'a11y.clearSearch': { en: 'Clear search', pl: 'Wyczyść wyszukiwanie' },
   'a11y.confirmProduct': { en: 'Confirm product', pl: 'Zatwierdź produkt' },
   'a11y.checkAllInGroup': {
     en: 'Add all {count} {name} to cart',
@@ -65,6 +64,10 @@ export const dictionary = {
   'a11y.recipePhoto': { en: 'Recipe photo', pl: 'Zdjęcie przepisu' },
   'a11y.changePhoto': { en: 'Add or change photo', pl: 'Dodaj lub zmień zdjęcie' },
   'a11y.import': { en: 'Import recipe', pl: 'Importuj przepis' },
+  'a11y.cookbookPicker': {
+    en: 'Cookbook: {name}',
+    pl: 'Książka kucharska: {name}',
+  },
 
   // --- Tabs ---
   'tabs.recipes': { en: 'Recipes', pl: 'Przepisy' },
@@ -95,6 +98,7 @@ export const dictionary = {
   // names the screen's function. App name stays untranslated.
   'home.title': { en: 'KeepTaste', pl: 'KeepTaste' },
   'home.allRecipes': { en: 'All recipes', pl: 'Wszystkie przepisy' },
+  'home.newCookbook': { en: 'New cookbook', pl: 'Nowa książka' },
   'home.emptyTitle': { en: 'No cookbooks', pl: 'Brak książek kucharskich' },
   'home.emptyText': {
     en: 'Create your first cookbook and start collecting recipes',
@@ -107,10 +111,17 @@ export const dictionary = {
 
   // --- Cookbook / recipes grid (app/cookbook/[id].tsx) ---
   'cookbook.searchPlaceholder': {
-    en: 'Search recipes...',
-    pl: 'Szukaj przepisów...',
+    en: 'Search by name or ingredient',
+    pl: 'Szukaj po nazwie lub składniku',
   },
-  'cookbook.noResults': { en: 'No results', pl: 'Brak wyników' },
+  'cookbook.noResults': {
+    en: 'Nothing found in names or ingredients',
+    pl: 'Nic nie znaleziono w nazwach ani składnikach',
+  },
+  'cookbook.inIngredients': {
+    en: 'in ingredients: {line}',
+    pl: 'w składnikach: {line}',
+  },
   'cookbook.emptyRecipes': {
     en: 'No recipes here yet — add your first one.',
     pl: 'Nie ma tu jeszcze przepisów — dodaj pierwszy.',
@@ -121,10 +132,15 @@ export const dictionary = {
     en: 'Could not export the cookbook.',
     pl: 'Nie udało się wyeksportować książki kucharskiej.',
   },
+  'cookbook.pdfPreparing': {
+    en: 'Preparing PDF…',
+    pl: 'Tworzę PDF…',
+  },
   'cookbook.sharePdfTitle': {
     en: 'Share cookbook (PDF)',
     pl: 'Udostępnij książkę (PDF)',
   },
+  'cookbook.menuSharePdf': { en: 'Share as PDF', pl: 'Udostępnij jako PDF' },
   'cookbook.minutes': { en: '{count} min', pl: '{count} min' },
   'cookbook.servings.one': { en: '{count} serving', pl: '{count} porcja' },
   'cookbook.servings.few': { en: '{count} servings', pl: '{count} porcje' },
@@ -155,6 +171,7 @@ export const dictionary = {
     en: 'Share recipe',
     pl: 'Udostępnij przepis',
   },
+  'recipe.menuShare': { en: 'Share', pl: 'Udostępnij' },
 
   // To-try status (§5.19) — shared badge/section label, view action + snackbar.
   'toTry.badge': { en: 'To try', pl: 'Do wypróbowania' },
@@ -212,22 +229,33 @@ export const dictionary = {
     en: 'e.g. Strawberry tart...',
     pl: 'np. Tarta truskawkowa...',
   },
+  'recipeForm.cookbook': { en: 'Cookbook', pl: 'Książka kucharska' },
+  'recipeForm.noCookbook': { en: 'No cookbook', pl: 'Bez książki' },
   'recipeForm.prep': { en: 'Prep (min)', pl: 'Przygot. (min)' },
   'recipeForm.cook': { en: 'Cook (min)', pl: 'Gotow. (min)' },
   'recipeForm.servings': { en: 'Servings', pl: 'Porcje' },
+  // Example placeholders start with "e.g." so they never read as entered
+  // values (SPEC.md §5.5, persona iteration 1, problem 3).
+  'recipeForm.prepPlaceholder': { en: 'e.g. 15', pl: 'np. 15' },
+  'recipeForm.cookPlaceholder': { en: 'e.g. 45', pl: 'np. 45' },
+  'recipeForm.servingsPlaceholder': { en: 'e.g. 4', pl: 'np. 4' },
   'recipeForm.ingredients': { en: 'Ingredients', pl: 'Składniki' },
+  'recipeForm.ingredientsHint': {
+    en: 'One ingredient per line',
+    pl: 'Każdy składnik w osobnej linii',
+  },
   'recipeForm.formatHelpLink': {
     en: 'See formatting tips',
     pl: 'Zobacz wskazówki formatowania',
   },
   'recipeForm.ingredientsPlaceholder': {
-    en: '200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream',
-    pl: '200g mąki\n100g masła\n- 3 jajka\n\n#Krem\n300ml śmietanki kremówki',
+    en: 'e.g. 200g flour\n100g butter\n- 3 eggs\n\n#Cream\n300ml heavy cream',
+    pl: 'np. 200g mąki\n100g masła\n- 3 jajka\n\n#Krem\n300ml śmietanki kremówki',
   },
   'recipeForm.instructions': { en: 'Instructions', pl: 'Przygotowanie' },
   'recipeForm.instructionsPlaceholder': {
-    en: '# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.',
-    pl: '# Przygotuj ciasto\nWymieszaj mąkę z masłem...\n\n# Pieczenie\n**Piecz przez 45 minut** w 180°C.',
+    en: 'e.g.\n# Prepare the dough\nMix the flour with the butter...\n\n# Baking\n**Bake for 45 minutes** at 180°C.',
+    pl: 'np.\n# Przygotuj ciasto\nWymieszaj mąkę z masłem...\n\n# Pieczenie\n**Piecz przez 45 minut** w 180°C.',
   },
   'recipeForm.toTryLabel': {
     en: 'Mark as "to try"',
@@ -239,13 +267,17 @@ export const dictionary = {
     pl: 'Twoje uwagi, poprawki, co zmienić następnym razem...',
   },
   'recipeForm.notesPlaceholder': {
-    en: 'Next time add more vanilla sugar...',
-    pl: 'Następnym razem dodać więcej cukru waniliowego...',
+    en: 'e.g. Next time add more vanilla sugar...',
+    pl: 'np. Następnym razem dodać więcej cukru waniliowego...',
   },
   'recipeForm.importAction': {
     en: 'Import from a link, text or photo',
     pl: 'Importuj z linku, tekstu lub zdjęcia',
   },
+  // Post-save snackbar (SPEC.md §5.5 "Save confirmation").
+  'recipeForm.savedIn': { en: 'Saved in "{name}"', pl: 'Zapisano w „{name}”' },
+  'recipeForm.saved': { en: 'Recipe saved', pl: 'Przepis zapisany' },
+  'recipeForm.movedTo': { en: 'Moved to "{name}"', pl: 'Przeniesiono do „{name}”' },
 
   // --- Single-recipe import sheet (components/recipe/ImportSheet.tsx) ---
   'import.title': { en: 'Import recipe', pl: 'Importuj przepis' },
@@ -388,7 +420,26 @@ export const dictionary = {
   },
   'shopping.emptyAction': { en: 'Create a list', pl: 'Stwórz listę' },
   'shopping.rename': { en: 'Rename', pl: 'Zmień nazwę' },
-  'shopping.shareList': { en: 'Share list', pl: 'Udostępnij listę' },
+  'shopping.shareList': {
+    en: "Send what's left ({count})",
+    pl: 'Wyślij pozostałe ({count})',
+  },
+  'shopping.sendTitle': {
+    en: "Send what's left",
+    pl: 'Wyślij pozostałe',
+  },
+  'shopping.send.one': {
+    en: 'Send {count} product',
+    pl: 'Wyślij {count} produkt',
+  },
+  'shopping.send.few': {
+    en: 'Send {count} products',
+    pl: 'Wyślij {count} produkty',
+  },
+  'shopping.send.many': {
+    en: 'Send {count} products',
+    pl: 'Wyślij {count} produktów',
+  },
   'shopping.shareDialogTitle': {
     en: 'Shopping list',
     pl: 'Lista zakupów',
@@ -421,6 +472,10 @@ export const dictionary = {
   },
   'shoppingList.addProduct': { en: 'Add product', pl: 'Dodaj produkt' },
   'shoppingList.inCartHeader': { en: 'In cart', pl: 'W koszyku' },
+  'shoppingList.movedToCart': {
+    en: '"{name}" moved to "In cart" below',
+    pl: '„{name}” przeniesiono niżej, do „W koszyku”',
+  },
   'shoppingList.productNamePlaceholder': {
     en: 'Product name...',
     pl: 'Nazwa produktu...',
@@ -431,6 +486,10 @@ export const dictionary = {
   },
   'shoppingList.qtyPlaceholder': { en: 'Qty', pl: 'Ilość' },
   'shoppingList.pasteProducts': { en: 'Paste products', pl: 'Wklej produkty' },
+  'shoppingList.pasteWholeList': {
+    en: 'Paste a whole list',
+    pl: 'Wklej całą listę',
+  },
 
   // --- Paste products into a shopping list (components/shopping/PasteListSheet.tsx, §5.16) ---
   'pasteList.title': { en: 'Paste products', pl: 'Wklej produkty' },
@@ -747,6 +806,53 @@ export const dictionary = {
     en: 'Delete everything',
     pl: 'Usuń wszystko',
   },
+
+  // --- Cooking timers (SPEC.md §5.21) ---
+  'timer.chipA11y': {
+    en: 'Start timer, {duration}',
+    pl: 'Uruchom minutnik, {duration}',
+  },
+  'timer.chipRunningA11y': {
+    en: 'Timer running, {remaining} left. Show controls',
+    pl: 'Minutnik działa, pozostały czas: {remaining}. Pokaż sterowanie',
+  },
+  'timer.chipPausedA11y': {
+    en: 'Timer paused, {remaining} left. Show controls',
+    pl: 'Minutnik wstrzymany, pozostały czas: {remaining}. Pokaż sterowanie',
+  },
+  'timer.chipDoneA11y': {
+    en: "Time's up. Dismiss timer",
+    pl: 'Czas minął. Wyłącz minutnik',
+  },
+  'timer.stepLabel': { en: '{title} · step {step}', pl: '{title} · krok {step}' },
+  'timer.more': { en: '+{count}', pl: '+{count}' },
+  'timer.done': { en: "Time's up", pl: 'Czas minął' },
+  'timer.paused': { en: 'Paused', pl: 'Wstrzymany' },
+  'timer.pause': { en: 'Pause', pl: 'Wstrzymaj' },
+  'timer.resume': { en: 'Resume', pl: 'Wznów' },
+  'timer.addMinute': { en: '+1 min', pl: '+1 min' },
+  'timer.stop': { en: 'Stop', pl: 'Zatrzymaj' },
+  'timer.dismiss': { en: 'Dismiss', pl: 'Wyłącz' },
+  'timer.listTitle': { en: 'Timers', pl: 'Minutniki' },
+  'timer.barA11y': {
+    en: 'Timers: {label}, {remaining}. Show all',
+    pl: 'Minutniki: {label}, {remaining}. Pokaż wszystkie',
+  },
+  'timer.collapseA11y': { en: 'Hide timers', pl: 'Ukryj minutniki' },
+  'timer.openRecipeA11y': {
+    en: 'Open recipe {title}',
+    pl: 'Otwórz przepis {title}',
+  },
+  'timer.doneAnnounce': { en: "Time's up: {label}", pl: 'Czas minął: {label}' },
+  'timer.unit.hour.one': { en: '{count} hour', pl: '{count} godzina' },
+  'timer.unit.hour.few': { en: '{count} hours', pl: '{count} godziny' },
+  'timer.unit.hour.many': { en: '{count} hours', pl: '{count} godzin' },
+  'timer.unit.minute.one': { en: '{count} minute', pl: '{count} minuta' },
+  'timer.unit.minute.few': { en: '{count} minutes', pl: '{count} minuty' },
+  'timer.unit.minute.many': { en: '{count} minutes', pl: '{count} minut' },
+  'timer.unit.second.one': { en: '{count} second', pl: '{count} sekunda' },
+  'timer.unit.second.few': { en: '{count} seconds', pl: '{count} sekundy' },
+  'timer.unit.second.many': { en: '{count} seconds', pl: '{count} sekund' },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

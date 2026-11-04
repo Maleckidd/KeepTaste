@@ -1,8 +1,10 @@
-import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, Spacing, Radius, Shadow } from '@/constants/theme';
+import { useTheme, Spacing, Radius, Shadow, Motion } from '@/constants/theme';
+import { useSnackbarTop } from '@/components/ui/SnackbarProvider';
+import { useTimerBarTop } from '@/components/timers/TimerProvider';
 
 type Props = {
   /** Required — the FAB is icon-only. */
@@ -17,7 +19,9 @@ type Props = {
 };
 
 // Floating action button — the screen's primary action, pinned bottom-right
-// in the thumb zone. Hide it on empty states that show their own CTA.
+// in the thumb zone. While a snackbar or the cooking-timer bar is up it slides
+// above the higher of the two, so neither covers the other's action (SPEC.md
+// §6, §5.21).
 export default function Fab({
   accessibilityLabel,
   onPress,
@@ -26,22 +30,59 @@ export default function Fab({
 }: Props) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
+  const snackbarTop = useSnackbarTop();
+  const timerBarTop = useTimerBarTop();
+  const obstacles = [snackbarTop, timerBarTop].filter((y): y is number => y !== null);
+  const obstacleTop = obstacles.length ? Math.min(...obstacles) : null;
+  const ref = useRef<View>(null);
+  // Window y of the FAB's resting bottom edge. Measured on layout only, when
+  // the FAB is not lifted, so the lift never feeds back into the measurement.
+  const [restingBottom, setRestingBottom] = useState<number | null>(null);
+  const lift = useRef(new Animated.Value(0)).current;
+
+  const overlap =
+    obstacleTop !== null && restingBottom !== null
+      ? Math.max(0, restingBottom - obstacleTop + Spacing.sm)
+      : 0;
+
+  // JS driver on purpose: with the native driver Fabric still hit-tests the
+  // FAB at its resting spot, so a tap on the snackbar action under it pressed
+  // the FAB instead.
+  useEffect(() => {
+    Animated.timing(lift, {
+      toValue: -overlap,
+      duration: Motion.duration.base,
+      useNativeDriver: false,
+    }).start();
+  }, [lift, overlap]);
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [
+    <Animated.View
+      ref={ref}
+      onLayout={() =>
+        ref.current?.measureInWindow((_x, y, _w, h) => setRestingBottom(y + h))
+      }
+      style={[
         styles.fab,
         {
-          backgroundColor: c.primary,
           bottom: Spacing.lg + (withBottomInset ? insets.bottom : 0),
+          transform: [{ translateY: lift }],
         },
-        pressed && styles.pressed,
       ]}
     >
-      <Ionicons name={icon} size={30} color={c.onPrimary} />
-    </Pressable>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        style={({ pressed }) => [
+          styles.button,
+          { backgroundColor: c.primary },
+          pressed && styles.pressed,
+        ]}
+      >
+        <Ionicons name={icon} size={30} color={c.onPrimary} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -51,6 +92,11 @@ const styles = StyleSheet.create({
     right: Spacing.lg,
     width: 56,
     height: 56,
+  },
+  // The shadow sits on the colored button, not the transparent wrapper —
+  // Android elevation needs a background to cast one.
+  button: {
+    flex: 1,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',

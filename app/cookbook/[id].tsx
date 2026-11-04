@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +16,6 @@ import { getCookbookById, deleteCookbook } from '@/db/cookbooks';
 import {
   getRecipesByCookbook,
   getAllRecipes,
-  searchRecipes,
   deleteRecipe,
 } from '@/db/recipes';
 import { getSetting, setSetting } from '@/db/settings';
@@ -27,7 +28,9 @@ import {
   subscribePendingDeletes,
 } from '@/utils/pendingDelete';
 import { useUndoDelete } from '@/components/ui/SnackbarProvider';
+import { useTimers, useTimerBarClearance } from '@/components/timers/TimerProvider';
 import { partitionToTry, countToTry } from '@/utils/toTry';
+import { matchRecipes } from '@/utils/search';
 import {
   useTheme,
   ThemePalette,
@@ -70,10 +73,13 @@ type ListItem =
 
 function RecipeCard({
   recipe,
+  hint,
   onPress,
   onLongPress,
 }: {
   recipe: Recipe;
+  /** Matched ingredient line for an ingredient-only search hit (§5.3). */
+  hint: string | null;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -81,6 +87,7 @@ function RecipeCard({
   const t = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
+  const hintText = hint ? t('cookbook.inIngredients', { line: hint }) : null;
 
   return (
     <Pressable
@@ -88,7 +95,7 @@ function RecipeCard({
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole="button"
-      accessibilityLabel={recipe.title}
+      accessibilityLabel={hintText ? `${recipe.title}, ${hintText}` : recipe.title}
     >
       {recipe.imagePath ? (
         <Image
@@ -118,6 +125,11 @@ function RecipeCard({
             />
           ) : null}
         </View>
+        {hintText ? (
+          <Text style={styles.cardHint} numberOfLines={1}>
+            {hintText}
+          </Text>
+        ) : null}
         {totalTime > 0 || recipe.servings ? (
           <View style={styles.cardMeta}>
             {totalTime > 0 ? (
@@ -168,32 +180,28 @@ export default function CookbookScreen() {
   const isAll = id === 'all';
 
   const [cookbook, setCookbook] = useState<Cookbook | null>(null);
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  // Everything this view can show, loaded once per focus; search and the
+  // to-try chip filter it in memory (§5.3 — never per keystroke from the DB).
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
+  // §5.14: rendering the PDF takes seconds with nothing else on screen.
+  const [pdfPreparing, setPdfPreparing] = useState(false);
+  const pdfBusy = useRef(false);
   const [recipeMenu, setRecipeMenu] = useState<Recipe | null>(null);
-  const [peekHint, setPeekHint] = useState(false);
-  // §5.19 filter chip: session-only, "All recipes" view only. Count is over the
-  // whole library, independent of the query.
+  const [peekRecipeId, setPeekRecipeId] = useState<number | null>(null);
+  // §5.19 filter chip: session-only, "All recipes" view only.
   const [toTryOnly, setToTryOnly] = useState(false);
-  const [toTryTotal, setToTryTotal] = useState(0);
   const showUndoDelete = useUndoDelete();
+  const { stopTimersForRecipe } = useTimers();
+  const timerClearance = useTimerBarClearance();
 
   const loadData = useCallback(async () => {
     if (isAll) {
-      const data = searchQuery
-        ? await searchRecipes(searchQuery)
-        : await getAllRecipes();
-      const visible = filterPendingDeletes(data, 'recipe', (r) => r.id);
-      setRecipes(toTryOnly ? visible.filter((r) => r.toTry) : visible);
-      // Chip count is derived from the full set, independent of the query.
-      const all = searchQuery
-        ? await getAllRecipes()
-        : data;
-      setToTryTotal(
-        countToTry(filterPendingDeletes(all, 'recipe', (r) => r.id))
-      );
+      const data = await getAllRecipes();
+      setAllRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
     } else {
       const cbId = Number(id);
       const [cb, data] = await Promise.all([
@@ -201,10 +209,36 @@ export default function CookbookScreen() {
         getRecipesByCookbook(cbId),
       ]);
       setCookbook(cb || null);
-      setRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
+      setAllRecipes(filterPendingDeletes(data, 'recipe', (r) => r.id));
     }
     setIsLoaded(true);
-  }, [id, isAll, searchQuery, toTryOnly]);
+  }, [id, isAll]);
+
+  // Chip count is over the whole library, independent of the query.
+  const toTryTotal = useMemo(
+    () => (isAll ? countToTry(allRecipes) : 0),
+    [isAll, allRecipes]
+  );
+
+  // Visible list: to-try chip filter, then the title + ingredient search (§5.3)
+  // in the All view — title matches first, ingredient matches after, each
+  // keeping the updated_at order. Ingredient-only hits carry a hint line.
+  const { recipes, hints } = useMemo(() => {
+    const base = toTryOnly ? allRecipes.filter((r) => r.toTry) : allRecipes;
+    const matches = isAll
+      ? matchRecipes(base, searchQuery)
+      : base.map((recipe) => ({ recipe, ingredientHint: null }));
+    const hintById = new Map<number, string>();
+    for (const m of matches) {
+      if (m.ingredientHint) hintById.set(m.recipe.id, m.ingredientHint);
+    }
+    return { recipes: matches.map((m) => m.recipe), hints: hintById };
+  }, [allRecipes, isAll, searchQuery, toTryOnly]);
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    searchInputRef.current?.focus();
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -213,22 +247,6 @@ export default function CookbookScreen() {
   );
 
   useEffect(() => subscribePendingDeletes(loadData), [loadData]);
-
-  // Swipe actions are otherwise invisible: on the very first visit that shows
-  // any recipes, briefly reveal the first row's actions, then never again.
-  useEffect(() => {
-    if (!isLoaded || recipes.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      if (await getSetting('swipeHintSeen')) return;
-      if (cancelled) return;
-      setPeekHint(true);
-      await setSetting('swipeHintSeen', '1');
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded, recipes.length]);
 
   // Confirmation first (deliberate speed bump for recipes and cookbooks),
   // then the delete still goes through the undo snackbar before committing.
@@ -245,6 +263,9 @@ export default function CookbookScreen() {
             async () => {
               await deleteRecipe(recipe.id);
               await deleteStoredImage(recipe.imagePath ?? null);
+              // After the Undo window only (SPEC.md §5.21). Deleting a
+              // cookbook stops none — its recipes survive.
+              stopTimersForRecipe(recipe.id);
             }
           ),
       },
@@ -278,14 +299,22 @@ export default function CookbookScreen() {
   };
 
   const handleExport = async () => {
-    if (!cookbook) return;
+    // Busy until the share sheet returns, so a second tap can't start another.
+    if (!cookbook || pdfBusy.current) return;
+    pdfBusy.current = true;
+    setPdfPreparing(true);
     try {
-      await shareCookbookPdf(cookbook, t, t('cookbook.sharePdfTitle'));
+      await shareCookbookPdf(cookbook, t, t('cookbook.sharePdfTitle'), () =>
+        setPdfPreparing(false)
+      );
     } catch (e) {
+      setPdfPreparing(false);
       Alert.alert(
         t('cookbook.exportFailedTitle'),
         t('cookbook.exportFailedMessage')
       );
+    } finally {
+      pdfBusy.current = false;
     }
   };
 
@@ -316,39 +345,65 @@ export default function CookbookScreen() {
     return items;
   }, [recipes, toTryOnly]);
 
+  // Swipe actions are otherwise invisible: on the very first visit that shows
+  // any recipes, briefly reveal the first row's actions, then never again.
+  // The hint is pinned to that recipe's id and cleared once it has played —
+  // a plain "first row" flag would replay on every row that later mounts at
+  // index 0 (e.g. each newly saved recipe).
+  const firstRecipeId =
+    listItems[0]?.kind === 'recipe' ? listItems[0].recipe.id : null;
+  useEffect(() => {
+    if (!isLoaded || firstRecipeId === null) return;
+    let cancelled = false;
+    (async () => {
+      if (await getSetting('swipeHintSeen')) return;
+      if (cancelled) return;
+      setPeekRecipeId(firstRecipeId);
+      await setSetting('swipeHintSeen', '1');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, firstRecipeId]);
+
   return (
     <View style={styles.container}>
       <ScreenHeader title={headerTitle} back>
         {!isAll && cookbook ? (
-          <>
-            <IconButton
-              icon="share-outline"
-              accessibilityLabel={t('a11y.shareCookbook')}
-              onPress={handleExport}
-            />
-            <IconButton
-              icon="ellipsis-horizontal"
-              accessibilityLabel={t('a11y.moreActions')}
-              onPress={() => setCookbookMenuOpen(true)}
-            />
-          </>
+          <IconButton
+            icon="ellipsis-horizontal"
+            accessibilityLabel={t('a11y.moreActions')}
+            onPress={() => setCookbookMenuOpen(true)}
+          />
         ) : null}
       </ScreenHeader>
 
-      {/* Search bar — title search works across all cookbooks (SPEC §5.3),
-          so it only appears in the "All recipes" view */}
+      {/* Search bar — title + ingredient search across all cookbooks (SPEC
+          §5.3), so it only appears in the "All recipes" view. Focused on
+          entry; the "×" is our own so it works on Android too (iOS-only
+          clearButtonMode is not relied on). */}
       {isAll ? (
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={16} color={c.textMuted} />
           <Input
+            ref={searchInputRef}
             style={styles.searchInput}
             placeholder={t('cookbook.searchPlaceholder')}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
-            clearButtonMode="while-editing"
+            autoFocus
             accessibilityLabel={t('cookbook.searchPlaceholder')}
           />
+          {searchQuery ? (
+            <IconButton
+              icon="close-circle"
+              size={18}
+              color={c.textMuted}
+              accessibilityLabel={t('a11y.clearSearch')}
+              onPress={clearSearch}
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -386,7 +441,7 @@ export default function CookbookScreen() {
           <SkeletonCard />
         </View>
       ) : recipes.length === 0 ? (
-        searchQuery ? (
+        searchQuery.trim() ? (
           <EmptyState icon="search-outline" text={t('cookbook.noResults')} />
         ) : (
           <EmptyState
@@ -402,7 +457,7 @@ export default function CookbookScreen() {
           keyExtractor={(item) =>
             item.kind === 'header' ? TO_TRY_HEADER_KEY : String(item.recipe.id)
           }
-          renderItem={({ item, index }) => {
+          renderItem={({ item }) => {
             if (item.kind === 'header') {
               return (
                 <Text style={styles.sectionHeader} accessibilityRole="header">
@@ -417,10 +472,12 @@ export default function CookbookScreen() {
                   router.push({ pathname: '/recipe/edit', params: { id: recipe.id } })
                 }
                 onDelete={() => handleDeleteRecipe(recipe)}
-                peek={peekHint && index === 0}
+                peek={recipe.id === peekRecipeId}
+                onPeekEnd={() => setPeekRecipeId(null)}
               >
                 <RecipeCard
                   recipe={recipe}
+                  hint={hints.get(recipe.id) ?? null}
                   onPress={() => router.push(`/recipe/${recipe.id}`)}
                   onLongPress={() => {
                     lightTap();
@@ -430,8 +487,13 @@ export default function CookbookScreen() {
               </SwipeableRow>
             );
           }}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: Spacing.xxxl * 2 + timerClearance },
+          ]}
           showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
         />
       )}
       {isLoaded && recipes.length > 0 ? (
@@ -446,6 +508,11 @@ export default function CookbookScreen() {
         title={cookbook?.name}
         onClose={() => setCookbookMenuOpen(false)}
         actions={[
+          {
+            label: t('cookbook.menuSharePdf'),
+            icon: 'share-outline',
+            onPress: handleExport,
+          },
           {
             label: t('common.edit'),
             icon: 'create-outline',
@@ -488,6 +555,17 @@ export default function CookbookScreen() {
             : []
         }
       />
+
+      {pdfPreparing ? (
+        // Blocks the screen while the PDF renders — the menu has already
+        // closed, so without this the tap looked like it did nothing.
+        <View style={styles.pdfOverlay} accessibilityViewIsModal>
+          <View style={styles.pdfCard} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={c.primary} />
+            <Text style={styles.pdfLabel}>{t('cookbook.pdfPreparing')}</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -496,6 +574,26 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.background,
+  },
+  pdfOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.base,
+    borderRadius: Radius.lg,
+    backgroundColor: c.surface,
+    ...Shadow.lg,
+  },
+  pdfLabel: {
+    fontSize: Typography.size.base,
+    color: c.text,
   },
   searchBar: {
     flexDirection: 'row',
@@ -558,6 +656,10 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
   },
   cardToTryIcon: {
     marginTop: 2,
+  },
+  cardHint: {
+    fontSize: Typography.size.sm,
+    color: c.textMuted,
   },
   sectionHeader: {
     fontSize: Typography.size.sm,

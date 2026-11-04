@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from './client';
 import { appSettings } from './schema';
+import { ACTIVE_TIMERS_KEY } from './settingKeys';
 
 /** Reads a single key/value setting, or null when absent. */
 export async function getSetting(key: string): Promise<string | null> {
@@ -44,4 +45,16 @@ export async function isUserEdited(): Promise<boolean> {
 /** Records that the user has edited real data (distinguishes a pristine seed). */
 export async function markUserEdited(): Promise<void> {
   await setSetting(USER_EDITED_KEY, '1');
+}
+
+// --- Cooking timers (SPEC.md §5.21) ---
+
+/** Raw JSON of the running timers (parsed by utils/timers parseStoredTimers). */
+export async function getActiveTimersJson(): Promise<string | null> {
+  return getSetting(ACTIVE_TIMERS_KEY);
+}
+
+/** Persists the running timers. Not a library edit: no auto-backup trigger. */
+export async function saveActiveTimersJson(json: string): Promise<void> {
+  await setSetting(ACTIVE_TIMERS_KEY, json);
 }

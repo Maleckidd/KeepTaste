@@ -68,6 +68,9 @@ const content: BackupContent = {
   settings: [
     { key: 'language', value: 'pl' },
     { key: 'backup_folder_uri', value: 'content://somewhere' },
+    // Running cooking timers are device state (SPEC.md §5.21) — older archives
+    // may still carry the key; it must never be restored.
+    { key: 'active_timers', value: '[]' },
   ],
 };
 
@@ -100,6 +103,19 @@ describe('restoreFullBackup', () => {
   it('restores normal settings but skips device-specific backup_* keys', async () => {
     await restoreFullBackup(content);
     expect(setSetting).toHaveBeenCalledWith('language', 'pl');
+    expect(setSetting).not.toHaveBeenCalledWith(
+      'backup_folder_uri',
+      expect.anything()
+    );
+  });
+
+  it('never restores active_timers (SPEC.md §5.21)', async () => {
+    await restoreFullBackup(content);
+    expect(setSetting).not.toHaveBeenCalledWith(
+      'active_timers',
+      expect.anything()
+    );
+    // the backup_* skip still holds alongside it
     expect(setSetting).not.toHaveBeenCalledWith(
       'backup_folder_uri',
       expect.anything()

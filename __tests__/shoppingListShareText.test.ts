@@ -1,5 +1,6 @@
 // Pure share-text builder for a shopping list (§5.18). No native/DB imports.
 import { buildShoppingListShareText } from '../utils/shoppingListShareText';
+import { partitionItems } from '../utils/shoppingList';
 
 function item(over: Partial<any> = {}): any {
   return {
@@ -31,6 +32,17 @@ describe('buildShoppingListShareText', () => {
     expect(text).toContain('- Apples (1kg)');
   });
 
+  it('sends only the items it is given, in that order (the send sheet passes its selection)', () => {
+    const all = [
+      item({ id: 1, name: 'Milk' }),
+      item({ id: 2, name: 'Bread' }),
+      item({ id: 3, name: 'Bananas' }),
+    ];
+    expect(buildShoppingListShareText('Weekend', [all[1], all[2]])).toBe(
+      'Weekend\n\n- Bread\n- Bananas'
+    );
+  });
+
   it('omits items already in the cart (checked)', () => {
     const text = buildShoppingListShareText('Weekend', [
       item({ id: 1, name: 'Milk', checked: 0 }),
@@ -56,6 +68,18 @@ describe('buildShoppingListShareText', () => {
       'Milk',
       'Apples (1kg)',
     ]);
+  });
+
+  it('sends exactly the active items: bullet count equals the active count (§5.18 "Send what\'s left (n)")', () => {
+    const items = [
+      item({ id: 1, name: 'Milk', checked: 0 }),
+      item({ id: 2, name: 'Bread', checked: 1 }),
+      item({ id: 3, name: 'Apples', quantity: '1kg', checked: 0 }),
+    ];
+    const text = buildShoppingListShareText('Weekend', items);
+    const bullets = text.split('\n').filter((line) => line.startsWith('- '));
+    expect(bullets).toHaveLength(partitionItems(items).active.length);
+    expect(bullets).toEqual(['- Milk', '- Apples (1kg)']);
   });
 
   it('an empty (or fully-checked) list shares just its name', () => {

@@ -38,10 +38,31 @@ describe('i18n/dictionary — completeness', () => {
     ['tabs.recipes', 'Recipes'],
     ['tabs.shopping', 'Shopping'],
     ['shopping.inCart', '{checked}/{total} in cart'],
+    ['shoppingList.pasteWholeList', 'Paste a whole list'],
+    ['shopping.shareList', "Send what's left ({count})"],
+    ['cookbook.menuSharePdf', 'Share as PDF'],
+    ['recipe.menuShare', 'Share'],
   ] as const)('contains pinned key %p with en %p', (key, en) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].en).toBe(en);
   });
+
+  // Package F: share actions moved into the "⋯" menus (SPEC.md §5.3/§5.4).
+  it.each([
+    ['cookbook.menuSharePdf', 'Udostępnij jako PDF'],
+    ['recipe.menuShare', 'Udostępnij'],
+  ] as const)('contains pinned key %p with pl %p', (key, pl) => {
+    expect(dictionary[key as TranslationKey]).toBeDefined();
+    expect(dictionary[key as TranslationKey].pl).toBe(pl);
+  });
+
+  // The header share icon buttons are gone, so their a11y labels are dead keys.
+  it.each(['a11y.shareRecipe', 'a11y.shareCookbook'])(
+    'no longer contains dead key %p',
+    (key) => {
+      expect(Object.prototype.hasOwnProperty.call(dictionary, key)).toBe(false);
+    },
+  );
 });
 
 describe('utils/i18n — parsePreference', () => {
@@ -126,6 +147,27 @@ describe('utils/i18n — createTranslator', () => {
   it('interpolates params in the English locale', () => {
     expect(en('shopping.inCart', { checked: 3, total: 8 })).toBe(
       '3/8 in cart'
+    );
+  });
+
+  it('interpolates the share label count in English (shopping.shareList)', () => {
+    expect(en('shopping.shareList' as TranslationKey, { count: 3 })).toBe(
+      "Send what's left (3)"
+    );
+    expect(en('shopping.shareList' as TranslationKey, { count: 0 })).toBe(
+      "Send what's left (0)"
+    );
+  });
+
+  it('interpolates the share label count in Polish (shopping.shareList)', () => {
+    expect(pl('shopping.shareList' as TranslationKey, { count: 3 })).toBe(
+      'Wyślij pozostałe (3)'
+    );
+  });
+
+  it('has the Polish label for shoppingList.pasteWholeList', () => {
+    expect(pl('shoppingList.pasteWholeList' as TranslationKey)).toBe(
+      'Wklej całą listę'
     );
   });
 

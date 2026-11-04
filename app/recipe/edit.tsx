@@ -3,8 +3,16 @@ import { StyleSheet, ActivityIndicator, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import RecipeForm from '@/components/recipe/RecipeForm';
-import { type RecipeFormData, recipeToFormData } from '@/utils/recipeForm';
+import {
+  type RecipeFormData,
+  recipeToFormData,
+  recipeSaveNotice,
+} from '@/utils/recipeForm';
 import { getRecipeById, updateRecipe } from '@/db/recipes';
+import { getCookbooks } from '@/db/cookbooks';
+import type { Cookbook } from '@/db/schema';
+import { filterPendingDeletes } from '@/utils/pendingDelete';
+import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { useTheme, ThemePalette } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
 import { parsePositiveInt } from '@/utils/numeric';
@@ -17,15 +25,24 @@ export default function EditRecipeScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [initialData, setInitialData] = useState<RecipeFormData | null>(null);
+  const [cookbooks, setCookbooks] = useState<Cookbook[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { showSnackbar } = useSnackbar();
   const originalImagePath = useRef<string | null>(null);
+  // The cookbook before editing — a change means the save moved the recipe.
+  const originalCookbookId = useRef<number | null>(null);
 
   useEffect(() => {
     async function load() {
       const recipeId = Number(id);
-      const recipe = await getRecipeById(recipeId);
+      const [recipe, allCookbooks] = await Promise.all([
+        getRecipeById(recipeId),
+        getCookbooks(),
+      ]);
+      setCookbooks(filterPendingDeletes(allCookbooks, 'cookbook', (cb) => cb.id));
       if (recipe) {
         originalImagePath.current = recipe.imagePath ?? null;
+        originalCookbookId.current = recipe.cookbookId ?? null;
         setInitialData(recipeToFormData(recipe));
       }
     }
@@ -41,6 +58,7 @@ export default function EditRecipeScreen() {
         originalImagePath.current
       );
       await updateRecipe(recipeId, {
+        cookbookId: data.cookbookId,
         title: data.title.trim(),
         prepTime: parsePositiveInt(data.prepTime),
         cookTime: parsePositiveInt(data.cookTime),
@@ -53,6 +71,21 @@ export default function EditRecipeScreen() {
       });
 
       router.back();
+      // Only a move is announced; a plain edit returns to the recipe view,
+      // which already shows the result (§5.5 "Save confirmation").
+      const notice = recipeSaveNotice(
+        'edit',
+        originalCookbookId.current,
+        data.cookbookId,
+        cookbooks
+      );
+      if (notice?.kind === 'moved') {
+        showSnackbar({
+          message: t('recipeForm.movedTo', {
+            name: notice.cookbookName ?? t('recipeForm.noCookbook'),
+          }),
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +104,7 @@ export default function EditRecipeScreen() {
       <RecipeForm
         title={t('stack.editRecipe')}
         initialData={initialData}
+        cookbooks={cookbooks}
         onSave={handleSave}
         onCancel={() => router.back()}
         isLoading={isLoading}

@@ -20,6 +20,7 @@ import ActionSheet, { ActionSheetAction } from '@/components/ui/ActionSheet';
 import FormattingHelpSheet from '@/components/ui/FormattingHelpSheet';
 import ImportSheet from '@/components/recipe/ImportSheet';
 import type { ImportIntent } from '@/utils/sharedUrl';
+import type { Cookbook } from '@/db/schema';
 import {
   useTheme,
   ThemePalette,
@@ -40,6 +41,8 @@ type Props = {
   /** Modal title, e.g. "New recipe" / "Edit recipe". */
   title: string;
   initialData?: RecipeFormData;
+  /** Choices for the Cookbook picker (§5.5); "No cookbook" is always offered. */
+  cookbooks: Pick<Cookbook, 'id' | 'name'>[];
   onSave: (data: RecipeFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
@@ -55,12 +58,15 @@ type Props = {
 function Field({
   label,
   children,
+  labelHint,
   hint,
   linkText,
   onLinkPress,
 }: {
   label: string;
   children: React.ReactNode;
+  /** Short permanent guidance between the label and the input. */
+  labelHint?: string;
   hint?: string;
   /** Optional tappable link shown under the field (e.g. "See formatting tips"). */
   linkText?: string;
@@ -71,6 +77,7 @@ function Field({
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}</Text>
+      {labelHint ? <Text style={fieldStyles.hint}>{labelHint}</Text> : null}
       {children}
       {hint ? <Text style={fieldStyles.hint}>{hint}</Text> : null}
       {linkText && onLinkPress ? (
@@ -125,6 +132,7 @@ const makeFieldStyles = (c: ThemePalette) => StyleSheet.create({
 export default function RecipeForm({
   title,
   initialData,
+  cookbooks,
   onSave,
   onCancel,
   isLoading,
@@ -137,6 +145,7 @@ export default function RecipeForm({
   const initial = initialData ?? emptyRecipeFormData();
   const [form, setForm] = useState<RecipeFormData>(initial);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
   const [formatHelpOpen, setFormatHelpOpen] = useState(false);
   // Open the ImportSheet immediately when pre-armed by a share (§5.15). Only
   // honored in import-enabled create mode; consumed once on mount.
@@ -154,9 +163,13 @@ export default function RecipeForm({
   const setToTry = (value: boolean) =>
     setForm((prev) => ({ ...prev, toTry: value }));
 
-  // Import only sets content fields (never imagePath — the partial excludes it).
+  const setCookbookId = (value: number | null) =>
+    setForm((prev) => ({ ...prev, cookbookId: value }));
+
+  // Import only sets content fields (never imagePath — the partial excludes it;
+  // never the cookbook the user already picked).
   const applyImport = (partial: Partial<RecipeFormData>) => {
-    setForm((prev) => ({ ...prev, ...partial }));
+    setForm((prev) => ({ ...prev, ...partial, cookbookId: prev.cookbookId }));
     setImportOpen(false);
     setShareArmed(false);
   };
@@ -206,6 +219,24 @@ export default function RecipeForm({
           },
         ]
       : []),
+  ];
+
+  // An id that is not in the list (e.g. deleted meanwhile) reads as "No cookbook".
+  const selectedCookbookName =
+    cookbooks.find((cb) => cb.id === form.cookbookId)?.name ??
+    t('recipeForm.noCookbook');
+
+  const cookbookActions: ActionSheetAction[] = [
+    {
+      label: t('recipeForm.noCookbook'),
+      selected: form.cookbookId === null,
+      onPress: () => setCookbookId(null),
+    },
+    ...cookbooks.map((cb) => ({
+      label: cb.name,
+      selected: form.cookbookId === cb.id,
+      onPress: () => setCookbookId(cb.id),
+    })),
   ];
 
   const handleSave = async () => {
@@ -295,12 +326,31 @@ export default function RecipeForm({
           </Pressable>
         </View>
 
+        {/* Cookbook (§5.5) — also the only way to move a recipe */}
+        <Pressable
+          onPress={() => setCookbookMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.cookbookPicker', {
+            name: selectedCookbookName,
+          })}
+          style={({ pressed }) => [
+            styles.cookbookRow,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text style={styles.cookbookLabel}>{t('recipeForm.cookbook')}</Text>
+          <Text style={styles.cookbookValue} numberOfLines={1}>
+            {selectedCookbookName}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color={c.textSecondary} />
+        </Pressable>
+
         {/* Times */}
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.prep')}>
               <Input
-                placeholder="15"
+                placeholder={t('recipeForm.prepPlaceholder')}
                 value={form.prepTime}
                 onChangeText={(v) => set('prepTime', v)}
                 keyboardType="numeric"
@@ -312,7 +362,7 @@ export default function RecipeForm({
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.cook')}>
               <Input
-                placeholder="45"
+                placeholder={t('recipeForm.cookPlaceholder')}
                 value={form.cookTime}
                 onChangeText={(v) => set('cookTime', v)}
                 keyboardType="numeric"
@@ -324,7 +374,7 @@ export default function RecipeForm({
           <View style={{ flex: 0.7 }}>
             <Field label={t('recipeForm.servings')}>
               <Input
-                placeholder="4"
+                placeholder={t('recipeForm.servingsPlaceholder')}
                 value={form.servings}
                 onChangeText={(v) => set('servings', v)}
                 keyboardType="numeric"
@@ -338,6 +388,7 @@ export default function RecipeForm({
         {/* Ingredients */}
         <Field
           label={t('recipeForm.ingredients')}
+          labelHint={t('recipeForm.ingredientsHint')}
           linkText={t('recipeForm.formatHelpLink')}
           onLinkPress={() => setFormatHelpOpen(true)}
         >
@@ -411,6 +462,13 @@ export default function RecipeForm({
         title={t('recipeForm.photoTitle')}
         actions={photoActions}
         onClose={() => setPhotoMenuOpen(false)}
+      />
+
+      <ActionSheet
+        visible={cookbookMenuOpen}
+        title={t('recipeForm.cookbook')}
+        actions={cookbookActions}
+        onClose={() => setCookbookMenuOpen(false)}
       />
 
       <FormattingHelpSheet
@@ -506,6 +564,29 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.surfaceAlt,
+  },
+  cookbookRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    minHeight: Touch.min,
+    paddingHorizontal: Spacing.base,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surfaceAlt,
+  },
+  cookbookLabel: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.semibold,
+    color: c.text,
+  },
+  // Takes the remaining width so a long name truncates instead of the label.
+  cookbookValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: Typography.size.base,
+    color: c.textSecondary,
   },
   toTryLabel: {
     fontSize: Typography.size.base,

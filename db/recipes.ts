@@ -8,7 +8,6 @@ import {
   type Recipe,
   type NewRecipe,
 } from './schema';
-import { filterRecipesByTitle } from '../utils/search';
 import { getCookbooks } from './cookbooks';
 import { scheduleAutoBackup } from '../utils/backupTrigger';
 import { noteUserEdit } from './userEdited';
@@ -35,11 +34,6 @@ export async function getUnassignedRecipes(): Promise<Recipe[]> {
 export async function getRecipeById(id: number): Promise<Recipe | undefined> {
   const result = await db.select().from(recipes).where(eq(recipes.id, id));
   return result[0];
-}
-
-export async function searchRecipes(query: string): Promise<Recipe[]> {
-  const all = await getAllRecipes();
-  return filterRecipesByTitle(all, query);
 }
 
 /**

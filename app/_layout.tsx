@@ -9,10 +9,12 @@ import * as SystemUI from 'expo-system-ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useShareIntent } from 'expo-share-intent';
 import { runMigrations } from '@/db/client';
-import { useTheme, useThemePreference, darkColors, lightColors, Typography, Motion } from '@/constants/theme';
+import { useTheme, useThemePreference, darkColors, lightColors, Typography, Motion, Spacing } from '@/constants/theme';
 import { ThemeProvider } from '@/constants/ThemeProvider';
 import { LanguageProvider, useLanguageReady, useT } from '@/i18n/LanguageProvider';
 import { SnackbarProvider, useSnackbar } from '@/components/ui/SnackbarProvider';
+import { TimerProvider, useTimerBarWindowInset } from '@/components/timers/TimerProvider';
+import TimerBar from '@/components/timers/TimerBar';
 import { useBackupRunning } from '@/utils/backupStatus';
 import { flushAutoBackup } from '@/utils/backupTrigger';
 import { maybeBackupOnLaunch } from '@/utils/backupArchiveFs';
@@ -35,9 +37,14 @@ function BackupBanner() {
   const c = useTheme();
   const t = useT();
   const { bottom } = useSafeAreaInsets();
+  const timerBarInset = useTimerBarWindowInset();
   if (!running) return null;
+  // Above the cooking-timer bar when it is shown (SPEC.md §5.21).
+  const defaultBottom = Math.max(bottom, 16) + 8;
+  const bannerBottom =
+    timerBarInset !== null ? Math.max(defaultBottom, timerBarInset + Spacing.sm) : defaultBottom;
   return (
-    <View style={[bannerStyles.banner, { backgroundColor: c.surface, borderColor: c.border, bottom: Math.max(bottom, 16) + 8 }]}>
+    <View style={[bannerStyles.banner, { backgroundColor: c.surface, borderColor: c.border, bottom: bannerBottom }]}>
       <ActivityIndicator size="small" color={c.primary} style={bannerStyles.spinner} />
       <Text style={[bannerStyles.label, { color: c.textSecondary }]}>{t('backup.saving')}</Text>
     </View>
@@ -410,14 +417,20 @@ export default function RootLayout() {
     <ThemeProvider>
       <ThemedRoot>
         <LanguageProvider>
-          <SnackbarProvider>
-            <SystemChrome />
-            <SplashGate />
-            <RootStack />
-            <BackupBanner />
-            <SplashOverlay />
-            {isShareIntentAvailable ? <ShareIntentHandler /> : null}
-          </SnackbarProvider>
+          {/* Timers outlive any one screen (SPEC.md §5.21). TimerProvider wraps
+              the snackbar so it can sit above the bar; the snackbar renders
+              after its children, so it still draws over the bar. */}
+          <TimerProvider>
+            <SnackbarProvider>
+              <SystemChrome />
+              <SplashGate />
+              <RootStack />
+              <TimerBar />
+              <BackupBanner />
+              <SplashOverlay />
+              {isShareIntentAvailable ? <ShareIntentHandler /> : null}
+            </SnackbarProvider>
+          </TimerProvider>
         </LanguageProvider>
       </ThemedRoot>
     </ThemeProvider>
