@@ -43,6 +43,10 @@ describe('i18n/dictionary — completeness', () => {
     ['cookbook.menuSharePdf', 'Share as PDF'],
     ['recipe.menuShare', 'Share'],
     ['timer.alarmStop', 'Stop'],
+    // Live countdown notification (SPEC.md §5.21 stage 3).
+    ['timer.liveEndsAt', 'Ends at {time}'],
+    ['timer.liveChannelName', 'Running timers'],
+    ['timer.liveChannelDescription', 'Countdown of running cooking timers'],
   ] as const)('contains pinned key %p with en %p', (key, en) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].en).toBe(en);
@@ -53,6 +57,9 @@ describe('i18n/dictionary — completeness', () => {
     ['cookbook.menuSharePdf', 'Udostępnij jako PDF'],
     ['recipe.menuShare', 'Udostępnij'],
     ['timer.alarmStop', 'Wyłącz'],
+    ['timer.liveEndsAt', 'Koniec o {time}'],
+    ['timer.liveChannelName', 'Odliczanie minutników'],
+    ['timer.liveChannelDescription', 'Odliczanie trwających minutników'],
   ] as const)('contains pinned key %p with pl %p', (key, pl) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].pl).toBe(pl);

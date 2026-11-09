@@ -1,8 +1,10 @@
 // Native side of the cooking-timer background alarm (SPEC.md §5.21, stage 2):
-// one local OS notification per running timer, at its end time. A thin, gated
-// wrapper around expo-notifications — the decisions (what to schedule, cancel
-// or dismiss; permission steps; foreground behaviour) live in the pure
-// utils/timerNotifications.ts.
+// one local OS notification per running timer, at its end time — plus, from
+// stage 3, one ongoing live countdown notification per running or paused
+// timer (channel `timers-live`, custom view added natively by
+// modules/exactalarm). A thin, gated wrapper around expo-notifications — the
+// decisions (what to schedule, post, cancel or dismiss; permission steps;
+// foreground behaviour) live in the pure utils/timerNotifications.ts.
 //
 // Gate (like utils/shareIntent.ts): Android dev/release builds only. Expo Go
 // warns as soon as expo-notifications is imported, web has no scheduler, and
@@ -21,13 +23,18 @@ import {
 } from '@/modules/exactalarm';
 import {
   TIMER_CHANNEL_ID,
+  TIMER_LIVE_CHANNEL_ID,
   armedAfterSync,
   createLatestRunner,
   fireTimeFromTrigger,
   parseTimerNotificationResponse,
+  planTimerLiveNotifications,
   planTimerNotifications,
   timerForegroundBehavior,
+  timerIdFromLiveNotificationId,
+  timerIdFromNotificationId,
   type AlarmPermission,
+  type PresentedTimerLive,
 } from './timerNotifications';
 
 type NotificationsModule = typeof import('expo-notifications');
@@ -56,7 +63,8 @@ let initialized = false;
 /**
  * Installs the foreground handler (idempotent): timer notifications are
  * presented with sound while the app is open too — the notification is the
- * single ringer (see timerForegroundBehavior).
+ * single ringer; live countdowns are listed silently (see
+ * timerForegroundBehavior).
  */
 export function initTimerAlarms(): void {
   if (!isTimerAlarmAvailable || initialized) return;
@@ -70,6 +78,18 @@ export function initTimerAlarms(): void {
 // --- Permission ---
 
 let permission: AlarmPermission | null = null;
+
+/**
+ * Caches the permission. Granted for the first time (or again) → reconcile
+ * once more with the last timers: the sync that ran before the answer (e.g.
+ * the one for the timer whose start asked for it) skipped the live countdowns.
+ */
+function setPermission(next: AlarmPermission): AlarmPermission {
+  const wasGranted = permission?.status === 'granted';
+  permission = next;
+  if (!wasGranted && next.status === 'granted' && lastSyncArgs) runner.request(lastSyncArgs);
+  return next;
+}
 
 function toAlarmPermission(r: { granted: boolean; status: string; canAskAgain: boolean }): AlarmPermission {
   const status = r.granted ? 'granted' : r.status === 'undetermined' ? 'undetermined' : 'denied';
@@ -92,8 +112,7 @@ export function isTimerAlarmArmed(timerId: string): boolean {
 /** Reads the current notification permission and caches it. */
 export async function refreshTimerAlarmPermission(): Promise<AlarmPermission> {
   if (!isTimerAlarmAvailable) return UNAVAILABLE;
-  permission = toAlarmPermission(await notifications().getPermissionsAsync());
-  return permission;
+  return setPermission(toAlarmPermission(await notifications().getPermissionsAsync()));
 }
 
 /**
@@ -102,8 +121,7 @@ export async function refreshTimerAlarmPermission(): Promise<AlarmPermission> {
  */
 export async function requestTimerAlarmPermission(): Promise<AlarmPermission> {
   if (!isTimerAlarmAvailable) return UNAVAILABLE;
-  permission = toAlarmPermission(await notifications().requestPermissionsAsync());
-  return permission;
+  return setPermission(toAlarmPermission(await notifications().requestPermissionsAsync()));
 }
 
 // --- Channel ---
@@ -112,28 +130,45 @@ let channelKey: string | null = null;
 let channelPromise: Promise<void> | null = null;
 
 /**
- * Creates (or renames) the `timers` channel. Memoized by the localized
- * name/description, so it reruns only on a language change. Android freezes
- * importance, sound and vibration after the first creation — only the name
- * and description follow later calls.
+ * Creates (or renames) the `timers` alarm channel and the `timers-live`
+ * countdown channel (default importance — listed, no heads-up — silent).
+ * Memoized by the localized names/descriptions, so it reruns only on a
+ * language change. Android freezes importance, sound and vibration after the
+ * first creation — only the name and description follow later calls.
  */
 export function ensureTimerChannel(t: Translator): Promise<void> {
   if (!isTimerAlarmAvailable) return Promise.resolve();
   const name = t('timer.listTitle');
   const description = t('timer.channelDescription');
-  const key = `${name}\u0000${description}`;
+  const liveName = t('timer.liveChannelName');
+  const liveDescription = t('timer.liveChannelDescription');
+  const key = [name, description, liveName, liveDescription].join('\u0000');
   if (channelKey === key && channelPromise) return channelPromise;
   const N = notifications();
-  const promise = N.setNotificationChannelAsync(TIMER_CHANNEL_ID, {
-    name,
-    description,
-    importance: N.AndroidImportance.HIGH,
-    sound: 'default',
-    enableVibrate: true,
-    vibrationPattern: ALARM_PATTERN,
-    lockscreenVisibility: N.AndroidNotificationVisibility.PUBLIC,
-    showBadge: false,
-  }).then(() => undefined);
+  const promise = Promise.all([
+    N.setNotificationChannelAsync(TIMER_CHANNEL_ID, {
+      name,
+      description,
+      importance: N.AndroidImportance.HIGH,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: ALARM_PATTERN,
+      lockscreenVisibility: N.AndroidNotificationVisibility.PUBLIC,
+      showBadge: false,
+    }),
+    N.setNotificationChannelAsync(TIMER_LIVE_CHANNEL_ID, {
+      name: liveName,
+      description: liveDescription,
+      importance: N.AndroidImportance.DEFAULT,
+      sound: null,
+      enableVibrate: false,
+      lockscreenVisibility: N.AndroidNotificationVisibility.PUBLIC,
+      showBadge: false,
+    }).catch(() => {
+      // The countdown channel is optional — its failure must never block the
+      // alarm channel or the permission request that waits on this promise.
+    }),
+  ]).then(() => undefined);
   channelKey = key;
   channelPromise = promise;
   promise.catch(() => {
@@ -149,6 +184,9 @@ export function ensureTimerChannel(t: Translator): Promise<void> {
 // --- Reconciler ---
 
 type SyncArgs = { timers: Timer[]; t: Translator };
+
+// The latest reconcile request, replayed when the permission becomes granted.
+let lastSyncArgs: SyncArgs | null = null;
 
 // Re-schedule every running timer on the next sync, even if listed: pending
 // on the first sync of each JS process (a force-stop drops the OS alarms while
@@ -197,7 +235,9 @@ async function syncOnce({ timers, t }: SyncArgs, rearm: boolean): Promise<boolea
       title: request.content.title ?? null,
       body: request.content.body ?? null,
     })),
-    presented: presented.map((notification) => notification.request.identifier),
+    presented: presented
+      .map((notification) => notification.request.identifier)
+      .filter((identifier) => timerIdFromNotificationId(identifier) !== null),
     rearm,
   });
 
@@ -231,7 +271,84 @@ async function syncOnce({ timers, t }: SyncArgs, rearm: boolean): Promise<boolea
     });
   }
   armed = armedAfterSync({ prev: armed, timers, nowMs, failed });
+
+  // Live countdowns: after the alarms, never affecting their outcome (`ok`
+  // drives the alarm re-arm only). Posting needs the permission — without it
+  // Android drops the notification anyway.
+  if (permission?.status === 'granted') {
+    try {
+      await syncLive(N, timers, t, nowMs, presented);
+    } catch {
+      // Best-effort: the next timer change reconciles again.
+    }
+  }
   return ok;
+}
+
+/** A presented notification reduced to the live planner's input, read defensively. */
+function toPresentedLive(
+  notification: Awaited<ReturnType<NotificationsModule['getPresentedNotificationsAsync']>>[number]
+): PresentedTimerLive {
+  const content = (notification.request.content ?? {}) as {
+    title?: unknown;
+    body?: unknown;
+    data?: unknown;
+  };
+  const data = typeof content.data === 'object' && content.data !== null
+    ? (content.data as { liveEndsAtMs?: unknown; livePausedMs?: unknown })
+    : {};
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return {
+    identifier: notification.request.identifier,
+    title: typeof content.title === 'string' ? content.title : null,
+    body: typeof content.body === 'string' ? content.body : null,
+    liveEndsAtMs: num(data.liveEndsAtMs),
+    livePausedMs: num(data.livePausedMs),
+  };
+}
+
+/** Executes the live countdown plan: dismiss, then (re)post. Each call isolated. */
+async function syncLive(
+  N: NotificationsModule,
+  timers: Timer[],
+  t: Translator,
+  nowMs: number,
+  presented: Awaited<ReturnType<NotificationsModule['getPresentedNotificationsAsync']>>
+): Promise<void> {
+  const live = planTimerLiveNotifications({
+    timers,
+    nowMs,
+    t,
+    presented: presented
+      .filter((notification) => timerIdFromLiveNotificationId(notification.request.identifier) !== null)
+      .map(toPresentedLive),
+  });
+  await Promise.all(live.dismiss.map((id) => N.dismissNotificationAsync(id).catch(() => {})));
+  for (const request of live.post) {
+    await N.scheduleNotificationAsync({
+      identifier: request.identifier,
+      content: {
+        title: request.title,
+        body: request.body,
+        // Same shape as buildTimerLiveContent's data; the native
+        // TimerPresentationDelegate builds the countdown from it.
+        data: {
+          recipeId: request.recipeId,
+          timerId: request.timerId,
+          ...(request.liveEndsAtMs !== null ? { liveEndsAtMs: request.liveEndsAtMs } : {}),
+          ...(request.livePausedMs !== null ? { livePausedMs: request.livePausedMs } : {}),
+        },
+        sound: false,
+        priority: N.AndroidNotificationPriority.DEFAULT,
+        sticky: true,
+        autoDismiss: false,
+      },
+      // A channel-only trigger presents immediately on that channel.
+      trigger: { channelId: TIMER_LIVE_CHANNEL_ID },
+    }).catch(() => {
+      // Retried by the next reconcile (the entry is still missing then).
+    });
+  }
 }
 
 const runner = createLatestRunner<SyncArgs>(runSync, () => {
@@ -241,7 +358,8 @@ const runner = createLatestRunner<SyncArgs>(runSync, () => {
 /** Reconciles the OS notifications with `timers` (serial, latest wins). */
 export function syncTimerNotifications(timers: Timer[], t: Translator): void {
   if (!isTimerAlarmAvailable) return;
-  runner.request({ timers, t });
+  lastSyncArgs = { timers, t };
+  runner.request(lastSyncArgs);
 }
 
 // --- Exact alarms (stage 2 addendum) ---
@@ -275,7 +393,8 @@ export async function openExactAlarmSettings(): Promise<void> {
 export function requestTimerAlarmRearm(timers: Timer[], t: Translator): void {
   if (!isTimerAlarmAvailable) return;
   rearmPending = true;
-  runner.request({ timers, t });
+  lastSyncArgs = { timers, t };
+  runner.request(lastSyncArgs);
 }
 
 // --- Taps ---
@@ -286,19 +405,23 @@ const handledTaps = new Set<string>();
 /**
  * Delivers taps on timer notifications (cold start included) — once per
  * delivered notification. Only the default action (the body tap) counts.
+ * A live countdown stays in the shade after a tap (autoDismiss off), so each
+ * new tap on it from the listener counts; the stored-response replay is still
+ * deduplicated.
  */
 export function subscribeTimerNotificationTaps(
   onTap: (tap: { timerId: string; recipeId: number }) => void
 ): () => void {
   if (!isTimerAlarmAvailable) return () => {};
   const N = notifications();
-  const handle = (response: NotificationResponse | null) => {
+  const handle = (response: NotificationResponse | null, fromListener: boolean) => {
     if (!response || response.actionIdentifier !== N.DEFAULT_ACTION_IDENTIFIER) return;
     const { request, date } = response.notification;
     const tap = parseTimerNotificationResponse(request.identifier, request.content.data);
     if (!tap) return;
     const key = `${request.identifier}|${date}`;
-    if (handledTaps.has(key)) return;
+    const repeatable = fromListener && timerIdFromLiveNotificationId(request.identifier) !== null;
+    if (handledTaps.has(key) && !repeatable) return;
     handledTaps.add(key);
     onTap(tap);
     try {
@@ -307,9 +430,9 @@ export function subscribeTimerNotificationTaps(
       // Not critical — the dedupe set already guards this process.
     }
   };
-  const subscription = N.addNotificationResponseReceivedListener(handle);
+  const subscription = N.addNotificationResponseReceivedListener((response) => handle(response, true));
   try {
-    handle(N.getLastNotificationResponse());
+    handle(N.getLastNotificationResponse(), false);
   } catch {
     // No stored response available.
   }
