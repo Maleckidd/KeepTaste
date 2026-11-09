@@ -40,6 +40,9 @@ export const shoppingItems = sqliteTable('shopping_items', {
   name: text('name').notNull(),
   quantity: text('quantity'),
   checked: integer('checked').notNull().default(0),
+  // ISO 8601 time of the last check-off; null while active. Orders the
+  // "In cart" section, most recently checked first (SPEC.md §5.10).
+  checkedAt: text('checked_at'),
   createdAt: text('created_at').notNull().default(new Date().toISOString()),
 });
 

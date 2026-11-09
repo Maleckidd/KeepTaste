@@ -50,6 +50,7 @@ function sampleContent(): BackupContent {
         listId: 5,
         name: 'Milk',
         quantity: null,
+        checkedAt: null,
         checked: 0,
         createdAt: '2026-01-06T00:00:00.000Z',
       },

@@ -150,6 +150,8 @@ describe('db/shoppingLists — setItemChecked', () => {
     const itemUpdate = updateCalls.find((c) => c.table === shoppingItems)!;
     expect(itemUpdate).toBeDefined();
     expect((itemUpdate.set as any).checked).toBe(1);
+    // check-off time drives the cart order (SPEC §5.10)
+    expect(typeof (itemUpdate.set as any).checkedAt).toBe('string');
 
     // parent list touched
     expect(db.update).toHaveBeenCalledWith(shoppingLists);
@@ -163,6 +165,14 @@ describe('db/shoppingLists — setItemChecked', () => {
     await listsModule.setItemChecked(5, false);
     const itemUpdate = updateCalls.find((c) => c.table === shoppingItems)!;
     expect((itemUpdate.set as any).checked).toBe(0);
+    expect((itemUpdate.set as any).checkedAt).toBeNull();
+  });
+
+  it('stamps the given check-off time, so a group check shares one timestamp', async () => {
+    selectResults = [[{ id: 5, listId: 42, checked: 0 }]];
+    await listsModule.setItemChecked(5, true, '2026-11-09T10:00:00.000Z');
+    const itemUpdate = updateCalls.find((c) => c.table === shoppingItems)!;
+    expect((itemUpdate.set as any).checkedAt).toBe('2026-11-09T10:00:00.000Z');
   });
 });
 
@@ -313,6 +323,18 @@ describe('db/shoppingLists — getItemsForList', () => {
     const items = await listsModule.getItemsForList(42);
     expect(db.select).toHaveBeenCalled();
     expect(items).toHaveLength(2);
+  });
+
+  it('orders the cart by check-off time, most recently checked first', async () => {
+    selectResults = [
+      [
+        { id: 1, listId: 42, name: 'Milk', checked: 1, checkedAt: '2026-11-09T10:05:00.000Z' },
+        { id: 2, listId: 42, name: 'Eggs', checked: 1, checkedAt: '2026-11-09T10:01:00.000Z' },
+        { id: 3, listId: 42, name: 'Bread', checked: 0, checkedAt: null },
+      ],
+    ];
+    const items = await listsModule.getItemsForList(42);
+    expect(items.map((i: { id: number }) => i.id)).toEqual([3, 1, 2]);
   });
 
   it('orders active before in-cart, newest first within each group', async () => {

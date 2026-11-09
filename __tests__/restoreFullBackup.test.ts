@@ -62,8 +62,8 @@ const content: BackupContent = {
     { id: 50, name: 'L', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-03-02T00:00:00.000Z' },
   ],
   shoppingItems: [
-    { id: 1, listId: 50, name: 'Milk', quantity: null, checked: 1, createdAt: '2026-03-03T00:00:00.000Z' },
-    { id: 2, listId: 999, name: 'Orphan', quantity: null, checked: 0, createdAt: '2026-03-04T00:00:00.000Z' },
+    { id: 1, listId: 50, name: 'Milk', quantity: null, checked: 1, checkedAt: '2026-03-05T00:00:00.000Z', createdAt: '2026-03-03T00:00:00.000Z' },
+    { id: 2, listId: 999, name: 'Orphan', quantity: null, checked: 0, checkedAt: null, createdAt: '2026-03-04T00:00:00.000Z' },
   ],
   settings: [
     { key: 'language', value: 'pl' },
@@ -98,6 +98,16 @@ describe('restoreFullBackup', () => {
     expect(items[0].name).toBe('Milk');
     expect(items[0].listId).toBe(1); // the single list got new id 1
     expect(items[0].checked).toBe(1);
+    expect(items[0].checkedAt).toBe('2026-03-05T00:00:00.000Z');
+  });
+
+  it('restores a missing checkedAt (archives from before §5.10 cart order) as null', async () => {
+    const { checkedAt: _drop, ...legacyMilk } = content.shoppingItems[0];
+    await restoreFullBackup({
+      ...content,
+      shoppingItems: [legacyMilk as typeof content.shoppingItems[0]],
+    });
+    expect(rowsFor(shoppingItems)[0].checkedAt).toBeNull();
   });
 
   it('restores normal settings but skips device-specific backup_* keys', async () => {

@@ -146,6 +146,7 @@ export async function restoreFullBackup(content: BackupContent): Promise<void> {
       name: item.name,
       quantity: item.quantity,
       checked: item.checked,
+      checkedAt: item.checkedAt ?? null, // older archives predate the column
       createdAt: item.createdAt,
     });
   }

@@ -189,6 +189,8 @@ async function main(): Promise<void> {
       quantity,
       checked,
       createdAt: stamp(),
+      // Evaluated after createdAt, so a checked item's check-off follows its add.
+      checkedAt: checked ? stamp() : null,
     })
   );
 

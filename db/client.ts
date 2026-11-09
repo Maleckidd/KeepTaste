@@ -15,7 +15,7 @@ export const db = drizzle(sqlite, { schema });
  * ladder in runMigrations and bump this. Tracked via PRAGMA user_version so a
  * backup restore can refuse data from a newer schema (SPEC.md §5.17.4).
  */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 /** Reads the persisted SQLite user_version (0 on a brand-new database). */
 export function getSchemaVersion(): number {
@@ -51,6 +51,17 @@ export function runMigrations() {
       sqlite.execSync(
         `ALTER TABLE recipes ADD COLUMN to_try INTEGER NOT NULL DEFAULT 0`
       );
+    } catch {
+      // column already exists (fresh DB created by the baseline DDL)
+    }
+  }
+
+  // v3 (SPEC.md §5.10): shopping_items.checked_at — the "In cart" section is
+  // ordered by check-off time. Items already in the cart keep NULL and sort
+  // after the timed ones. Same duplicate-column swallow as v2.
+  if (from < 3) {
+    try {
+      sqlite.execSync(`ALTER TABLE shopping_items ADD COLUMN checked_at TEXT`);
     } catch {
       // column already exists (fresh DB created by the baseline DDL)
     }
