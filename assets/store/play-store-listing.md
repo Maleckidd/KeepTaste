@@ -189,6 +189,12 @@ Do not claim "never connects to the internet" in the listing.
 
 ## Release notes
 
+**1.3.0 — EN:**
+Cooking timers now ring even when the app is closed or the screen is locked, and keep ringing until you stop them. A live countdown in your notifications shows how much time is left. To ring on time, allow "Alarms & reminders" when the app asks. Also new: a "New cookbook" tile, creating a cookbook straight from the recipe form, and a smoother shopping list where checked items move to "In cart" in the order you picked them.
+
+**1.3.0 — PL:**
+Minutniki dzwonią teraz także przy zamkniętej aplikacji i zablokowanym ekranie, aż do wyłączenia. Odliczanie widać na żywo w powiadomieniach. Żeby minutnik dzwonił punktualnie, zezwól na „Alarmy i przypomnienia”, gdy aplikacja o to poprosi. Nowe są też: kafelek „Nowa książka”, tworzenie książki prosto z formularza przepisu i płynniejsza lista zakupów, na której odhaczone produkty trafiają do „W koszyku” w kolejności zbierania.
+
 **1.0.1 — EN:**
 Rebuilt on the current Android toolchain (Expo SDK 57). Bottom sheets no longer hide behind an open keyboard, the navigation bar follows the dark theme, and the auto-backup warning now names Google Drive properly.
 
