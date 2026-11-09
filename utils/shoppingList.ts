@@ -43,6 +43,27 @@ export function partitionItems<T extends { checked: number }>(
   return { active, inCart };
 }
 
+/**
+ * List order (SPEC.md §5.10): active items first, newest added on top, so a
+ * just-added product is above the fold; then the "In cart" section, most
+ * recently checked on top, so a just-checked product leads the cart. In-cart
+ * items without a check-off time (checked before it was recorded) come after
+ * the timed ones. Ties fall back to newest added. Returns a new array.
+ */
+export function sortShoppingItems<
+  T extends { id: number; checked: number; checkedAt: string | null }
+>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => {
+    if (a.checked !== b.checked) return a.checked - b.checked;
+    if (a.checked) {
+      const at = a.checkedAt ?? '';
+      const bt = b.checkedAt ?? '';
+      if (at !== bt) return at < bt ? 1 : -1;
+    }
+    return b.id - a.id;
+  });
+}
+
 /** "{checked}/{total} in cart", or null for an empty list. */
 export function progressLabel(counts: {
   totalCount: number;
@@ -186,4 +207,36 @@ export function countItems(
     map.set(item.listId, entry);
   }
   return map;
+}
+
+/**
+ * Check-off motion (SPEC.md §5.10): a tapped row (or a group header with its
+ * children) plays the check animation for a short window before it moves to
+ * "In cart". Tapping again inside the window cancels — the pending set loses
+ * those ids. A group cancels only when all its children are pending; otherwise
+ * the tap (re)starts it for every child. Returns a new set; never mutates.
+ */
+export function togglePendingCheck(
+  pending: ReadonlySet<number>,
+  ids: number[]
+): { action: 'start' | 'cancel'; next: Set<number> } {
+  const next = new Set(pending);
+  const allPending = ids.length > 0 && ids.every((id) => pending.has(id));
+  if (allPending) {
+    ids.forEach((id) => next.delete(id));
+    return { action: 'cancel', next };
+  }
+  ids.forEach((id) => next.add(id));
+  return { action: 'start', next };
+}
+
+/**
+ * The sticky "In cart · N" pill (SPEC.md §5.10) says where checked rows went;
+ * it is redundant — and hidden — once the cart section is on screen.
+ */
+export function inCartPillVisible(state: {
+  inCartCount: number;
+  cartInView: boolean;
+}): boolean {
+  return state.inCartCount > 0 && !state.cartInView;
 }

@@ -13,6 +13,9 @@ import {
   buildActiveRows,
   collapseLineBreaks,
   classifyAddRowChange,
+  togglePendingCheck,
+  inCartPillVisible,
+  sortShoppingItems,
 } from '../utils/shoppingList';
 import { parseIngredients } from '../utils/ingredients';
 
@@ -444,5 +447,112 @@ describe('utils/shoppingList — classifyAddRowChange', () => {
         value: '# Fruit',
       });
     });
+  });
+});
+
+// Check-off motion (§5.10): a tapped row plays its check animation for a short
+// window before it moves to "In cart"; tapping again inside the window cancels.
+describe('utils/shoppingList — togglePendingCheck', () => {
+  it('starts a check for ids that are not pending', () => {
+    const r = togglePendingCheck(new Set(), [4]);
+    expect(r.action).toBe('start');
+    expect([...r.next]).toEqual([4]);
+  });
+
+  it('cancels when the tapped row is already pending', () => {
+    const r = togglePendingCheck(new Set([4, 7]), [4]);
+    expect(r.action).toBe('cancel');
+    expect([...r.next]).toEqual([7]);
+  });
+
+  it('cancels a group only when all its children are pending', () => {
+    const r = togglePendingCheck(new Set([1, 2]), [1, 2]);
+    expect(r.action).toBe('cancel');
+    expect(r.next.size).toBe(0);
+  });
+
+  it('starts a group when only some children are pending, adding the rest', () => {
+    const r = togglePendingCheck(new Set([1]), [1, 2]);
+    expect(r.action).toBe('start');
+    expect([...r.next].sort()).toEqual([1, 2]);
+  });
+
+  it('does not mutate the input set', () => {
+    const input = new Set([3]);
+    togglePendingCheck(input, [5]);
+    expect([...input]).toEqual([3]);
+  });
+
+  it('treats an empty id list as a no-op start', () => {
+    const r = togglePendingCheck(new Set([3]), []);
+    expect(r.action).toBe('start');
+    expect([...r.next]).toEqual([3]);
+  });
+});
+
+// The sticky "In cart · N" pill replaces the moved-to-cart snackbar (§5.10):
+// it says where checked rows went, so it hides once the cart is on screen.
+describe('utils/shoppingList — inCartPillVisible', () => {
+  it('shows when the cart has items and is off screen', () => {
+    expect(inCartPillVisible({ inCartCount: 2, cartInView: false })).toBe(true);
+  });
+
+  it('hides when the cart is empty', () => {
+    expect(inCartPillVisible({ inCartCount: 0, cartInView: false })).toBe(false);
+  });
+
+  it('hides when the cart section is already visible', () => {
+    expect(inCartPillVisible({ inCartCount: 3, cartInView: true })).toBe(false);
+  });
+});
+
+describe('utils/shoppingList — sortShoppingItems (SPEC §5.10)', () => {
+  const ids = (rows: { id: number }[]) => rows.map((r) => r.id);
+
+  it('puts active items before in-cart ones, newest added first among active', () => {
+    const rows = [
+      { id: 1, checked: 0, checkedAt: null },
+      { id: 3, checked: 1, checkedAt: '2026-11-09T10:00:00.000Z' },
+      { id: 2, checked: 0, checkedAt: null },
+    ];
+    expect(ids(sortShoppingItems(rows))).toEqual([2, 1, 3]);
+  });
+
+  it('orders the cart by check-off time, most recently checked first', () => {
+    // Item 1 was added first but checked last: it must lead the cart.
+    const rows = [
+      { id: 1, checked: 1, checkedAt: '2026-11-09T10:05:00.000Z' },
+      { id: 2, checked: 1, checkedAt: '2026-11-09T10:01:00.000Z' },
+      { id: 3, checked: 1, checkedAt: '2026-11-09T10:03:00.000Z' },
+    ];
+    expect(ids(sortShoppingItems(rows))).toEqual([1, 3, 2]);
+  });
+
+  it('places in-cart items without checkedAt (checked before the upgrade) after timed ones, newest added first', () => {
+    const rows = [
+      { id: 1, checked: 1, checkedAt: null },
+      { id: 2, checked: 1, checkedAt: '2026-11-09T10:00:00.000Z' },
+      { id: 3, checked: 1, checkedAt: null },
+    ];
+    expect(ids(sortShoppingItems(rows))).toEqual([2, 3, 1]);
+  });
+
+  it('breaks a check-off time tie (group header) by newest added first', () => {
+    const at = '2026-11-09T10:00:00.000Z';
+    const rows = [
+      { id: 4, checked: 1, checkedAt: at },
+      { id: 7, checked: 1, checkedAt: at },
+    ];
+    expect(ids(sortShoppingItems(rows))).toEqual([7, 4]);
+  });
+
+  it('ignores a stale checkedAt on an active item and does not mutate its input', () => {
+    const rows = [
+      { id: 1, checked: 0, checkedAt: '2026-11-09T10:00:00.000Z' },
+      { id: 2, checked: 0, checkedAt: null },
+    ];
+    const copy = [...rows];
+    expect(ids(sortShoppingItems(rows))).toEqual([2, 1]);
+    expect(rows).toEqual(copy);
   });
 });

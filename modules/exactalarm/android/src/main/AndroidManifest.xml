@@ -1,0 +1,23 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Timer alarms ring until the user acts (SPEC.md §5.21). expo-notifications
+      sends NOTIFICATION_EVENT to the highest-priority receiver in the package;
+      priority 0 beats the library's NotificationsService (-1). Only this
+      action: the library receiver keeps boot / package-replaced handling.
+    -->
+    <receiver
+      android:name="expo.modules.exactalarm.TimerNotificationsService"
+      android:enabled="true"
+      android:exported="false">
+      <intent-filter android:priority="0">
+        <action android:name="expo.modules.notifications.NOTIFICATION_EVENT" />
+      </intent-filter>
+    </receiver>
+
+    <!-- The "Stop" action on a ringing timer notification. -->
+    <receiver
+      android:name="expo.modules.exactalarm.TimerAlarmStopReceiver"
+      android:exported="false" />
+  </application>
+</manifest>

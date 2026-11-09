@@ -6,7 +6,7 @@ import {
   type ShoppingList,
   type ShoppingItem,
 } from './schema';
-import { countItems } from '../utils/shoppingList';
+import { countItems, sortShoppingItems } from '../utils/shoppingList';
 import { noteUserEdit } from './userEdited';
 
 export type ShoppingListWithCounts = ShoppingList & {
@@ -70,12 +70,9 @@ export async function getItemsForList(listId: number): Promise<ShoppingItem[]> {
     .select()
     .from(shoppingItems)
     .where(eq(shoppingItems.listId, listId));
-  // Order active (checked 0) before in-cart (checked 1); within each group
-  // newest first, so a just-added product appears at the top of the list
-  // instead of below the fold.
-  return [...rows].sort(
-    (a, b) => a.checked - b.checked || b.id - a.id
-  );
+  // Active first (newest added on top), then the cart (most recently checked
+  // on top) — see sortShoppingItems.
+  return sortShoppingItems(rows);
 }
 
 export async function createShoppingItem(
@@ -134,9 +131,15 @@ export async function updateShoppingItem(
   noteUserEdit();
 }
 
+/**
+ * Checks or unchecks an item. `at` is the check-off time (defaults to now);
+ * callers checking several items in one gesture pass one shared time, so the
+ * batch keeps a stable order in the cart.
+ */
 export async function setItemChecked(
   id: number,
-  checked: boolean
+  checked: boolean,
+  at: string = new Date().toISOString()
 ): Promise<void> {
   const rows = await db
     .select({ listId: shoppingItems.listId })
@@ -146,7 +149,7 @@ export async function setItemChecked(
   const now = new Date().toISOString();
   await db
     .update(shoppingItems)
-    .set({ checked: checked ? 1 : 0 })
+    .set({ checked: checked ? 1 : 0, checkedAt: checked ? at : null })
     .where(eq(shoppingItems.id, id));
   if (listId != null) await touchList(listId, now);
   noteUserEdit();

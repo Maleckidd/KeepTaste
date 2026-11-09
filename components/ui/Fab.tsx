@@ -16,6 +16,11 @@ type Props = {
    * the tab bar, which already consumes it.
    */
   withBottomInset?: boolean;
+  /**
+   * Floating content to the left of the button (e.g. the shopping list's
+   * "In cart" pill). It shares the FAB's lift above the snackbar/timer bar.
+   */
+  leading?: React.ReactNode;
 };
 
 // Floating action button — the screen's primary action, pinned bottom-right
@@ -27,6 +32,7 @@ export default function Fab({
   onPress,
   icon = 'add',
   withBottomInset = true,
+  leading,
 }: Props) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
@@ -69,7 +75,9 @@ export default function Fab({
           transform: [{ translateY: lift }],
         },
       ]}
+      pointerEvents="box-none"
     >
+      {leading}
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
@@ -90,13 +98,15 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: Spacing.lg,
-    width: 56,
-    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   // The shadow sits on the colored button, not the transparent wrapper —
   // Android elevation needs a background to cast one.
   button: {
-    flex: 1,
+    width: 56,
+    height: 56,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',

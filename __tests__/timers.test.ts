@@ -24,6 +24,8 @@ import {
   formatDurationWords,
   timerLabel,
   shouldShowTimerBar,
+  isModalFormRoute,
+  stillRinging,
 } from '../utils/timers';
 import type { Timer } from '../utils/timers';
 import { createTranslator } from '../utils/i18n';
@@ -529,5 +531,77 @@ describe('shouldShowTimerBar', () => {
     expect(
       shouldShowTimerBar({ pathname, keyboardVisible: false, timerCount: 1 })
     ).toBe(true);
+  });
+});
+
+describe('isModalFormRoute', () => {
+  it.each([
+    '/recipe/new',
+    '/recipe/edit',
+    '/recipe/add-to-list',
+    '/shopping/new',
+    '/cookbook/new',
+    '/cookbook/edit',
+  ])('%s is a modal form', (pathname) => {
+    expect(isModalFormRoute(pathname)).toBe(true);
+  });
+
+  it.each(['/', '/recipe/5', '/cookbook/all', '/shopping/3', '/settings', '/recipe/new/x', ''])(
+    '%s is not a modal form',
+    (pathname) => {
+      expect(isModalFormRoute(pathname)).toBe(false);
+    }
+  );
+});
+
+// TDD red phase — ringing alarm (stage 2 addendum). TimerProvider keeps a
+// "ringing" id set for the repeating in-app vibration; after every timers
+// change it keeps only the ids whose timer still exists in state 'done'
+// (Dismiss / Stop / +1 min drop it) and stops the vibration when it empties.
+describe('stillRinging', () => {
+  const sorted = (s: Set<string>) => [...s].sort();
+
+  it('keeps ids whose timer is still done', () => {
+    const r = stillRinging(new Set(['a', 'b']), [done({ id: 'a' }), done({ id: 'b' })]);
+    expect(sorted(r)).toEqual(['a', 'b']);
+  });
+
+  it('drops ids whose timer is running again (+1 min) or paused', () => {
+    const r = stillRinging(new Set(['a', 'b', 'c']), [
+      done({ id: 'a' }),
+      running({ id: 'b', endsInSec: 60 }),
+      paused({ id: 'c' }),
+    ]);
+    expect(sorted(r)).toEqual(['a']);
+  });
+
+  it('drops ids whose timer was removed (dismissed or stopped)', () => {
+    expect(sorted(stillRinging(new Set(['gone', 'd']), [done({ id: 'd' })]))).toEqual(['d']);
+    expect(stillRinging(new Set(['gone']), []).size).toBe(0);
+  });
+
+  it('never adds done timers that were not ringing', () => {
+    const r = stillRinging(new Set(['a']), [done({ id: 'a' }), done({ id: 'silent' })]);
+    expect(sorted(r)).toEqual(['a']);
+  });
+
+  it('empty in → empty out', () => {
+    const r = stillRinging(new Set<string>(), [done({ id: 'a' }), running({ id: 'b' })]);
+    expect(r).toBeInstanceOf(Set);
+    expect(r.size).toBe(0);
+  });
+
+  it('returns a new Set and does not mutate its input', () => {
+    const ringing = new Set(['a', 'b']);
+    const timers = [done({ id: 'a' })];
+    const snapshot = JSON.stringify(timers);
+    const r = stillRinging(ringing, timers);
+    expect(r).toBeInstanceOf(Set);
+    expect(r).not.toBe(ringing);
+    expect(sorted(ringing)).toEqual(['a', 'b']);
+    expect(JSON.stringify(timers)).toBe(snapshot);
+
+    const all = new Set(['a']);
+    expect(stillRinging(all, timers)).not.toBe(all);
   });
 });

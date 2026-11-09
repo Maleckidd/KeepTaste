@@ -21,12 +21,15 @@ import { AccessibilityInfo, AppState } from 'react-native';
 import { Spacing } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
 import { getActiveTimersJson, saveActiveTimersJson } from '@/db/settings';
-import { timerDoneAlert } from '@/utils/haptics';
+import { stopTimerAlert, timerDoneAlert } from '@/utils/haptics';
+import { isExactAlarmAllowed, isTimerAlarmArmed } from '@/utils/timerAlarm';
+import { shouldAlertOnExpire } from '@/utils/timerNotifications';
 import {
   expireDue,
   findTimerForChip,
   parseStoredTimers,
   serializeTimers,
+  stillRinging,
   timerLabel,
   timersReducer,
   type Timer,
@@ -43,6 +46,8 @@ export type StartTimerInput = {
 
 type TimerContextValue = {
   timers: Timer[];
+  /** True once the persisted-timers read has settled (success or failure). */
+  loaded: boolean;
   startTimer: (input: StartTimerInput) => string;
   pauseTimer: (id: string) => void;
   resumeTimer: (id: string) => void;
@@ -105,6 +110,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const t = useT();
   const [timers, dispatch] = useReducer(providerReducer, []);
   const [hydrated, setHydrated] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [expanded, setExpanded] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -116,6 +122,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   timersRef.current = timers;
   const tRef = useRef(t);
   tRef.current = t;
+  // Done timers whose in-app alarm is ringing. One repeating vibration covers
+  // them all: it starts when the set goes empty → non-empty and stops when the
+  // last one is dismissed, stopped or extended (+1 min). Timers that load as
+  // done at launch never join it.
+  const ringingRef = useRef<Set<string>>(new Set());
 
   // Load persisted timers once. Timers that ended while the app was gone come
   // back as done, silently (parseStoredTimers) — no alarm at launch.
@@ -127,10 +138,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         dispatch({ type: 'hydrate', timers: parseStoredTimers(raw, Date.now()) });
         setHydrated(true);
+        setLoaded(true);
       } catch {
         // Unreadable — timers still work in memory this session, but nothing
         // is persisted (`hydrated` stays false), so a failed read can never
-        // overwrite the stored timers with [].
+        // overwrite the stored timers with []. `loaded` still flips: the OS
+        // alarms (TimerNotifications) then follow the in-memory timers.
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => {
@@ -149,7 +163,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const tick = useCallback(() => {
     const at = Date.now();
-    const { timers: next, expiredIds } = expireDue(timersRef.current, at);
+    const prev = timersRef.current;
+    const { timers: next, expiredIds } = expireDue(prev, at);
     // Eagerly advance the ref so a second tick before re-render (interval and
     // AppState firing together) cannot alarm twice for the same timer.
     timersRef.current = next;
@@ -159,7 +174,26 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     for (const id of expiredIds) {
       const timer = next.find((x) => x.id === id);
       if (!timer) continue;
-      timerDoneAlert();
+      // With this timer's OS alarm armed and exact (stage 2) the insistent
+      // notification is the single ringer, in the foreground too. Armed but
+      // inexact: the in-app alarm rings only for a live expiry seen in the
+      // foreground. Not armed (denied, Expo Go/web, or any native failure) →
+      // the in-app alarm always rings (stage 1). Either way it repeats until
+      // the timer is dismissed, stopped or extended.
+      const endsAtMs = Date.parse(prev.find((x) => x.id === id)?.endsAt ?? '');
+      const endedAgoMs = Number.isFinite(endsAtMs) ? at - endsAtMs : 0;
+      if (
+        shouldAlertOnExpire({
+          osAlarmEnabled: isTimerAlarmArmed(id),
+          exactAllowed: isExactAlarmAllowed(),
+          appActive: AppState.currentState === 'active',
+          endedAgoMs,
+        })
+      ) {
+        const wasSilent = ringingRef.current.size === 0;
+        ringingRef.current.add(id);
+        if (wasSilent) timerDoneAlert();
+      }
       AccessibilityInfo.announceForAccessibility(
         tRef.current('timer.doneAnnounce', {
           label: timerLabel(tRef.current, timer.title, timer.step),
@@ -177,6 +211,26 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [hasRunning, tick]);
 
+  // Silence the in-app alarm once no ringing timer is still done (dismissed,
+  // stopped, or restarted with +1 min). The tick adds to the ref before its
+  // dispatch lands, so this effect sees the new timer as done, never as gone.
+  useEffect(() => {
+    const prevSize = ringingRef.current.size;
+    // timersRef, not `timers`: a tick may already have advanced it past this
+    // render, and a stale list would drop the id the tick just started ringing.
+    const next = stillRinging(ringingRef.current, timersRef.current);
+    ringingRef.current = next;
+    if (prevSize > 0 && next.size === 0) stopTimerAlert();
+  }, [timers]);
+
+  // Stop any ringing vibration if the provider goes away.
+  useEffect(() => {
+    return () => {
+      if (ringingRef.current.size > 0) stopTimerAlert();
+      ringingRef.current = new Set();
+    };
+  }, []);
+
   // Refresh `now` whenever the timers change (start/resume/+1 min), so a new
   // countdown never renders against a stale clock.
   useEffect(() => {
@@ -184,7 +238,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   }, [timers]);
 
   // Back in the foreground: catch up at once (a timer may have ended while
-  // the app was in the background — stage 1 alerts on return).
+  // the app was in the background). Without the OS alarm this rings on
+  // return (stage 1); with it, the notification is ringing — see tick.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') tick();
@@ -255,6 +310,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<TimerContextValue>(
     () => ({
       timers,
+      loaded,
       startTimer,
       pauseTimer,
       resumeTimer,
@@ -272,6 +328,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       timers,
+      loaded,
       startTimer,
       pauseTimer,
       resumeTimer,

@@ -38,4 +38,17 @@ describe('db/client migrations', () => {
 
     expect(mockExecSync.mock.calls.length).toBe(callsAfterImport);
   });
+
+  it('adds shopping_items.checked_at for a v2 install and stamps the current version', () => {
+    mockGetFirstSync.mockReturnValueOnce({ user_version: 2 });
+    const { CURRENT_SCHEMA_VERSION } = require('../db/client');
+
+    const sql = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(sql).toContain('ALTER TABLE shopping_items ADD COLUMN checked_at TEXT');
+    expect(sql).not.toContain(
+      'ALTER TABLE recipes ADD COLUMN to_try INTEGER NOT NULL DEFAULT 0'
+    );
+    expect(CURRENT_SCHEMA_VERSION).toBe(3);
+    expect(sql).toContain('PRAGMA user_version = 3');
+  });
 });

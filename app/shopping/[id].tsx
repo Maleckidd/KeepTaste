@@ -8,6 +8,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Share,
+  AccessibilityInfo,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +32,8 @@ import {
   buildActiveRows,
   classifyAddRowChange,
   collapseLineBreaks,
+  togglePendingCheck,
+  inCartPillVisible,
 } from '@/utils/shoppingList';
 import {
   pendingDeleteKey,
@@ -56,6 +60,12 @@ import ActionSheet from '@/components/ui/ActionSheet';
 import SwipeableRow from '@/components/ui/SwipeableRow';
 import PasteListSheet from '@/components/shopping/PasteListSheet';
 import SendListSheet from '@/components/shopping/SendListSheet';
+import {
+  CheckOffMotion,
+  PopCheck,
+  InCartPill,
+  CHECK_OFF_DELAY_MS,
+} from '@/components/shopping/CheckOffMotion';
 import { buildShoppingListShareText } from '@/utils/shoppingListShareText';
 import type { ShoppingList, ShoppingItem } from '@/db/schema';
 import type { TranslationKey } from '@/i18n/dictionary';
@@ -102,6 +112,18 @@ export default function ShoppingListScreen() {
   const [titleDraft, setTitleDraft] = useState('');
   const showUndoDelete = useUndoDelete();
   const { showSnackbar } = useSnackbar();
+  const listRef = useRef<FlatList<Row>>(null);
+  // Rows playing their check-off animation, not yet written as checked
+  // (§5.10). The ref mirrors the state for the timers' closures.
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<number>>(new Set());
+  const pendingRef = useRef<ReadonlySet<number>>(new Set());
+  const checkTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  // Ids whose timers fired in the same tick — written in one batch.
+  const dueChecks = useRef<number[]>([]);
+  // Whether the "In cart" section is on screen; the pill hides while it is.
+  const [cartInView, setCartInView] = useState(false);
+  const cartHeaderRef = useRef<View>(null);
+  const { height: windowHeight } = useWindowDimensions();
 
   const loadData = useCallback(async () => {
     const [l, data] = await Promise.all([
@@ -141,38 +163,110 @@ export default function ShoppingListScreen() {
     loadData();
   };
 
-  // No animateLayout() on toggle: a toggle can now add/remove a group-header
-  // row (a structural list change), and LayoutAnimation reparents cells in the
+  const setPending = (next: ReadonlySet<number>) => {
+    pendingRef.current = next;
+    setPendingIds(next);
+  };
+
+  const flushDueChecks = async () => {
+    const ids = dueChecks.current;
+    dueChecks.current = [];
+    if (ids.length === 0) return;
+    // One check-off time per batch: a group header's children land in the
+    // cart together, in a stable order (sortShoppingItems).
+    const at = new Date().toISOString();
+    await Promise.all(ids.map((id) => setItemChecked(id, true, at)));
+    await loadData();
+    const next = new Set(pendingRef.current);
+    ids.forEach((id) => next.delete(id));
+    setPending(next);
+  };
+
+  // No animateLayout() on toggle: a toggle can add/remove a group-header row
+  // (a structural list change), and LayoutAnimation reparents cells in the
   // virtualized list on Android — crashing with "child already has a parent"
   // (and IndexOutOfBounds in subview clipping) when Reanimated is present.
+  // The check-off motion runs on the row's own Animated values instead.
+  //
+  // Checking is deferred by CHECK_OFF_DELAY_MS: the row plays its animation,
+  // then moves to "In cart", where the "In cart · N" pill bumps (§5.10). A
+  // second tap inside the window cancels — that replaces the old Undo
+  // snackbar for a mis-tap. Unchecking is immediate.
+  const startOrCancelCheck = (ids: number[], label: string) => {
+    const { action, next } = togglePendingCheck(pendingRef.current, ids);
+    setPending(next);
+    ids.forEach((id) => {
+      clearTimeout(checkTimers.current.get(id));
+      checkTimers.current.delete(id);
+    });
+    if (action === 'cancel') return;
+    ids.forEach((id) => {
+      checkTimers.current.set(
+        id,
+        setTimeout(() => {
+          checkTimers.current.delete(id);
+          dueChecks.current.push(id);
+          if (dueChecks.current.length === 1) setTimeout(flushDueChecks, 0);
+        }, CHECK_OFF_DELAY_MS)
+      );
+    });
+    // The visual "where did it go" cue doesn't reach screen readers.
+    AccessibilityInfo.announceForAccessibility(
+      t('shoppingList.movedToCart', { name: label })
+    );
+  };
+
+  // Leaving the screen mid-animation still checks the row off.
+  useEffect(() => {
+    const timers = checkTimers.current;
+    return () => {
+      const at = new Date().toISOString();
+      timers.forEach((timer, id) => {
+        clearTimeout(timer);
+        setItemChecked(id, true, at);
+      });
+      timers.clear();
+    };
+  }, []);
+
   const handleToggle = async (item: ShoppingItem) => {
     lightTap();
-    await setItemChecked(item.id, !item.checked);
-    loadData();
-    if (!item.checked) announceInCart(item.name, [item.id]);
+    if (item.checked) {
+      await setItemChecked(item.id, false);
+      loadData();
+      return;
+    }
+    startOrCancelCheck([item.id], item.name);
   };
 
   // Tapping a group header checks all its remaining active children at once.
-  const handleToggleGroup = async (name: string, childIds: number[]) => {
+  const handleToggleGroup = (name: string, childIds: number[]) => {
     lightTap();
-    await Promise.all(childIds.map((id) => setItemChecked(id, true)));
-    loadData();
-    announceInCart(`${name} (${childIds.length})`, childIds);
+    startOrCancelCheck(childIds, `${name} (${childIds.length})`);
   };
 
-  // A checked row jumps to "In cart" at the bottom, often far below the fold,
-  // so without a word it reads as deleted (iteration 4, problem 1). Unchecking
-  // stays silent: the user is looking at the cart and chose to move it back.
-  const announceInCart = (label: string, ids: number[]) => {
-    showSnackbar({
-      message: t('shoppingList.movedToCart', { name: label }),
-      actionLabel: t('undo.action'),
-      onAction: async () => {
-        await Promise.all(ids.map((id) => setItemChecked(id, false)));
-        loadData();
-      },
-    });
-  };
+  // The cart counts as "on screen" once its header sits above the FAB row —
+  // measured in the window, not via FlatList viewability: right after a
+  // check the moved row's cached frame is stale (still at the top), and the
+  // viewability callback could settle on "visible" with the cart off screen.
+  // A header just peeking out behind the FAB doesn't count. Unmounted (no
+  // cart, or virtualized away) reads as off screen.
+  const checkCartInView = useCallback(() => {
+    const node = cartHeaderRef.current;
+    if (!node) {
+      setCartInView(false);
+      return;
+    }
+    const visibleBottom =
+      windowHeight - insets.bottom - timerClearance - (Touch.list + 2 * Spacing.lg);
+    node.measureInWindow((_x, y) => setCartInView(y < visibleBottom));
+  }, [windowHeight, insets.bottom, timerClearance]);
+
+  // Rows moved (check, uncheck, add, delete): re-measure after they lay out.
+  useEffect(() => {
+    const frame = requestAnimationFrame(checkCartInView);
+    return () => cancelAnimationFrame(frame);
+  }, [items, checkCartInView]);
 
   // No animateLayout() here: LayoutAnimation.configureNext is global and
   // would also catch the snackbar mounting in the same frame, making it
@@ -308,76 +402,81 @@ export default function ShoppingListScreen() {
     name: string;
     count: number;
     childIds: number[];
-  }) => (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      onPress={() => handleToggleGroup(row.name, row.childIds)}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: false }}
-      accessibilityLabel={t('a11y.checkAllInGroup', {
-        name: row.name,
-        count: row.count,
-      })}
-    >
-      <View style={styles.rowBody}>
-        <Text
-          style={[styles.itemName, styles.groupHeaderName]}
-          numberOfLines={2}
+  }) => {
+    const isPending = row.childIds.every((id) => pendingIds.has(id));
+    return (
+      <CheckOffMotion active={isPending}>
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => handleToggleGroup(row.name, row.childIds)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: false }}
+          accessibilityLabel={t('a11y.checkAllInGroup', {
+            name: row.name,
+            count: row.count,
+          })}
         >
-          {row.name}
-        </Text>
-        <Text style={styles.groupHeaderCount}>{`(${row.count})`}</Text>
-      </View>
-      <Ionicons name="ellipse-outline" size={28} color={c.textMuted} />
-    </Pressable>
-  );
+          <View style={styles.rowBody}>
+            <Text
+              style={[styles.itemName, styles.groupHeaderName]}
+              numberOfLines={2}
+            >
+              {row.name}
+            </Text>
+            <Text style={styles.groupHeaderCount}>{`(${row.count})`}</Text>
+          </View>
+          <PopCheck checked={isPending} color={isPending ? c.primary : c.textMuted} />
+        </Pressable>
+      </CheckOffMotion>
+    );
+  };
 
   const renderItem = (item: ShoppingItem, isRepeat: boolean) => {
-    const isChecked = !!item.checked;
+    // Pending = playing the check-off animation, still in the active section.
+    const isPending = !item.checked && pendingIds.has(item.id);
+    const isChecked = !!item.checked || isPending;
     return (
       <SwipeableRow
         onEdit={() => openEdit(item)}
         onDelete={() => handleDeleteItem(item)}
       >
-        <Pressable
-          style={({ pressed }) => [
-            styles.row,
-            isRepeat && styles.rowRepeat,
-            pressed && styles.rowPressed,
-          ]}
-          onPress={() => handleToggle(item)}
-          onLongPress={() => handleItemLongPress(item)}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: isChecked }}
-          accessibilityLabel={
-            item.quantity ? `${item.name}, ${item.quantity}` : item.name
-          }
-        >
-          <View style={[styles.rowBody, isRepeat && styles.rowBodyRepeat]}>
-            <Text
-              style={[
-                styles.itemName,
-                isRepeat && styles.itemNameRepeat,
-                isChecked && styles.itemNameChecked,
-              ]}
-              numberOfLines={2}
-            >
-              {item.name}
-            </Text>
-            {item.quantity ? (
+        <CheckOffMotion active={isPending}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.row,
+              isRepeat && styles.rowRepeat,
+              pressed && styles.rowPressed,
+            ]}
+            onPress={() => handleToggle(item)}
+            onLongPress={() => handleItemLongPress(item)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isChecked }}
+            accessibilityLabel={
+              item.quantity ? `${item.name}, ${item.quantity}` : item.name
+            }
+          >
+            <View style={[styles.rowBody, isRepeat && styles.rowBodyRepeat]}>
               <Text
-                style={[styles.itemQty, isChecked && styles.itemNameChecked]}
+                style={[
+                  styles.itemName,
+                  isRepeat && styles.itemNameRepeat,
+                  isChecked && styles.itemNameChecked,
+                ]}
+                numberOfLines={2}
               >
-                {item.quantity}
+                {item.name}
               </Text>
-            ) : null}
-          </View>
-          <Ionicons
-            name={isChecked ? 'checkmark-circle' : 'ellipse-outline'}
-            size={28}
-            color={isChecked ? c.primary : c.textMuted}
-          />
-        </Pressable>
+              {item.quantity ? (
+                <Text
+                  style={[styles.itemQty, isChecked && styles.itemNameChecked]}
+                >
+                  {item.quantity}
+                </Text>
+              ) : null}
+            </View>
+            <PopCheck checked={isChecked} color={isChecked ? c.primary : c.textMuted} />
+          </Pressable>
+        </CheckOffMotion>
       </SwipeableRow>
     );
   };
@@ -437,7 +536,14 @@ export default function ShoppingListScreen() {
         />
       ) : (
         <FlatList
+          ref={listRef}
           data={rows}
+          onScroll={checkCartInView}
+          scrollEventThrottle={100}
+          onContentSizeChange={checkCartInView}
+          // Rows vary in height, so a jump to the cart header can miss the
+          // render window — fall back to the end, where the cart sits.
+          onScrollToIndexFailed={() => listRef.current?.scrollToEnd({ animated: true })}
           keyExtractor={(row) =>
             row.kind === 'header'
               ? 'section-in-cart'
@@ -447,9 +553,11 @@ export default function ShoppingListScreen() {
           }
           renderItem={({ item: row }) =>
             row.kind === 'header' ? (
-              <Text style={styles.sectionHeader} accessibilityRole="header">
-                {t('shoppingList.inCartHeader')}
-              </Text>
+              <View ref={cartHeaderRef} collapsable={false} onLayout={checkCartInView}>
+                <Text style={styles.sectionHeader} accessibilityRole="header">
+                  {t('shoppingList.inCartHeader')}
+                </Text>
+              </View>
             ) : row.kind === 'groupHeader' ? (
               renderGroupHeader(row)
             ) : (
@@ -536,7 +644,25 @@ export default function ShoppingListScreen() {
         </View>
       ) : items.length > 0 ? (
         // FAB — the primary "add product" action stays in the thumb zone.
-        <Fab accessibilityLabel={t('a11y.addProduct')} onPress={openAdd} />
+        <Fab
+          accessibilityLabel={t('a11y.addProduct')}
+          onPress={openAdd}
+          leading={
+            <InCartPill
+              label={t('shoppingList.inCartHeader')}
+              accessibilityLabel={t('a11y.showCart', { count: inCart.length })}
+              count={inCart.length}
+              visible={inCartPillVisible({ inCartCount: inCart.length, cartInView })}
+              onPress={() =>
+                listRef.current?.scrollToIndex({
+                  index: activeRows.length,
+                  viewPosition: 0,
+                  animated: true,
+                })
+              }
+            />
+          }
+        />
       ) : null}
 
       {/* Item context menu (long-press) */}

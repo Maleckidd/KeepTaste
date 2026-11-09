@@ -15,6 +15,7 @@ import { LanguageProvider, useLanguageReady, useT } from '@/i18n/LanguageProvide
 import { SnackbarProvider, useSnackbar } from '@/components/ui/SnackbarProvider';
 import { TimerProvider, useTimerBarWindowInset } from '@/components/timers/TimerProvider';
 import TimerBar from '@/components/timers/TimerBar';
+import TimerNotifications from '@/components/timers/TimerNotifications';
 import { useBackupRunning } from '@/utils/backupStatus';
 import { flushAutoBackup } from '@/utils/backupTrigger';
 import { maybeBackupOnLaunch } from '@/utils/backupArchiveFs';
@@ -428,6 +429,9 @@ export default function RootLayout() {
               <TimerBar />
               <BackupBanner />
               <SplashOverlay />
+              {/* Background alarms (SPEC.md §5.21, stage 2) — renders null and
+                  mounts nothing native in Expo Go / on web. */}
+              <TimerNotifications />
               {isShareIntentAvailable ? <ShareIntentHandler /> : null}
             </SnackbarProvider>
           </TimerProvider>

@@ -104,6 +104,18 @@ export function expireDue(
   return { timers: expiredIds.length ? next : timers, expiredIds };
 }
 
+/**
+ * The ringing (in-app alarm) ids still worth ringing for: those whose timer
+ * still exists and is done. Dismiss/Stop removes it, +1 min makes it running
+ * again — either way it drops out. Never adds ids; returns a new Set.
+ */
+export function stillRinging(ringing: ReadonlySet<string>, timers: readonly Timer[]): Set<string> {
+  const doneIds = new Set(timers.filter((t) => t.state === 'done').map((t) => t.id));
+  const next = new Set<string>();
+  for (const id of ringing) if (doneIds.has(id)) next.add(id);
+  return next;
+}
+
 export function timersReducer(timers: Timer[], action: TimerAction): Timer[] {
   switch (action.type) {
     case 'start': {
@@ -315,8 +327,8 @@ export function timerLabel(t: Translator, title: string, step: number | null): s
   return step == null ? title : t('timer.stepLabel', { title, step });
 }
 
-/** Modal routes where the bar would sit over a form. */
-const HIDDEN_ROUTES = new Set([
+/** Modal form routes: the bar would sit over a form, and a timer alarm tap must not navigate away. */
+const MODAL_FORM_ROUTES: ReadonlySet<string> = new Set([
   '/recipe/new',
   '/recipe/edit',
   '/recipe/add-to-list',
@@ -325,11 +337,16 @@ const HIDDEN_ROUTES = new Set([
   '/cookbook/edit',
 ]);
 
+/** True on a modal form route (exact pathname match). */
+export function isModalFormRoute(pathname: string): boolean {
+  return MODAL_FORM_ROUTES.has(pathname);
+}
+
 export function shouldShowTimerBar(o: {
   pathname: string;
   keyboardVisible: boolean;
   timerCount: number;
 }): boolean {
   if (o.timerCount <= 0 || o.keyboardVisible) return false;
-  return !HIDDEN_ROUTES.has(o.pathname);
+  return !isModalFormRoute(o.pathname);
 }

@@ -41,6 +41,7 @@ export const MIGRATION_DDL = `
     name TEXT NOT NULL,
     quantity TEXT,
     checked INTEGER NOT NULL DEFAULT 0,
+    checked_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 

@@ -17,9 +17,10 @@
         "backgroundColor": "#C84B31"
       },
       "package": "com.damianmalecki.keeptaste",
-      "versionCode": 13,
+      "versionCode": 14,
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ],
       "blockedPermissions": [
         "android.permission.READ_MEDIA_IMAGES",
@@ -48,6 +49,13 @@
       "expo-asset",
       "expo-font",
       "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#C84B31"
+        }
+      ],
       [
         "expo-share-intent",
         {
