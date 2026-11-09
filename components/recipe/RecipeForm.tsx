@@ -36,6 +36,7 @@ import {
   emptyRecipeFormData,
   isRecipeFormDirty,
 } from '@/utils/recipeForm';
+import QuickCookbookSheet from '@/components/recipe/QuickCookbookSheet';
 
 type Props = {
   /** Modal title, e.g. "New recipe" / "Edit recipe". */
@@ -45,6 +46,12 @@ type Props = {
   cookbooks: Pick<Cookbook, 'id' | 'name'>[];
   onSave: (data: RecipeFormData) => Promise<void>;
   onCancel: () => void;
+  /**
+   * Adds a "New cookbook" entry to the Cookbook picker (§5.5), opening a
+   * name-only sheet. Creates the cookbook, updates `cookbooks`, and resolves
+   * with its id, which the form then selects.
+   */
+  onCreateCookbook?: (name: string) => Promise<number>;
   isLoading?: boolean;
   /** Shows the "Import from a link, text or photo" affordance (create mode only). */
   enableImport?: boolean;
@@ -135,6 +142,7 @@ export default function RecipeForm({
   cookbooks,
   onSave,
   onCancel,
+  onCreateCookbook,
   isLoading,
   enableImport,
   initialImport,
@@ -146,6 +154,7 @@ export default function RecipeForm({
   const [form, setForm] = useState<RecipeFormData>(initial);
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [cookbookMenuOpen, setCookbookMenuOpen] = useState(false);
+  const [quickCookbookOpen, setQuickCookbookOpen] = useState(false);
   const [formatHelpOpen, setFormatHelpOpen] = useState(false);
   // Open the ImportSheet immediately when pre-armed by a share (§5.15). Only
   // honored in import-enabled create mode; consumed once on mount.
@@ -165,6 +174,7 @@ export default function RecipeForm({
 
   const setCookbookId = (value: number | null) =>
     setForm((prev) => ({ ...prev, cookbookId: value }));
+
 
   // Import only sets content fields (never imagePath — the partial excludes it;
   // never the cookbook the user already picked).
@@ -237,6 +247,15 @@ export default function RecipeForm({
       selected: form.cookbookId === cb.id,
       onPress: () => setCookbookId(cb.id),
     })),
+    ...(onCreateCookbook
+      ? [
+          {
+            label: t('recipeForm.newCookbook'),
+            icon: 'add' as const,
+            onPress: () => setQuickCookbookOpen(true),
+          },
+        ]
+      : []),
   ];
 
   const handleSave = async () => {
@@ -470,6 +489,17 @@ export default function RecipeForm({
         actions={cookbookActions}
         onClose={() => setCookbookMenuOpen(false)}
       />
+
+      {onCreateCookbook ? (
+        <QuickCookbookSheet
+          visible={quickCookbookOpen}
+          onClose={() => setQuickCookbookOpen(false)}
+          onCreate={async (name) => {
+            const id = await onCreateCookbook(name);
+            setCookbookId(id);
+          }}
+        />
+      ) : null}
 
       <FormattingHelpSheet
         visible={formatHelpOpen}

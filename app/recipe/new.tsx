@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { StyleSheet, ActivityIndicator, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router as globalRouter, useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,7 +10,7 @@ import {
   recipeSaveNotice,
 } from '@/utils/recipeForm';
 import { createRecipe } from '@/db/recipes';
-import { getCookbooks } from '@/db/cookbooks';
+import { createCookbook, getCookbooks } from '@/db/cookbooks';
 import type { Cookbook } from '@/db/schema';
 import { filterPendingDeletes } from '@/utils/pendingDelete';
 import {
@@ -42,13 +42,22 @@ export default function NewRecipeScreen() {
   // once on mount.
   const [cookbooks, setCookbooks] = useState<Cookbook[] | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      const data = await getCookbooks();
-      setCookbooks(filterPendingDeletes(data, 'cookbook', (cb) => cb.id));
-    }
-    load();
+  const loadCookbooks = useCallback(async () => {
+    const data = await getCookbooks();
+    setCookbooks(filterPendingDeletes(data, 'cookbook', (cb) => cb.id));
   }, []);
+
+  useEffect(() => {
+    loadCookbooks();
+  }, [loadCookbooks]);
+
+  // Quick "New cookbook" from the picker (§5.5): name only, the form then
+  // selects the returned id. Reloaded first so the picker already lists it.
+  const handleCreateCookbook = async (name: string) => {
+    const id = await createCookbook({ name, coverImagePath: null });
+    await loadCookbooks();
+    return id;
+  };
 
   // Pre-selects the cookbook the user came from, if it still exists.
   const initialData = useMemo(
@@ -117,6 +126,7 @@ export default function NewRecipeScreen() {
         cookbooks={cookbooks}
         onSave={handleSave}
         onCancel={() => router.back()}
+        onCreateCookbook={handleCreateCookbook}
         isLoading={isLoading}
         enableImport
         initialImport={initialImport}

@@ -235,6 +235,12 @@ export const dictionary = {
   },
   'recipeForm.cookbook': { en: 'Cookbook', pl: 'Książka kucharska' },
   'recipeForm.noCookbook': { en: 'No cookbook', pl: 'Bez książki' },
+  'recipeForm.newCookbook': { en: 'New cookbook', pl: 'Nowa książka' },
+  'recipeForm.quickCookbookHint': {
+    en: 'You can add a cover later by editing the cookbook.',
+    pl: 'Okładkę dodasz później, edytując książkę.',
+  },
+  'recipeForm.quickCookbookCreate': { en: 'Create', pl: 'Utwórz' },
   'recipeForm.prep': { en: 'Prep (min)', pl: 'Przygot. (min)' },
   'recipeForm.cook': { en: 'Cook (min)', pl: 'Gotow. (min)' },
   'recipeForm.servings': { en: 'Servings', pl: 'Porcje' },

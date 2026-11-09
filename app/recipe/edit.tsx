@@ -9,7 +9,7 @@ import {
   recipeSaveNotice,
 } from '@/utils/recipeForm';
 import { getRecipeById, updateRecipe } from '@/db/recipes';
-import { getCookbooks } from '@/db/cookbooks';
+import { createCookbook, getCookbooks } from '@/db/cookbooks';
 import type { Cookbook } from '@/db/schema';
 import { filterPendingDeletes } from '@/utils/pendingDelete';
 import { useSnackbar } from '@/components/ui/SnackbarProvider';
@@ -48,6 +48,15 @@ export default function EditRecipeScreen() {
     }
     load();
   }, [id]);
+
+  // Quick "New cookbook" from the picker (§5.5): name only, the form then
+  // selects the returned id. Reloaded first so the picker already lists it.
+  const handleCreateCookbook = async (name: string) => {
+    const id = await createCookbook({ name, coverImagePath: null });
+    const all = await getCookbooks();
+    setCookbooks(filterPendingDeletes(all, 'cookbook', (cb) => cb.id));
+    return id;
+  };
 
   const handleSave = async (data: RecipeFormData) => {
     setIsLoading(true);
@@ -107,6 +116,7 @@ export default function EditRecipeScreen() {
         cookbooks={cookbooks}
         onSave={handleSave}
         onCancel={() => router.back()}
+        onCreateCookbook={handleCreateCookbook}
         isLoading={isLoading}
       />
     </SafeAreaView>

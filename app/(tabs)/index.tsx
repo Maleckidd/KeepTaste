@@ -86,6 +86,34 @@ function CookbookTile({
   );
 }
 
+// Last cell of the grid — the only "create a cookbook" entry point once any
+// cookbook exists (§5.1). Dashed outline instead of a color fill so it reads
+// as a slot to fill, not as one more cookbook.
+function NewCookbookTile({ onPress }: { onPress: () => void }) {
+  const c = useTheme();
+  const t = useT();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.tile, styles.newTile, pressed && styles.tilePressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={t('home.newCookbook')}
+    >
+      <View style={styles.newTileIcon}>
+        <Ionicons name="add" size={28} color={c.primary} />
+      </View>
+      <Text style={styles.newTileText} numberOfLines={2}>
+        {t('home.newCookbook')}
+      </Text>
+    </Pressable>
+  );
+}
+
+type GridCell = Cookbook | typeof NEW_COOKBOOK_CELL;
+const NEW_COOKBOOK_CELL = 'new-cookbook' as const;
+
 export default function HomeScreen() {
   const router = useRouter();
   const c = useTheme();
@@ -190,14 +218,22 @@ export default function HomeScreen() {
     setMenuCookbook(cookbook);
   };
 
-  const renderItem = ({ item, index }: { item: Cookbook; index: number }) => (
-    <CookbookTile
-      item={item}
-      index={index}
-      onPress={() => router.push(`/cookbook/${item.id}`)}
-      onLongPress={() => handleCookbookLongPress(item)}
-    />
+  const gridData = useMemo<GridCell[]>(
+    () => [...cookbooks, NEW_COOKBOOK_CELL],
+    [cookbooks]
   );
+
+  const renderItem = ({ item, index }: { item: GridCell; index: number }) =>
+    item === NEW_COOKBOOK_CELL ? (
+      <NewCookbookTile onPress={handleAddCookbook} />
+    ) : (
+      <CookbookTile
+        item={item}
+        index={index}
+        onPress={() => router.push(`/cookbook/${item.id}`)}
+        onLongPress={() => handleCookbookLongPress(item)}
+      />
+    );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -206,25 +242,13 @@ export default function HomeScreen() {
         <Text style={styles.headerTitle} accessibilityRole="header">
           {t('home.title')}
         </Text>
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={handleAddCookbook}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.newCookbookButton,
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Text style={styles.newCookbookText}>{t('home.newCookbook')}</Text>
-          </Pressable>
-          <IconButton
-            icon="settings-outline"
-            accessibilityLabel={t('a11y.settings')}
-            color={c.primary}
-            raised
-            onPress={() => router.push('/settings')}
-          />
-        </View>
+        <IconButton
+          icon="settings-outline"
+          accessibilityLabel={t('a11y.settings')}
+          color={c.primary}
+          raised
+          onPress={() => router.push('/settings')}
+        />
       </View>
 
       {/* "All recipes" tile */}
@@ -257,9 +281,11 @@ export default function HomeScreen() {
         ) : null
       ) : (
         <FlatList
-          data={cookbooks}
+          data={gridData}
           renderItem={renderItem}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) =>
+            item === NEW_COOKBOOK_CELL ? NEW_COOKBOOK_CELL : String(item.id)
+          }
           numColumns={2}
           contentContainerStyle={[
             styles.grid,
@@ -321,21 +347,6 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.base,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  newCookbookButton: {
-    minHeight: Touch.min,
-    paddingHorizontal: Spacing.sm,
-    justifyContent: 'center',
-  },
-  newCookbookText: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.semibold,
-    color: c.primary,
-  },
   headerTitle: {
     fontSize: Typography.size.xxl,
     fontWeight: Typography.weight.bold,
@@ -394,5 +405,32 @@ const makeStyles = (c: ThemePalette) => StyleSheet.create({
     fontWeight: Typography.weight.semibold,
     color: '#FFFFFF',
     letterSpacing: -0.2,
+  },
+  // Flat on purpose: no shadow, so it sits behind the real cookbooks visually.
+  newTile: {
+    elevation: 0,
+    shadowOpacity: 0,
+    backgroundColor: c.surfaceAlt,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: c.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.base,
+  },
+  newTileIcon: {
+    width: Touch.min,
+    height: Touch.min,
+    borderRadius: Radius.full,
+    backgroundColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newTileText: {
+    fontSize: Typography.size.md,
+    fontWeight: Typography.weight.semibold,
+    color: c.primary,
+    textAlign: 'center',
   },
 });
