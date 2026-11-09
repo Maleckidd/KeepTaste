@@ -1,5 +1,5 @@
-// Cooking timers, stage 2 (SPEC.md §5.21): background alarms as local OS
-// notifications. Pure — imports only utils/i18n and utils/timers, never
+// Cooking timers, stages 2–3 (SPEC.md §5.21): background alarms as local OS
+// notifications, plus the live countdown notification. Pure — imports only utils/i18n and utils/timers, never
 // expo-notifications or react-native, so it runs under jest as-is. The native
 // side (utils/timerAlarm.ts) reads the OS state, asks planTimerNotifications
 // what to change, and executes the plan. The notifications ring until the user
@@ -201,12 +201,15 @@ export function armedAfterSync(o: {
   return armed;
 }
 
-/** Validates a tapped notification: ours, with a positive-integer recipe id. */
+/**
+ * Validates a tapped notification — an alarm (`timer:`) or a live countdown
+ * (`timer-live:`) one — with a positive-integer recipe id.
+ */
 export function parseTimerNotificationResponse(
   identifier: string,
   data: unknown
 ): { timerId: string; recipeId: number } | null {
-  const timerId = timerIdFromNotificationId(identifier);
+  const timerId = timerIdFromNotificationId(identifier) ?? timerIdFromLiveNotificationId(identifier);
   if (timerId === null) return null;
   if (typeof data !== 'object' || data === null) return null;
   const { recipeId, timerId: dataTimerId } = data as { recipeId?: unknown; timerId?: unknown };
@@ -268,11 +271,15 @@ export type ForegroundBehavior = {
  * Foreground presentation: timer notifications are shown with sound (heads-up
  * banner with the Stop action) — the notification is the single ringer while
  * the app is open too; the in-app Dismiss / Stop / +1 min removes it through
- * the reconciler. Anything else is shown silently.
+ * the reconciler. Live countdowns (`timer-live:`) are listed only, silently,
+ * like the system stopwatch. Anything else is shown silently.
  */
 export function timerForegroundBehavior(identifier: string): ForegroundBehavior {
   if (timerIdFromNotificationId(identifier) !== null) {
     return { shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false };
+  }
+  if (identifier.startsWith(TIMER_LIVE_PREFIX)) {
+    return { shouldShowBanner: false, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false };
   }
   return { shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false };
 }
@@ -378,4 +385,167 @@ export function parseNoticeCount(raw: string | null | undefined): number {
   if (raw == null || !/^\d+$/.test(raw)) return 0;
   const n = Number(raw);
   return Number.isSafeInteger(n) ? n : 0;
+}
+
+// --- Live countdown (stage 3, v1) ---
+//
+// One ongoing, silent notification per running or paused timer
+// (`timer-live:<id>`, channel `timers-live`). The countdown itself is a native
+// Chronometer (modules/exactalarm TimerPresentationDelegate) that the system
+// ticks; JS only posts it with the end time (or the frozen remaining time)
+// and reconciles it on every timer change. The alarm `timer:<id>` replaces it:
+// the native delegate cancels the live one when the alarm is presented.
+
+/** Android notification channel for the live countdowns. */
+export const TIMER_LIVE_CHANNEL_ID = 'timers-live';
+/** Live countdown identifiers start with this (note: not with `timer:`). */
+export const TIMER_LIVE_PREFIX = 'timer-live:';
+
+export function timerLiveNotificationId(timerId: string): string {
+  return TIMER_LIVE_PREFIX + timerId;
+}
+
+/** The timer id behind a live countdown identifier, or null if it isn't one. */
+export function timerIdFromLiveNotificationId(identifier: string): string | null {
+  if (!identifier.startsWith(TIMER_LIVE_PREFIX)) return null;
+  const id = identifier.slice(TIMER_LIVE_PREFIX.length);
+  return id.length > 0 ? id : null;
+}
+
+/** Local wall-clock time of `ms`, 24 h, zero-padded "HH:MM" (seconds dropped). */
+export function formatClockTime(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export type TimerLiveContent = {
+  title: string;
+  body: string;
+  /**
+   * The native TimerPresentationDelegate reads `liveEndsAtMs` (running:
+   * count down to it) or `livePausedMs` (paused: frozen remaining time).
+   * Exactly one of them is present.
+   */
+  data: { recipeId: number; timerId: string; liveEndsAtMs?: number; livePausedMs?: number };
+};
+
+/**
+ * Localized live content: the timer label as the title, and "Ends at 14:05"
+ * (running) or "Paused" as the body. Null for a timer without a countdown
+ * (done, or a state missing its time).
+ */
+export function buildTimerLiveContent(timer: Timer, t: Translator): TimerLiveContent | null {
+  const title = timerLabel(t, timer.title, timer.step);
+  const base = { recipeId: timer.recipeId, timerId: timer.id };
+  if (timer.state === 'running' && timer.endsAt) {
+    const endsAtMs = Date.parse(timer.endsAt);
+    if (!Number.isFinite(endsAtMs)) return null;
+    return {
+      title,
+      body: t('timer.liveEndsAt', { time: formatClockTime(endsAtMs) }),
+      data: { ...base, liveEndsAtMs: endsAtMs },
+    };
+  }
+  if (timer.state === 'paused' && typeof timer.remainingSec === 'number') {
+    return { title, body: t('timer.paused'), data: { ...base, livePausedMs: timer.remainingSec * 1000 } };
+  }
+  return null;
+}
+
+/** A presented live notification, reduced to what the planner compares. */
+export type PresentedTimerLive = {
+  identifier: string;
+  title: string | null;
+  body: string | null;
+  liveEndsAtMs: number | null;
+  livePausedMs: number | null;
+};
+
+export type TimerLiveRequest = {
+  identifier: string;
+  timerId: string;
+  recipeId: number;
+  title: string;
+  body: string;
+  liveEndsAtMs: number | null;
+  livePausedMs: number | null;
+};
+
+export type TimerLivePlan = {
+  /** Live notifications to (re)post — same identifier replaces the shown one. */
+  post: TimerLiveRequest[];
+  /** Presented live identifiers to remove. */
+  dismiss: string[];
+};
+
+/**
+ * Reconciles the shown live countdowns with the timer list.
+ * - Wanted: running timers whose end is still ahead, and paused timers.
+ * - post: wanted timers with no presented entry, or one that differs in title,
+ *   body, end time (beyond FIRE_TIME_TOLERANCE_MS) or paused time (exact).
+ * - dismiss: presented live ids whose timer is not wanted (gone, done, or
+ *   running but due — its alarm takes over), deduplicated.
+ * Identifiers without the live prefix are ignored.
+ */
+export function planTimerLiveNotifications(input: {
+  timers: readonly Timer[];
+  presented: readonly PresentedTimerLive[];
+  nowMs: number;
+  t: Translator;
+}): TimerLivePlan {
+  const { timers, presented, nowMs, t } = input;
+  const presentedById = new Map<string, PresentedTimerLive>();
+  for (const entry of presented) {
+    if (timerIdFromLiveNotificationId(entry.identifier) !== null && !presentedById.has(entry.identifier)) {
+      presentedById.set(entry.identifier, entry);
+    }
+  }
+
+  const wanted = new Set<string>();
+  const post: TimerLiveRequest[] = [];
+  for (const timer of timers) {
+    if (timer.state === 'running' && desiredFireTime(timer, nowMs) === null) continue;
+    const content = buildTimerLiveContent(timer, t);
+    if (!content) continue;
+    const identifier = timerLiveNotificationId(timer.id);
+    wanted.add(identifier);
+    const liveEndsAtMs = content.data.liveEndsAtMs ?? null;
+    const livePausedMs = content.data.livePausedMs ?? null;
+    const existing = presentedById.get(identifier);
+    const endsMatch =
+      liveEndsAtMs === null
+        ? existing?.liveEndsAtMs === null
+        : existing?.liveEndsAtMs != null &&
+          Math.abs(existing.liveEndsAtMs - liveEndsAtMs) <= FIRE_TIME_TOLERANCE_MS;
+    const matches =
+      existing !== undefined &&
+      existing.title === content.title &&
+      existing.body === content.body &&
+      endsMatch &&
+      existing.livePausedMs === livePausedMs;
+    if (!matches) {
+      post.push({
+        identifier,
+        timerId: timer.id,
+        recipeId: timer.recipeId,
+        title: content.title,
+        body: content.body,
+        liveEndsAtMs,
+        livePausedMs,
+      });
+    }
+  }
+
+  const dismiss: string[] = [];
+  const seen = new Set<string>();
+  for (const { identifier } of presented) {
+    if (timerIdFromLiveNotificationId(identifier) === null || seen.has(identifier)) continue;
+    if (!wanted.has(identifier)) {
+      seen.add(identifier);
+      dismiss.push(identifier);
+    }
+  }
+
+  return { post, dismiss };
 }

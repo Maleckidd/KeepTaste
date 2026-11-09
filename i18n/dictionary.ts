@@ -866,6 +866,13 @@ export const dictionary = {
     pl: 'Powiadomienia są wyłączone, więc minutnik nie zadzwoni, gdy KeepTaste jest zamknięty.',
   },
   'timer.alarmOffAction': { en: 'Turn on', pl: 'Włącz' },
+  // Live countdown notification (stage 3): body line + its Android channel.
+  'timer.liveEndsAt': { en: 'Ends at {time}', pl: 'Koniec o {time}' },
+  'timer.liveChannelName': { en: 'Running timers', pl: 'Odliczanie minutników' },
+  'timer.liveChannelDescription': {
+    en: 'Countdown of running cooking timers',
+    pl: 'Odliczanie trwających minutników',
+  },
   // Exact-alarm access ("Alarms & reminders", Android 14+): without it the
   // alarm may ring up to 3/4 of the duration late.
   'timer.exactNotice': {

@@ -7,6 +7,8 @@
 // acts (insistent flag + a Stop action, added natively by modules/exactalarm's
 // TimerPresentationDelegate); the reconciler dismisses it — which also
 // silences it — once its timer is dismissed, stopped or extended in the app.
+// The same sync keeps one live countdown notification per running or paused
+// timer (stage 3, `timer-live:<id>`); tapping it opens the recipe too.
 // Mounted only where the alarm is available (Android dev / release build) — in
 // Expo Go and on web the timers keep stage-1 behaviour.
 // Must sit inside TimerProvider, LanguageProvider and SnackbarProvider.

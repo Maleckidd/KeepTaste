@@ -35,10 +35,19 @@ import {
   nextExactAlarmStep,
   shouldRearmOnExactChange,
   parseNoticeCount,
+  // Stage 3 — live countdown notification (v1). TDD red: not implemented yet.
+  TIMER_LIVE_PREFIX,
+  timerLiveNotificationId,
+  timerIdFromLiveNotificationId,
+  formatClockTime,
+  buildTimerLiveContent,
+  planTimerLiveNotifications,
 } from '../utils/timerNotifications';
 import type {
   ScheduledTimerNotification,
   AlarmPermission,
+  PresentedTimerLive,
+  TimerLiveRequest,
 } from '../utils/timerNotifications';
 import type { Timer } from '../utils/timers';
 import { createTranslator, type Translator } from '../utils/i18n';
@@ -954,5 +963,463 @@ describe('parseNoticeCount', () => {
     ['Infinity'],
   ])('falls back to 0 for %p', (raw) => {
     expect(parseNoticeCount(raw)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 3 — live countdown notification (v1), SPEC.md §5.21.
+//
+// New exports expected in utils/timerNotifications.ts (pure):
+//   TIMER_LIVE_PREFIX = 'timer-live:'
+//   timerLiveNotificationId(timerId: string): string
+//   timerIdFromLiveNotificationId(identifier: string): string | null
+//   formatClockTime(ms: number): string            — local 24 h "HH:MM"
+//   buildTimerLiveContent(timer: Timer, t: Translator):
+//     { title: string; body: string;
+//       data: { recipeId: number; timerId: string;
+//               liveEndsAtMs?: number; livePausedMs?: number } } | null
+//   type PresentedTimerLive = { identifier: string; title: string | null;
+//     body: string | null; liveEndsAtMs: number | null; livePausedMs: number | null }
+//   type TimerLiveRequest = { identifier: string; timerId: string; recipeId: number;
+//     title: string; body: string; liveEndsAtMs: number | null; livePausedMs: number | null }
+//   planTimerLiveNotifications(input: { timers: readonly Timer[];
+//     presented: readonly PresentedTimerLive[]; nowMs: number; t: Translator }):
+//     { post: TimerLiveRequest[]; dismiss: string[] }
+// Plus: parseTimerNotificationResponse and timerForegroundBehavior accept
+// `timer-live:<id>` ids. New dictionary keys: timer.liveEndsAt ("Ends at
+// {time}" / "Koniec o {time}"), timer.liveChannelName, timer.liveChannelDescription.
+// ---------------------------------------------------------------------------
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+/** TZ-independent expectation: the local clock time of `ms`. */
+const clockOf = (ms: number) => {
+  const d = new Date(ms);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
+/** A presented live entry exactly matching what the planner wants for `timer`. */
+function presentedLiveFor(
+  timer: Timer,
+  t: Translator = en,
+  over: Partial<PresentedTimerLive> = {},
+): PresentedTimerLive {
+  const content = buildTimerLiveContent(timer, t);
+  if (!content) throw new Error('presentedLiveFor: timer has no live content');
+  return {
+    identifier: timerLiveNotificationId(timer.id),
+    title: content.title,
+    body: content.body,
+    liveEndsAtMs: content.data.liveEndsAtMs ?? null,
+    livePausedMs: content.data.livePausedMs ?? null,
+    ...over,
+  };
+}
+
+function livePlan(o: {
+  timers?: Timer[];
+  presented?: PresentedTimerLive[];
+  t?: Translator;
+  nowMs?: number;
+}) {
+  return planTimerLiveNotifications({
+    timers: o.timers ?? [],
+    presented: o.presented ?? [],
+    nowMs: o.nowMs ?? NOW,
+    t: o.t ?? en,
+  });
+}
+
+const EMPTY_LIVE_PLAN = { post: [], dismiss: [] };
+
+describe('live notification ids', () => {
+  it('exposes the live prefix', () => {
+    expect(TIMER_LIVE_PREFIX).toBe('timer-live:');
+  });
+
+  it('prefixes the timer id', () => {
+    expect(timerLiveNotificationId('abc')).toBe('timer-live:abc');
+  });
+
+  it('round-trips', () => {
+    expect(timerIdFromLiveNotificationId(timerLiveNotificationId('abc'))).toBe('abc');
+    expect(
+      timerIdFromLiveNotificationId(timerLiveNotificationId('t-1730000000-x')),
+    ).toBe('t-1730000000-x');
+  });
+
+  it('returns null for the bare prefix', () => {
+    expect(timerIdFromLiveNotificationId('timer-live:')).toBeNull();
+  });
+
+  it('returns null for alarm and foreign identifiers', () => {
+    expect(timerIdFromLiveNotificationId('timer:abc')).toBeNull();
+    expect(timerIdFromLiveNotificationId('other:abc')).toBeNull();
+    expect(timerIdFromLiveNotificationId('abc')).toBeNull();
+    expect(timerIdFromLiveNotificationId('')).toBeNull();
+  });
+
+  // Pin (already true today): 'timer-live:' does not start with 'timer:'.
+  it('the alarm id parser does not treat a live id as an alarm id', () => {
+    expect(timerIdFromNotificationId('timer-live:x')).toBeNull();
+  });
+
+  it('the alarm id parser rejects a generated live id', () => {
+    expect(timerIdFromNotificationId(timerLiveNotificationId('abc'))).toBeNull();
+  });
+});
+
+describe('formatClockTime', () => {
+  // Built from local components, so the expectation holds in any TZ.
+  const local = (h: number, m: number, s = 0, ms = 0) =>
+    new Date(2026, 10, 5, h, m, s, ms).getTime();
+
+  it.each<[number, number, string]>([
+    [14, 5, '14:05'],
+    [9, 7, '09:07'],
+    [0, 0, '00:00'],
+    [23, 59, '23:59'],
+    [12, 30, '12:30'],
+  ])('formats %p:%p as %p (24 h, zero-padded)', (h, m, expected) => {
+    expect(formatClockTime(local(h, m))).toBe(expected);
+  });
+
+  it('drops seconds without rounding up', () => {
+    expect(formatClockTime(local(14, 5, 59, 999))).toBe('14:05');
+  });
+
+  it('matches the local clock for an arbitrary instant', () => {
+    expect(formatClockTime(NOW)).toBe(clockOf(NOW));
+    expect(formatClockTime(NOW + 12_345_678)).toBe(clockOf(NOW + 12_345_678));
+  });
+});
+
+describe('buildTimerLiveContent', () => {
+  it('running EN: label title, "Ends at HH:MM" body, liveEndsAtMs in data', () => {
+    const timer = running({ id: 'abc', recipeId: 7, step: 3 });
+    const endsAtMs = NOW + 300_000;
+    const c = buildTimerLiveContent(timer, en);
+    expect(c).not.toBeNull();
+    expect(c!.title).toBe('Bread · step 3');
+    expect(c!.body).toBe(`Ends at ${clockOf(endsAtMs)}`);
+    expect(c!.data).toEqual({ recipeId: 7, timerId: 'abc', liveEndsAtMs: endsAtMs });
+    expect(c!.data).not.toHaveProperty('livePausedMs');
+  });
+
+  it('running PL: "Koniec o HH:MM"', () => {
+    const c = buildTimerLiveContent(running({ step: 3 }), pl);
+    expect(c!.title).toBe('Bread · krok 3');
+    expect(c!.body).toBe(`Koniec o ${clockOf(NOW + 300_000)}`);
+  });
+
+  it('running without a step: title is just the recipe title', () => {
+    expect(buildTimerLiveContent(running({ step: null }), en)!.title).toBe('Bread');
+  });
+
+  it('paused EN: label title, "Paused" body, livePausedMs in data', () => {
+    const c = buildTimerLiveContent(
+      paused({ id: 'p9', recipeId: 4, step: 2, remainingSec: 42 }),
+      en,
+    );
+    expect(c).not.toBeNull();
+    expect(c!.title).toBe('Bread · step 2');
+    expect(c!.body).toBe('Paused');
+    expect(c!.data).toEqual({ recipeId: 4, timerId: 'p9', livePausedMs: 42_000 });
+    expect(c!.data).not.toHaveProperty('liveEndsAtMs');
+  });
+
+  it('paused PL: "Wstrzymany"', () => {
+    const c = buildTimerLiveContent(paused(), pl);
+    expect(c!.title).toBe('Bread');
+    expect(c!.body).toBe('Wstrzymany');
+  });
+
+  it('done → null', () => {
+    expect(buildTimerLiveContent(done(), en)).toBeNull();
+  });
+
+  it('running without endsAt → null', () => {
+    expect(buildTimerLiveContent(running({ endsAt: undefined }), en)).toBeNull();
+  });
+
+  it('paused without remainingSec → null', () => {
+    expect(buildTimerLiveContent(paused({ remainingSec: undefined }), en)).toBeNull();
+  });
+});
+
+describe('planTimerLiveNotifications', () => {
+  it('empty in, empty out', () => {
+    expect(livePlan({})).toEqual(EMPTY_LIVE_PLAN);
+  });
+
+  it('posts a running timer with no live notification yet', () => {
+    const endsAtMs = NOW + 300_000;
+    const expected: TimerLiveRequest = {
+      identifier: 'timer-live:t1',
+      timerId: 't1',
+      recipeId: 1,
+      title: 'Bread · step 3',
+      body: `Ends at ${clockOf(endsAtMs)}`,
+      liveEndsAtMs: endsAtMs,
+      livePausedMs: null,
+    };
+    expect(livePlan({ timers: [running()] })).toEqual({ post: [expected], dismiss: [] });
+  });
+
+  it('posts a paused timer with no live notification yet', () => {
+    const expected: TimerLiveRequest = {
+      identifier: 'timer-live:p1',
+      timerId: 'p1',
+      recipeId: 1,
+      title: 'Bread',
+      body: 'Paused',
+      liveEndsAtMs: null,
+      livePausedMs: 42_000,
+    };
+    expect(livePlan({ timers: [paused()] })).toEqual({ post: [expected], dismiss: [] });
+  });
+
+  it('does nothing when the presented entries already match', () => {
+    const r = running();
+    const p = paused();
+    expect(
+      livePlan({ timers: [r, p], presented: [presentedLiveFor(r), presentedLiveFor(p)] }),
+    ).toEqual(EMPTY_LIVE_PLAN);
+  });
+
+  it('tolerates a liveEndsAtMs drift of up to 1 s', () => {
+    const r = running();
+    const endsAtMs = NOW + 300_000;
+    for (const drift of [1000, -1000, 400]) {
+      expect(
+        livePlan({
+          timers: [r],
+          presented: [presentedLiveFor(r, en, { liveEndsAtMs: endsAtMs + drift })],
+        }).post,
+      ).toEqual([]);
+    }
+  });
+
+  it('re-posts on a liveEndsAtMs drift over 1 s', () => {
+    const r = running();
+    const endsAtMs = NOW + 300_000;
+    for (const drift of [1001, -1001]) {
+      const out = livePlan({
+        timers: [r],
+        presented: [presentedLiveFor(r, en, { liveEndsAtMs: endsAtMs + drift })],
+      });
+      expect(out.post.map((x) => x.liveEndsAtMs)).toEqual([endsAtMs]);
+      expect(out.dismiss).toEqual([]);
+    }
+  });
+
+  it('compares livePausedMs exactly', () => {
+    const p = paused();
+    const out = livePlan({
+      timers: [p],
+      presented: [presentedLiveFor(p, en, { livePausedMs: 41_999 })],
+    });
+    expect(out.post.map((x) => x.livePausedMs)).toEqual([42_000]);
+  });
+
+  it('re-posts on a title change (language switch)', () => {
+    const r = running({ step: 3 });
+    const out = livePlan({ timers: [r], presented: [presentedLiveFor(r, en)], t: pl });
+    expect(out.post).toHaveLength(1);
+    expect(out.post[0].title).toBe('Bread · krok 3');
+    expect(out.post[0].body).toBe(`Koniec o ${clockOf(NOW + 300_000)}`);
+    expect(out.dismiss).toEqual([]);
+  });
+
+  it('re-posts on a body-only change (paused, language switch)', () => {
+    const p = paused({ step: null });
+    const out = livePlan({ timers: [p], presented: [presentedLiveFor(p, en)], t: pl });
+    expect(out.post.map((x) => [x.title, x.body])).toEqual([['Bread', 'Wstrzymany']]);
+  });
+
+  it('re-posts when the presented title or body is missing', () => {
+    const r = running();
+    expect(
+      livePlan({ timers: [r], presented: [presentedLiveFor(r, en, { title: null })] }).post,
+    ).toHaveLength(1);
+    expect(
+      livePlan({ timers: [r], presented: [presentedLiveFor(r, en, { body: null })] }).post,
+    ).toHaveLength(1);
+  });
+
+  it('re-posts after +1 min (endsAt moved)', () => {
+    const before = running({ endsInSec: 300 });
+    const after = running({ endsInSec: 360 });
+    const out = livePlan({ timers: [after], presented: [presentedLiveFor(before)] });
+    expect(out.post.map((x) => x.liveEndsAtMs)).toEqual([NOW + 360_000]);
+    expect(out.dismiss).toEqual([]);
+  });
+
+  it('re-posts on pause (running → paused)', () => {
+    const r = running({ id: 'x' });
+    const p = paused({ id: 'x', step: 3, remainingSec: 300 });
+    const out = livePlan({ timers: [p], presented: [presentedLiveFor(r)] });
+    expect(out.post).toEqual([
+      {
+        identifier: 'timer-live:x',
+        timerId: 'x',
+        recipeId: 1,
+        title: 'Bread · step 3',
+        body: 'Paused',
+        liveEndsAtMs: null,
+        livePausedMs: 300_000,
+      },
+    ]);
+    expect(out.dismiss).toEqual([]);
+  });
+
+  it('re-posts on resume (paused → running)', () => {
+    const p = paused({ id: 'x', step: 3, remainingSec: 300 });
+    const r = running({ id: 'x', step: 3, endsInSec: 300 });
+    const out = livePlan({ timers: [r], presented: [presentedLiveFor(p)] });
+    expect(out.post).toEqual([
+      {
+        identifier: 'timer-live:x',
+        timerId: 'x',
+        recipeId: 1,
+        title: 'Bread · step 3',
+        body: `Ends at ${clockOf(NOW + 300_000)}`,
+        liveEndsAtMs: NOW + 300_000,
+        livePausedMs: null,
+      },
+    ]);
+    expect(out.dismiss).toEqual([]);
+  });
+
+  it('dismisses a live notification whose timer is gone', () => {
+    const gone = running({ id: 'gone' });
+    expect(livePlan({ presented: [presentedLiveFor(gone)] })).toEqual({
+      post: [],
+      dismiss: ['timer-live:gone'],
+    });
+  });
+
+  it('dismisses a done timer\'s live notification', () => {
+    const r = running({ id: 'd1' });
+    expect(livePlan({ timers: [done()], presented: [presentedLiveFor(r)] })).toEqual({
+      post: [],
+      dismiss: ['timer-live:d1'],
+    });
+  });
+
+  it('dismisses (and never posts) a running-but-due timer', () => {
+    const live = presentedLiveFor(running());
+    for (const endsInSec of [0, -5]) {
+      expect(
+        livePlan({ timers: [running({ endsInSec })], presented: [live] }),
+      ).toEqual({ post: [], dismiss: ['timer-live:t1'] });
+      expect(livePlan({ timers: [running({ endsInSec })] })).toEqual(EMPTY_LIVE_PLAN);
+    }
+  });
+
+  it('dismisses a running timer without endsAt', () => {
+    const live = presentedLiveFor(running());
+    expect(
+      livePlan({ timers: [running({ endsAt: undefined })], presented: [live] }),
+    ).toEqual({ post: [], dismiss: ['timer-live:t1'] });
+  });
+
+  it('ignores presented ids that are not live ids', () => {
+    const r = running();
+    const foreign = (identifier: string): PresentedTimerLive => ({
+      identifier,
+      title: null,
+      body: null,
+      liveEndsAtMs: null,
+      livePausedMs: null,
+    });
+    const presented = [foreign('timer:t1'), foreign('timer:gone'), foreign('other:1'), foreign('timer-live:')];
+    // Never dismissed, and the alarm entry `timer:t1` doesn't count as t1's live one.
+    expect(livePlan({ presented })).toEqual(EMPTY_LIVE_PLAN);
+    const out = livePlan({ timers: [r], presented });
+    expect(out.dismiss).toEqual([]);
+    expect(out.post.map((x) => x.identifier)).toEqual(['timer-live:t1']);
+  });
+
+  it('dedupes dismissals of a repeated presented id', () => {
+    const gone = presentedLiveFor(running({ id: 'gone' }));
+    expect(livePlan({ presented: [gone, gone, { ...gone }] })).toEqual({
+      post: [],
+      dismiss: ['timer-live:gone'],
+    });
+  });
+
+  it('does not post twice for duplicate matching presented entries', () => {
+    const r = running();
+    const live = presentedLiveFor(r);
+    expect(livePlan({ timers: [r], presented: [live, { ...live }] })).toEqual(EMPTY_LIVE_PLAN);
+  });
+
+  it('post follows timers order; dismiss follows presented order', () => {
+    const timers = [running({ id: 'z' }), paused({ id: 'a' }), running({ id: 'm' })];
+    const presented = ['q', 'b', 'k'].map((id) => presentedLiveFor(running({ id })));
+    const out = livePlan({ timers, presented });
+    expect(out.post.map((x) => x.timerId)).toEqual(['z', 'a', 'm']);
+    expect(out.dismiss).toEqual(['timer-live:q', 'timer-live:b', 'timer-live:k']);
+  });
+});
+
+describe('parseTimerNotificationResponse — live ids', () => {
+  it('accepts a tapped live notification', () => {
+    expect(
+      parseTimerNotificationResponse('timer-live:abc', {
+        recipeId: 5,
+        timerId: 'abc',
+        liveEndsAtMs: NOW,
+      }),
+    ).toEqual({ timerId: 'abc', recipeId: 5 });
+  });
+
+  it('applies the same data checks', () => {
+    expect(parseTimerNotificationResponse('timer-live:', { recipeId: 5, timerId: '' })).toBeNull();
+    expect(parseTimerNotificationResponse('timer-live:abc', null)).toBeNull();
+    expect(
+      parseTimerNotificationResponse('timer-live:abc', { recipeId: 5, timerId: 'xyz' }),
+    ).toBeNull();
+    for (const recipeId of ['5', 0, 1.5, NaN, undefined]) {
+      expect(
+        parseTimerNotificationResponse('timer-live:abc', { recipeId, timerId: 'abc' }),
+      ).toBeNull();
+    }
+  });
+});
+
+describe('timerForegroundBehavior — live ids', () => {
+  it('lists a live notification silently, without a banner', () => {
+    expect(timerForegroundBehavior('timer-live:x')).toEqual({
+      shouldShowBanner: false,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    });
+  });
+
+  it('keeps the alarm behaviour for timer: ids', () => {
+    expect(timerForegroundBehavior('timer:x').shouldPlaySound).toBe(true);
+    expect(timerForegroundBehavior('timer:x').shouldShowBanner).toBe(true);
+  });
+
+  it('the bare live prefix is silent', () => {
+    expect(timerForegroundBehavior('timer-live:').shouldPlaySound).toBe(false);
+  });
+});
+
+describe('planTimerNotifications — ignores live ids', () => {
+  it('never dismisses or cancels timer-live: ids', () => {
+    const r = running();
+    const out = plan({
+      timers: [r],
+      scheduled: [
+        scheduledFor(r),
+        { identifier: 'timer-live:t1', fireAtMs: null, title: null, body: null },
+        { identifier: 'timer-live:gone', fireAtMs: null, title: null, body: null },
+      ],
+      presented: ['timer-live:t1', 'timer-live:gone', 'timer-live:'],
+    });
+    expect(out).toEqual(EMPTY_PLAN);
   });
 });

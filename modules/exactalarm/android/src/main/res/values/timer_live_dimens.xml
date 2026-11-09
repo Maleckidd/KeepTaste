@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sizes for the live countdown notification layouts (SPEC.md §5.21 stage 3). -->
+<resources>
+  <dimen name="timer_live_collapsed_count_size">22sp</dimen>
+  <dimen name="timer_live_expanded_count_size">40sp</dimen>
+  <dimen name="timer_live_gap">8dp</dimen>
+</resources>
