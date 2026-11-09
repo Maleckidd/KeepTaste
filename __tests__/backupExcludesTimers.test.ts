@@ -7,6 +7,15 @@
 //   ACTIVE_TIMERS_KEY, isExcludedFromBackup(key), isSkippedOnRestore(key)
 // and db/backup.ts getFullBackupData filtering with isExcludedFromBackup.
 //
+// Stage 2 (timer notifications): TIMER_ALARM_NOTICE_KEY = 'timer_alarm_notice'
+// records that the one-time "notifications are off" snackbar was shown — also
+// device-only, so it is excluded from export and skipped on restore (exact
+// key match, not a prefix).
+//
+// Exact-alarm addendum: TIMER_EXACT_NOTICE_KEY = 'timer_exact_notice' counts
+// the sessions the "allow alarms" snackbar was shown — device-only too, so it
+// is excluded from export and skipped on restore (exact key match).
+//
 // db/client is mocked (pattern from restoreFullBackup.test.ts): select().from()
 // resolves rows by table identity against the real schema objects.
 import {
@@ -38,6 +47,8 @@ jest.mock('../db/settings', () => ({
 import { getFullBackupData } from '../db/backup';
 import {
   ACTIVE_TIMERS_KEY,
+  TIMER_ALARM_NOTICE_KEY,
+  TIMER_EXACT_NOTICE_KEY,
   isExcludedFromBackup,
   isSkippedOnRestore,
 } from '../db/settingKeys';
@@ -57,6 +68,8 @@ beforeEach(() => {
       key: 'active_timers',
       value: '[{"id":"a","recipeId":1,"sourceKey":"k","title":"T","step":null,"durationSec":60,"state":"paused","remainingSec":30}]',
     },
+    { key: 'timer_alarm_notice', value: '1' },
+    { key: 'timer_exact_notice', value: '2' },
   ]);
 });
 
@@ -65,8 +78,27 @@ describe('settingKeys', () => {
     expect(ACTIVE_TIMERS_KEY).toBe('active_timers');
   });
 
-  it('isExcludedFromBackup is true for active_timers only', () => {
+  it('names the alarm-notice key timer_alarm_notice', () => {
+    expect(TIMER_ALARM_NOTICE_KEY).toBe('timer_alarm_notice');
+  });
+
+  it('names the exact-alarm notice key timer_exact_notice', () => {
+    expect(TIMER_EXACT_NOTICE_KEY).toBe('timer_exact_notice');
+  });
+
+  it('excludes timer_exact_notice from export and skips it on restore (exact match)', () => {
+    expect(isExcludedFromBackup('timer_exact_notice')).toBe(true);
+    expect(isSkippedOnRestore('timer_exact_notice')).toBe(true);
+    expect(isExcludedFromBackup('timer_exact_notice_x')).toBe(false);
+    expect(isSkippedOnRestore('timer_exact_notice_x')).toBe(false);
+    expect(isExcludedFromBackup('timer_exact')).toBe(false);
+    expect(isSkippedOnRestore('timer_exact')).toBe(false);
+  });
+
+  it('isExcludedFromBackup is true for device-only keys', () => {
     expect(isExcludedFromBackup('active_timers')).toBe(true);
+    expect(isExcludedFromBackup('timer_alarm_notice')).toBe(true);
+    expect(isExcludedFromBackup('timer_alarm_notice_x')).toBe(false);
     expect(isExcludedFromBackup('backup_folder_uri')).toBe(false);
     expect(isExcludedFromBackup('backup_last_at')).toBe(false);
     expect(isExcludedFromBackup('language')).toBe(false);
@@ -74,8 +106,10 @@ describe('settingKeys', () => {
     expect(isExcludedFromBackup('demo_seeded')).toBe(false);
   });
 
-  it('isSkippedOnRestore is true for backup_* and active_timers', () => {
+  it('isSkippedOnRestore is true for backup_* and device-only keys', () => {
     expect(isSkippedOnRestore('active_timers')).toBe(true);
+    expect(isSkippedOnRestore('timer_alarm_notice')).toBe(true);
+    expect(isSkippedOnRestore('timer_alarm_notice_x')).toBe(false);
     expect(isSkippedOnRestore('backup_folder_uri')).toBe(true);
     expect(isSkippedOnRestore('backup_last_at')).toBe(true);
     expect(isSkippedOnRestore('language')).toBe(false);
@@ -89,6 +123,18 @@ describe('getFullBackupData', () => {
     const data = await getFullBackupData();
     const keys = data.settings.map((s) => s.key);
     expect(keys).not.toContain('active_timers');
+  });
+
+  it('omits timer_alarm_notice from exported settings', async () => {
+    const data = await getFullBackupData();
+    const keys = data.settings.map((s) => s.key);
+    expect(keys).not.toContain('timer_alarm_notice');
+  });
+
+  it('omits timer_exact_notice from exported settings', async () => {
+    const data = await getFullBackupData();
+    const keys = data.settings.map((s) => s.key);
+    expect(keys).not.toContain('timer_exact_notice');
   });
 
   it('still exports language and backup_* settings', async () => {

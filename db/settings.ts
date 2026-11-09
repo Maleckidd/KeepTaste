@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { db } from './client';
 import { appSettings } from './schema';
-import { ACTIVE_TIMERS_KEY } from './settingKeys';
+import { ACTIVE_TIMERS_KEY, TIMER_ALARM_NOTICE_KEY, TIMER_EXACT_NOTICE_KEY } from './settingKeys';
+import { parseNoticeCount } from '../utils/timerNotifications';
 
 /** Reads a single key/value setting, or null when absent. */
 export async function getSetting(key: string): Promise<string | null> {
@@ -57,4 +58,24 @@ export async function getActiveTimersJson(): Promise<string | null> {
 /** Persists the running timers. Not a library edit: no auto-backup trigger. */
 export async function saveActiveTimersJson(json: string): Promise<void> {
   await setSetting(ACTIVE_TIMERS_KEY, json);
+}
+
+/** True once the "notifications are off" timer-alarm snackbar has been shown. */
+export async function isTimerAlarmNoticeShown(): Promise<boolean> {
+  return (await getSetting(TIMER_ALARM_NOTICE_KEY)) === '1';
+}
+
+/** Records that the timer-alarm notice was shown. Device state: no backup trigger. */
+export async function markTimerAlarmNoticeShown(): Promise<void> {
+  await setSetting(TIMER_ALARM_NOTICE_KEY, '1');
+}
+
+/** Sessions the "allow alarms" (exact-alarm) snackbar has been shown. */
+export async function getTimerExactNoticeCount(): Promise<number> {
+  return parseNoticeCount(await getSetting(TIMER_EXACT_NOTICE_KEY));
+}
+
+/** Counts one more session of the exact-alarm notice. Device state: no backup trigger. */
+export async function incrementTimerExactNoticeCount(): Promise<void> {
+  await setSetting(TIMER_EXACT_NOTICE_KEY, String((await getTimerExactNoticeCount()) + 1));
 }

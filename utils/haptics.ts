@@ -12,14 +12,18 @@ export async function lightTap(): Promise<void> {
   }
 }
 
-// Timer-done alarm (SPEC.md §5.21): a three-pulse vibration that plays once,
-// plus a warning haptic on native. Foreground only — stage 1 has no
-// notifications. Errors are swallowed (vibration may be unsupported).
-const ALARM_PATTERN = [0, 400, 200, 400, 200, 400];
+// Timer-done alarm (SPEC.md §5.21): a three-pulse vibration that repeats until
+// stopTimerAlert(), plus a warning haptic once on native. This is the in-app
+// alert; the background alarm is the OS notification (utils/timerAlarm.ts),
+// whose channel vibrates with the same pattern and, being insistent, loops it
+// too. The trailing 800 ms pause separates the repeats — both the in-app
+// repeat and the insistent notification restart the pattern from index 0.
+// Errors are swallowed (vibration may be unsupported).
+export const ALARM_PATTERN = [0, 400, 200, 400, 200, 400, 800];
 
 export function timerDoneAlert(): void {
   try {
-    Vibration.vibrate(ALARM_PATTERN);
+    Vibration.vibrate(ALARM_PATTERN, true);
   } catch {
     // Vibration unavailable — skip.
   }
@@ -27,4 +31,13 @@ export function timerDoneAlert(): void {
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {
     // Haptics unavailable — skip.
   });
+}
+
+/** Stops the repeating timer-done vibration. Never throws. */
+export function stopTimerAlert(): void {
+  try {
+    Vibration.cancel();
+  } catch {
+    // Vibration unavailable — nothing to stop.
+  }
 }

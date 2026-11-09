@@ -833,6 +833,7 @@ export const dictionary = {
   'timer.addMinute': { en: '+1 min', pl: '+1 min' },
   'timer.stop': { en: 'Stop', pl: 'Zatrzymaj' },
   'timer.dismiss': { en: 'Dismiss', pl: 'Wyłącz' },
+  'timer.alarmStop': { en: 'Stop', pl: 'Wyłącz' },
   'timer.listTitle': { en: 'Timers', pl: 'Minutniki' },
   'timer.barA11y': {
     en: 'Timers: {label}, {remaining}. Show all',
@@ -844,6 +845,24 @@ export const dictionary = {
     pl: 'Otwórz przepis {title}',
   },
   'timer.doneAnnounce': { en: "Time's up: {label}", pl: 'Czas minął: {label}' },
+  // Background alarms (stage 2): Android channel description + the one-time
+  // notice when notification permission is off.
+  'timer.channelDescription': {
+    en: 'Alarms for cooking timers while the app is in the background',
+    pl: 'Alarmy minutników, gdy aplikacja działa w tle',
+  },
+  'timer.alarmOffNotice': {
+    en: "Notifications are off, so timers can't ring while KeepTaste is closed.",
+    pl: 'Powiadomienia są wyłączone, więc minutnik nie zadzwoni, gdy KeepTaste jest zamknięty.',
+  },
+  'timer.alarmOffAction': { en: 'Turn on', pl: 'Włącz' },
+  // Exact-alarm access ("Alarms & reminders", Android 14+): without it the
+  // alarm may ring up to 3/4 of the duration late.
+  'timer.exactNotice': {
+    en: 'To ring on time, timers need permission for alarms.',
+    pl: 'Żeby minutnik dzwonił punktualnie, potrzebuje zgody na alarmy.',
+  },
+  'timer.exactAction': { en: 'Allow', pl: 'Zezwól' },
   'timer.unit.hour.one': { en: '{count} hour', pl: '{count} godzina' },
   'timer.unit.hour.few': { en: '{count} hours', pl: '{count} godziny' },
   'timer.unit.hour.many': { en: '{count} hours', pl: '{count} godzin' },

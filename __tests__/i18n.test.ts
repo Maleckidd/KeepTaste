@@ -42,6 +42,7 @@ describe('i18n/dictionary — completeness', () => {
     ['shopping.shareList', "Send what's left ({count})"],
     ['cookbook.menuSharePdf', 'Share as PDF'],
     ['recipe.menuShare', 'Share'],
+    ['timer.alarmStop', 'Stop'],
   ] as const)('contains pinned key %p with en %p', (key, en) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].en).toBe(en);
@@ -51,6 +52,7 @@ describe('i18n/dictionary — completeness', () => {
   it.each([
     ['cookbook.menuSharePdf', 'Udostępnij jako PDF'],
     ['recipe.menuShare', 'Udostępnij'],
+    ['timer.alarmStop', 'Wyłącz'],
   ] as const)('contains pinned key %p with pl %p', (key, pl) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].pl).toBe(pl);
