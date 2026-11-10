@@ -20,11 +20,18 @@ bash persona-lab/engine/run.sh persona-lab/config --count 1 --runs 1   # smoke r
 | `engine/` | the tool: `run.sh`, `verify-isolation.sh`, `lib/`, `prompts/`, `templates/` | **yes — never names this app** |
 | `config/` | this app's setup: `config.sh`, `brief*.md`, `personas.override.md`, `calibration/` | no |
 | `config-import/`, `config-research/` | focused studies built on `config/` (below) | no |
+| `config-seeded/` | the calibration run: the app with planted defects, and their manifest | no |
+| `history/` | one file per session, plus the findings ledger (`findings.json`, `findings.md`); tracked | — |
 | `runs/` | session output, git-ignored | — |
 
 `engine/` is kept free of anything app-specific so it can move to its own
 repository later unchanged. Keep it that way: an app detail goes in
 `config/config.sh` (or a hook there), never in the engine.
+
+`bash persona-lab/engine/selftest.sh` checks the engine's own logic (rig
+incidents, outcome verdicts, the evidence rule, the ledger, the comparison, the
+seeded score) in a few seconds, with no device and no model. Run it after any
+change under `engine/lib`.
 
 ## How it works
 
@@ -36,12 +43,124 @@ repository later unchanged. Keep it that way: an app detail goes in
    of use, tech level, patience budget, start state, language, font scale /
    dark mode. Stored as `personas.json`; reuse a set with `--personas-file`.
 4. **Runs** — per persona × run: device profile (font scale, dark mode) →
-   `reset_app` hook → video starts → the loop → video stops → the persona
-   writes its report → the engine checks its evidence.
+   `reset_app` hook → the app's state is read → video starts → the loop → video
+   stops → the app's state is read again → the persona writes its report → the
+   engine checks its evidence, the outcome and the rig (below).
 5. **Synthesis** — one model call that *does* have the repository (read-only:
-   Read/Grep/Glob) groups, dedupes and prioritises findings by how often they
-   recur, maps them to screens and components, and — once real-tester feedback
-   is filled in — measures how much of it the personas caught.
+   Read/Grep/Glob) groups, dedupes and prioritises findings by how many
+   personas hit them, maps them to screens and components, judges the store
+   listing's promises against what happened, and matches every finding with
+   the ledger of earlier sessions.
+6. **Calibration** — only with `--seeded`: how many defects planted in this
+   build the personas caught.
+
+### What the engine does not take on trust
+
+A prompt can ask a model to behave; only the engine can make sure. Three things
+used to be asked for and are now enforced or checked.
+
+**The outcome.** `done` is what the persona believes. With a `capture_state`
+hook in the config the engine reads what is actually stored in the app, after
+the reset and again after the run, both times after a restart so an unsaved
+form doesn't count. The lines the second read adds are what the persona did.
+Two checks use them:
+
+- the persona's own `expect` patterns (hand-written personas only):
+  `{"need": 1, "label": "the cake is saved", "matches": "piernik"}`,
+  `{"need": 3, "label": "no private notes left", "lacks": "buziaki"}`. They
+  are regular expressions and involve no model;
+- a judge: one tool-free model call, isolated like a persona, that gets the
+  needs, the materials and both states and answers per need `met`, `partly`,
+  `not_met` or `unverifiable`.
+
+`summary.json` then has `verified` (`met` / `partly` / `not_met` /
+`unverifiable`, or `none` when nothing was checked) and `self_report`.
+`overclaimed` means the persona said done and the end state disagrees. That is
+the most expensive kind of usability problem (the user leaves believing it
+worked), and no report written by the persona can contain it. The synthesis
+reports each one. The judge is a model reading a screen capture, so the
+synthesis is told to open `state.md` itself before repeating a verdict.
+
+**The rig.** A turn that takes minutes instead of seconds means the host slept
+or a call hung. The engine records the time of every turn and of the setup
+before the first one; a turn slower than `STALL_SECONDS` (180) marks the run
+`tainted`, and the turns that start within three minutes after it are listed as
+`suspect_steps`. A failure seen only there (a network error right after a wake)
+is an artifact, and the synthesis is told to discard it unless a clean run
+shows the same. Run on the logs of iteration 7, it flags two runs, one of them
+the run whose "couldn't load the page" was traced by hand to the Mac sleeping;
+both failed attempts are among its suspect steps. The engine also starts
+`caffeinate` itself and waits 30 s after a stall before touching the app again;
+neither stops the sleep of a closed lid.
+
+**The gestures.** A persona with `"avoids": ["long_press"]` doesn't get that
+action in its list, and the engine refuses it if the model tries anyway. A
+model playing a low-tech person still knows every platform convention; without
+this it "discovers" what a real one never would. The patience cap works the
+same way. Only `long_press` and `swipe` can be ruled out.
+
+### The findings ledger
+
+`history/findings.json` (tracked, with a readable `findings.md` next to it)
+holds every finding under a stable id, with a status and each session that saw
+it. The synthesis gets the ledger in its prompt, tags each of its findings with
+the id it matches or `NEW-n`, and for the known ones it did not reproduce says
+whether a persona went through that flow (`not_reproduced`) or nobody did
+(`not_exercised`). The engine merges that and assigns the new ids.
+
+```bash
+bash persona-lab/engine/run.sh persona-lab/config --finding F-012 fixed "commit abc123"
+```
+
+| Status | Set by | Meaning |
+|---|---|---|
+| `open` | engine | reported, nothing decided |
+| `fixed` | owner | a fix went in, not confirmed yet |
+| `verified` | engine | marked fixed, then a later session went through the flow and it did not happen |
+| `regressed` | engine | marked fixed (or verified), then a later session reproduced it |
+| `wontfix`, `artifact` | owner | kept for the record; a new sighting doesn't reopen it |
+
+Only a session started after the owner's verdict can confirm or refute it.
+Re-synthesizing a session replaces what that session contributed and keeps its
+ids. The ledger starts with the first session synthesized after it was added;
+`--synthesize-only` on an older session adds that session's findings too (it
+costs a synthesis). A confirmed, deterministic finding belongs in a unit or E2E
+test as well: the ledger says whether a fix held in a later study, a test says
+so on every commit.
+
+### Comparing two sessions
+
+```bash
+bash persona-lab/engine/run.sh persona-lab/config --compare \
+  persona-lab/runs/<session-A> persona-lab/runs/<session-B> > compare.md
+```
+
+The same personas (`--personas-file`) on two builds, or on two store listings
+(two config directories with different briefs). No model call: outcomes,
+verified outcomes, steps and rig incidents per persona, and the ledger ids that
+are in one session and not in the other. Read it as what changed, not as a
+measurement: one run flipping from `give_up` to `done` proves nothing.
+
+### Calibration on seeded defects
+
+How much of what is wrong do the personas catch? Plant a handful of usability
+defects in a build, list them in a manifest (`engine/templates/seeded.json`),
+run a normal session with `--seeded <manifest>`, and the engine reports recall:
+the mutation-testing idea applied to a usability test.
+
+- The personas can't see any file, and the synthesis is written before the
+  scoring. Recall is measured on the personas' reports, never on the synthesis,
+  because the synthesis reads the repository and could come across the manifest.
+- Per defect: `reported` (in a report), `noticed` (only in the turn notes: the
+  persona ran into it and didn't report it), `missed`, or `not_exercised`
+  (nobody got there; left out of the denominator).
+- A seeded session is archived in `history/` but stays out of the ledger.
+- It measures misses, not false alarms: on a real app nobody knows the full
+  list of true problems, so a finding outside the manifest is not a false one.
+- With six defects the number is coarse. Use it to compare engine versions,
+  models and persona sets against each other, on the same manifest.
+
+For KeepTaste this is `config-seeded/` (below).
 
 ### The loop, and why the persona cannot see the repo
 
@@ -178,11 +297,21 @@ runs/<session-id>/
     shots/shot-NNN.png           what the persona saw at turn NNN
     video.webm                   the full run, real time (emulator console recorder)
     video.mp4                    the same with the waiting cut down (still frames dropped)
-    actions.log, summary.json    raw actions; outcome, steps, cost, time
-    steps/                       per-turn prompts and transcripts (debugging)
+    actions.log, summary.json    raw actions; outcome, steps, cost, time, and the engine's checks:
+                                 verified, self_report, tainted, taint
+    state-before.md, state.md    what was stored in the app before and after the run
+    state-new.md                 the lines the run added: what the persona really did
+    outcome.json                 per need: met / partly / not_met / unverifiable, with a quote;
+                                 the result of each "expect" pattern
+    steps/                       per-turn prompts and transcripts, timing.tsv (debugging)
   summary.json                   all runs
-  synthesis.md                   the combined report
+  synthesis.md                   the combined report, findings tagged with their ledger ids
+  findings.json                  this session's findings as the ledger took them
+  seeded-score.md, .json         recall on planted defects (sessions run with --seeded)
 ```
+
+A run costs about two minutes more than before: reading the app's state takes
+close to a minute each time, and the judge is one more model call.
 
 Every synthesis is also archived to **`history/`** — tracked in git, unlike
 `runs/` — as `NN-YYYY-MM-DD.md` (iteration number, date, app version, outcomes,
@@ -212,6 +341,33 @@ number. `run.sh <config> --archive-only <session-dir>` rewrites one entry.
   `assets/store/keeptaste-demo*.zip` and the coordinates in `scripts/lib/screen.sh`).
 - The app UI language follows the persona's language via
   `cmd locale set-app-locales`.
+- `capture_state` in `config/config.sh` reads the end state through the UI,
+  because the release build is not debuggable: a cold start into "all recipes"
+  by deep link (`keeptaste://cookbook/all`), the full text of the three most
+  recently changed recipes, the recipe titles, the shopping lists and the first
+  list. It taps recipe cards, list rows and Back, nothing else. It finds cards
+  by shape (the only tall tappable elements on that screen), so a redesign of
+  the recipe list needs a look at it.
+- `config-import/personas.json` has `expect` patterns for every import path
+  (the recipe is there, ingredients have their own section, the mother's
+  private notes are gone, no hashtags), so that study's outcomes no longer
+  depend on what the persona thinks it saved.
+- `config-seeded/` is the calibration run. `seeded.patch` plants six defects
+  (no confirmation after saving, a PDF share action called "Export", an error
+  that only says "Error.", no add button inside a cookbook, an empty search
+  that claims there are no recipes, an import button called "More");
+  `seeded.json` lists them for the scorer. The patch is never left in the
+  working tree:
+
+  ```bash
+  bash persona-lab/config-seeded/build.sh     # apply → gradlew assembleRelease → take it back out
+  bash persona-lab/engine/run.sh persona-lab/config-seeded \
+    --seeded persona-lab/config-seeded/seeded.json
+  ```
+
+  The run installs the seeded APK over the app on the emulator; build and
+  install a normal one afterwards. When the patch stops applying, the code has
+  moved: plant the defects again and save them with `git diff`.
 - `config/calibration/real-testers.md` — the 5 external testers' feedback goes
   here; the synthesis then adds a "Kalibracja" section (what the personas caught,
   missed, recall).

@@ -1,0 +1,41 @@
+{
+  "build": "KeepTaste z łatką persona-lab/config-seeded/seeded.patch (6 zasianych defektów użyteczności)",
+  "defects": [
+    {
+      "id": "S1",
+      "screen": "nowy przepis — chwila po naciśnięciu Zapisz",
+      "defect": "po zapisaniu nowego przepisu nie pojawia się żadne potwierdzenie (usunięty komunikat „Przepis zapisany” / „Zapisano w …” z przyciskiem Pokaż)",
+      "symptom": "formularz znika bez słowa; użytkownik nie wie, czy przepis się zapisał ani gdzie trafił, szuka go albo zapisuje drugi raz"
+    },
+    {
+      "id": "S2",
+      "screen": "książka kucharska — menu z akcjami książki",
+      "defect": "akcja udostępniania książki jako PDF nazywa się samym „Eksport” zamiast „Udostępnij książkę (PDF)”",
+      "symptom": "użytkownik, który chce zrobić PDF albo książkę na prezent, nie rozpoznaje właściwej opcji, waha się lub jej nie znajduje"
+    },
+    {
+      "id": "S3",
+      "screen": "formularz przepisu — próba zapisu bez tytułu",
+      "defect": "komunikat błędu pod polem tytułu brzmi „Błąd.” zamiast „Wpisz tytuł przepisu.”",
+      "symptom": "zapis się nie udaje, a użytkownik nie wie, co poprawić"
+    },
+    {
+      "id": "S4",
+      "screen": "ekran książki kucharskiej, w której są już przepisy (także „Wszystkie przepisy”)",
+      "defect": "zniknął pływający przycisk dodawania przepisu (plus w rogu); dodać przepis da się tylko z ekranu głównego",
+      "symptom": "użytkownik będący w książce nie znajduje sposobu na dodanie kolejnego przepisu, musi się cofnąć albo rezygnuje"
+    },
+    {
+      "id": "S5",
+      "screen": "wyszukiwanie na liście przepisów — brak wyników",
+      "defect": "przy braku wyników zamiast „Nic nie znaleziono w nazwach ani składnikach” pokazuje się „Nie masz jeszcze przepisów. Dodaj pierwszy!”",
+      "symptom": "użytkownik myśli, że przepisy zniknęły albo że biblioteka jest pusta, choć tylko wyszukiwanie nic nie znalazło"
+    },
+    {
+      "id": "S6",
+      "screen": "formularz nowego przepisu — wejście do importu",
+      "defect": "przycisk importu ma napis „Więcej” zamiast „Importuj z linku, tekstu lub zdjęcia”",
+      "symptom": "użytkownik, który chce wkleić link lub tekst albo użyć zdjęcia, nie znajduje importu obiecanego w opisie sklepu i przepisuje ręcznie lub rezygnuje"
+    }
+  ]
+}

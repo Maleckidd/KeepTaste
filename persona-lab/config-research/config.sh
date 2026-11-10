@@ -60,6 +60,10 @@ scope_scrub() {
   fi
 }
 
+# Specialists explore; they have no task whose result could be checked in the
+# app afterwards, so the end state is not read and nobody judges an outcome.
+JUDGE_OUTCOME=0
+
 RUNS_PER_PERSONA=1
 MAX_STEPS=30
 EVIDENCE_SECTIONS="Obserwacje"

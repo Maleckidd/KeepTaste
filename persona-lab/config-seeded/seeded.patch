@@ -1,0 +1,85 @@
+diff --git a/app/cookbook/[id].tsx b/app/cookbook/[id].tsx
+index eb20b3c..3773076 100644
+--- a/app/cookbook/[id].tsx
++++ b/app/cookbook/[id].tsx
+@@ -496,7 +496,8 @@ export default function CookbookScreen() {
+           keyboardShouldPersistTaps="handled"
+         />
+       )}
+-      {isLoaded && recipes.length > 0 ? (
++      {/* SEEDED DEFECT S4 (persona-lab calibration): no add button inside a cookbook that has recipes. */}
++      {isLoaded && recipes.length < 0 ? (
+         <Fab
+           accessibilityLabel={t('a11y.addRecipe')}
+           onPress={handleAddRecipe}
+diff --git a/app/recipe/new.tsx b/app/recipe/new.tsx
+index 178bbb9..17046c4 100644
+--- a/app/recipe/new.tsx
++++ b/app/recipe/new.tsx
+@@ -96,7 +96,9 @@ export default function NewRecipeScreen() {
+       // screen is unmounted by the time "Show" is tapped, so navigate through
+       // the imperative router.
+       const notice = recipeSaveNotice('create', null, data.cookbookId, cookbooks ?? []);
+-      showSnackbar({
++      // SEEDED DEFECT S1 (persona-lab calibration): no confirmation after saving.
++      const seededShowConfirmation = false as boolean;
++      if (seededShowConfirmation) showSnackbar({
+         message:
+           notice?.kind === 'savedIn'
+             ? t('recipeForm.savedIn', { name: notice.cookbookName })
+diff --git a/i18n/dictionary.ts b/i18n/dictionary.ts
+index 8334d72..473710f 100644
+--- a/i18n/dictionary.ts
++++ b/i18n/dictionary.ts
+@@ -118,9 +118,10 @@ export const dictionary = {
+     en: 'Search by name or ingredient',
+     pl: 'Szukaj po nazwie lub składniku',
+   },
++  // SEEDED DEFECT S5 (persona-lab calibration): an empty search claims the library is empty.
+   'cookbook.noResults': {
+-    en: 'Nothing found in names or ingredients',
+-    pl: 'Nic nie znaleziono w nazwach ani składnikach',
++    en: 'No recipes yet. Add your first one!',
++    pl: 'Nie masz jeszcze przepisów. Dodaj pierwszy!',
+   },
+   'cookbook.inIngredients': {
+     en: 'in ingredients: {line}',
+@@ -140,9 +141,10 @@ export const dictionary = {
+     en: 'Preparing PDF…',
+     pl: 'Tworzę PDF…',
+   },
++  // SEEDED DEFECT S2 (persona-lab calibration): the PDF share action has a label that says nothing.
+   'cookbook.sharePdfTitle': {
+-    en: 'Share cookbook (PDF)',
+-    pl: 'Udostępnij książkę (PDF)',
++    en: 'Export',
++    pl: 'Eksport',
+   },
+   'cookbook.menuSharePdf': { en: 'Share as PDF', pl: 'Udostępnij jako PDF' },
+   'cookbook.minutes': { en: '{count} min', pl: '{count} min' },
+@@ -224,9 +226,10 @@ export const dictionary = {
+ 
+   // --- Recipe form (components/recipe/RecipeForm.tsx) ---
+   'recipeForm.photoTitle': { en: 'Photo', pl: 'Zdjęcie' },
++  // SEEDED DEFECT S3 (persona-lab calibration): the only validation error does not say what is wrong.
+   'recipeForm.missingTitleMessage': {
+-    en: 'Please enter a recipe title.',
+-    pl: 'Wpisz tytuł przepisu.',
++    en: 'Error.',
++    pl: 'Błąd.',
+   },
+   'recipeForm.title': { en: 'Recipe title', pl: 'Tytuł przepisu' },
+   'recipeForm.titlePlaceholder': {
+@@ -280,9 +283,10 @@ export const dictionary = {
+     en: 'e.g. Next time add more vanilla sugar...',
+     pl: 'np. Następnym razem dodać więcej cukru waniliowego...',
+   },
++  // SEEDED DEFECT S6 (persona-lab calibration): the import entry point no longer says "import".
+   'recipeForm.importAction': {
+-    en: 'Import from a link, text or photo',
+-    pl: 'Importuj z linku, tekstu lub zdjęcia',
++    en: 'More',
++    pl: 'Więcej',
+   },
+   // Post-save snackbar (SPEC.md §5.5 "Save confirmation").
+   'recipeForm.savedIn': { en: 'Saved in "{name}"', pl: 'Zapisano w „{name}”' },

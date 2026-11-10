@@ -20,7 +20,27 @@
         "style": "Spokojna, ale kiedy dwa razy coś nie działa, zaczyna wątpić w aplikację. Sprawdza wynik pobieżnie, zanim zapisze."
       },
       "start_state": "link_ok",
-      "device": { "font_scale": 1.0, "dark_mode": false }
+      "device": {
+        "font_scale": 1.0,
+        "dark_mode": false
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "babeczki są zapisane",
+          "matches": "babeczk"
+        },
+        {
+          "need": 1,
+          "label": "babeczki mają sposób przygotowania",
+          "matches": "(?m)^\\s*(PRZYGOTOWANIE|INSTRUCTIONS)\\s*$"
+        },
+        {
+          "need": 2,
+          "label": "orzo jest zapisane",
+          "matches": "orzo"
+        }
+      ]
     },
     {
       "id": "marek-kwestia-smaku",
@@ -41,7 +61,17 @@
         "style": "Rzeczowy. Gdy główna obietnica aplikacji nie działa, mówi to wprost i przestaje się starać, chyba że aplikacja jasno pokaże, co dalej."
       },
       "start_state": "link_microdata",
-      "device": { "font_scale": 1.0, "dark_mode": false }
+      "device": {
+        "font_scale": 1.0,
+        "dark_mode": false
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "sernik jest zapisany",
+          "matches": "sernik"
+        }
+      ]
     },
     {
       "id": "basia-wiadomosc-od-mamy",
@@ -63,7 +93,27 @@
         "style": "Cierpliwa, ale zniechęca ją dużo poprawiania na klawiaturze. Gdy wynik wygląda na bałagan, zastanawia się, czy nie prościej zostawić wiadomość na Messengerze."
       },
       "start_state": "paste_mom",
-      "device": { "font_scale": 1.15, "dark_mode": false }
+      "device": {
+        "font_scale": 1.15,
+        "dark_mode": false
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "piernik jest zapisany",
+          "matches": "piernik"
+        },
+        {
+          "need": 2,
+          "label": "składniki są w osobnej sekcji",
+          "matches": "(?m)^\\s*(SK.ADNIKI|INGREDIENTS)\\s*$"
+        },
+        {
+          "need": 3,
+          "label": "prywatne dopiski mamy nie zostały",
+          "lacks": "buziaki|daj zna.|nie zgub"
+        }
+      ]
     },
     {
       "id": "kuba-blog-wklejka",
@@ -85,7 +135,32 @@
         "style": "Wymagający i szczery. Gdy musi sprzątać więcej niż kilka linijek, uznaje, że aplikacja nie spełnia obietnicy, i kończy."
       },
       "start_state": "paste_blog",
-      "device": { "font_scale": 1.0, "dark_mode": true }
+      "device": {
+        "font_scale": 1.0,
+        "dark_mode": true
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "zupa z dyni jest zapisana",
+          "matches": "dyni"
+        },
+        {
+          "need": 2,
+          "label": "nie zostały reklamy, nawigacja, newsletter ani komentarze",
+          "lacks": "reklama|newsletter|zobacz te.|strona g..wna|komentarz"
+        },
+        {
+          "need": 3,
+          "label": "czasy 15 i 30 minut są na swoim miejscu",
+          "matches": "(?s)(?=.*\\b15 min)(?=.*\\b30 min)"
+        },
+        {
+          "need": 3,
+          "label": "wskazówka o mrożeniu została",
+          "matches": "mro[zż]"
+        }
+      ]
     },
     {
       "id": "tom-insta-caption",
@@ -107,7 +182,27 @@
         "style": "Quits the moment the app wastes his time, and says exactly why."
       },
       "start_state": "paste_insta",
-      "device": { "font_scale": 1.0, "dark_mode": true }
+      "device": {
+        "font_scale": 1.0,
+        "dark_mode": true
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "the noodles are saved",
+          "matches": "miso"
+        },
+        {
+          "need": 1,
+          "label": "there is a separate ingredient list",
+          "matches": "(?m)^\\s*(INGREDIENTS|SK.ADNIKI)\\s*$"
+        },
+        {
+          "need": 2,
+          "label": "no hashtags, account name or follow-me left",
+          "lacks": "#[a-z]{3,}|sophie\\.cooks|follow @|view all \\d+ comments"
+        }
+      ]
     },
     {
       "id": "irena-ksiazka-zdjecie",
@@ -128,7 +223,30 @@
         "style": "Czyta na głos wszystko, co widzi. Gdy pojawia się ekran, którego nie rozumie, cofa się albo rezygnuje, zamiast próbować na chybił trafił."
       },
       "start_state": "photo_book",
-      "device": { "font_scale": 1.3, "dark_mode": false }
+      "device": {
+        "font_scale": 1.3,
+        "dark_mode": false
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "gołąbki są zapisane",
+          "matches": "go[łl][ąa]bk"
+        },
+        {
+          "need": 2,
+          "label": "kluczowe składniki nie zginęły (kapusta, ryż, majeranek, bulion, passata, śmietana)",
+          "matches": "(?s)(?=.*kapust)(?=.*ry[żz]u)(?=.*majerank)(?=.*bulion)(?=.*passat)(?=.*mietan)"
+        },
+        {
+          "need": 2,
+          "label": "jest sześć kroków przygotowania",
+          "matches": "(?m)^\\s*6\\.\\s*$"
+        }
+      ],
+      "avoids": [
+        "long_press"
+      ]
     },
     {
       "id": "zosia-kartka-babci",
@@ -150,7 +268,27 @@
         "style": "Zależy jej, więc próbuje dłużej niż inni, ale gdy instrukcja jest niezrozumiała, mówi, w którym miejscu się pogubiła."
       },
       "start_state": "photo_card",
-      "device": { "font_scale": 1.0, "dark_mode": false }
+      "device": {
+        "font_scale": 1.0,
+        "dark_mode": false
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "szarlotka jest zapisana",
+          "matches": "szarlotk"
+        },
+        {
+          "need": 1,
+          "label": "składniki są w osobnej sekcji",
+          "matches": "(?m)^\\s*(SK.ADNIKI|INGREDIENTS)\\s*$"
+        },
+        {
+          "need": 2,
+          "label": "treść kartki się zgadza (jabłka, cynamon, żółtka, lukrowanie)",
+          "matches": "(?s)(?=.*jab.ek)(?=.*cynamon)(?=.*[żz][óo][łl]tka)(?=.*polukrowa)"
+        }
+      ]
     },
     {
       "id": "piotr-udostepnij",
@@ -171,7 +309,22 @@
         "style": "Niecierpliwy, ale życzliwy. Gdy cokolwiek wymaga dłuższego zastanowienia, odkłada to na później i zamyka aplikację."
       },
       "start_state": "share_link",
-      "device": { "font_scale": 1.0, "dark_mode": false }
+      "device": {
+        "font_scale": 1.0,
+        "dark_mode": false
+      },
+      "expect": [
+        {
+          "need": 1,
+          "label": "paluchy wiedźmy są zapisane",
+          "matches": "paluch"
+        },
+        {
+          "need": 2,
+          "label": "są składniki i przygotowanie",
+          "matches": "(?sm)(?=.*^\\s*(SK.ADNIKI|INGREDIENTS)\\s*$)(?=.*^\\s*(PRZYGOTOWANIE|INSTRUCTIONS)\\s*$)"
+        }
+      ]
     }
   ]
 }
