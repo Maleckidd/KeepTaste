@@ -325,6 +325,7 @@ const NOISE_EXACT = new Set([
   'węglowodany', 'weglowodany', 'białko', 'bialko', 'tłuszcze', 'tluszcze',
   'w tym cukry', 'w 100 g', 'w 100g', 'dowiedz się więcej', 'dowiedz sie wiecej',
   'reklama', 'advertisement', 'sponsored', 'ad', 'udostępnij', 'udostepnij', 'share', 'print',
+  'nie wygaszaj', 'nie wygaszaj ekranu',
   'print recipe', 'save', 'save recipe',
 ]);
 const NOISE_PREFIX = [
@@ -345,6 +346,42 @@ const PAGE_TAIL_HEADERS = new Set([
   'kategoria', 'kategorie', 'categories', 'przeglądaj wpisy po składnikach',
 ]);
 
+// Copy that sells: a call to action, a discount, a price. (Not a link: a blog
+// signs its own recipes with one.)
+const AD_COPY =
+  /kup teraz|zam[óo]w|sprawd[źz] ofert|promocj|rabat|taniej|gratis|buy now|shop now|order now|learn more|dowiedz si[ęe]|-\s?\d+\s?%|\d+[.,]\d{2}\s?z[łl]/i;
+// An ad is a few words, never a sentence of the recipe.
+const isSlogan = (line: string) => line.split(/\s+/).length <= 6 && !/[.?]$/.test(line);
+
+// When a post went up: "Wczoraj o 18:22", "12 maja o 9:05".
+const POST_META =
+  /^(wczoraj|dzisiaj|today|yesterday)\b.{0,6}\d{1,2}:\d{2}.{0,6}$|^\d{1,2}\s+\p{L}{3,12}(\s+\d{4})?\s+(o|at)\s+\d{1,2}:\d{2}.{0,6}$/iu;
+
+// What a social or chat app draws around the text in a screenshot (or leaves in
+// a copied post): like and comment counters, "2 dni temu", reply/like buttons,
+// the composer placeholder, presence, view counts. Matched on the lowercased
+// line, each pattern covering the whole line or its unmistakable start.
+const APP_CHROME: RegExp[] = [
+  /^liczba polubie[ńn](?![\p{L}])|^polubienia:|^liked by\b|^\d[\d\s.,]*\s*(polubie\p{L}*|likes?)$/u,
+  /^(zobacz|wy[śs]wietl) (wszystkie )?komentarz|^view all( \d+)? comments?/u,
+  /^(\d+\s+\p{L}+\.?\s+temu|\d+\s+(minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\b.{0,30}$/u,
+  /^zobacz t[łt]+umaczenie|^see translation|^zobacz wi[ęe]cej$|^see more$/u,
+  /lubi[ęe] to!?.*\b(komentarz|odpowiedz|udost[ęe]pnij)|^(like|reply|comment|share)(\s+(like|reply|comment|share))+\b/u,
+  /^\d+\s+\p{L}{1,5}\.\s+lubi[ęe] to|^\d+\s*[a-z]{1,3}\s+like\s+reply/u,
+  /^\d+\s+komentarz\p{L}*$|\d+\s+komentarz\p{L}*\s*[·•]?\s*\d+\s+udost[ęe]pnie|^\d+\s+comments?$|\d+\s+comments?\s*[·•]?\s*\d+\s+shares?/u,
+  /^(lubi[ęe] to|skomentuj|wy[śs]lij|odpowiedz|like|comment|send|reply)$/u,
+  /^(przekazan[ao]|forwarded)$|^(\p{L}+,\s*){2,}(ty|you)$/u,
+  /^@[a-z0-9_.]+([\s.]+[a-z0-9_.]+){0,4}$/u,
+  /^(napisz|dodaj) komentarz|^(write|add) a comment/u,
+  /^aktywn\p{L}*\s*\(?a?\)?\s.*(temu|teraz)$|^active (now|\d+.*ago)$|^(online|dost[ęe]pn[ya]|pisze\.\.\.|typing\.\.\.)$|^(widzian[yao]|last seen)\b/u,
+  /^(wiadomo[śs][ćc]|message|aa)$/u,
+  /^(pon|wt|[śs]r|czw|pt|sob|niedz)\.$|^(pon|wt|[śs]r|czw|pt|sob|niedz|mon|tue|wed|thu|fri|sat|sun)\p{L}*\.?,?\s+\d{1,2}:\d{2}$|^(dzisiaj|wczoraj|today|yesterday)(,?\s+\d{1,2}:\d{2})?$/u,
+  /^(edytowano|edited)\b.{0,24}$/u,
+  POST_META,
+  /^[\d.,]+\s*(tys\.|mln|k|m)?\s*(wy[śs]wietle[ńn]|views)(?![\p{L}])|^(subskrybuj|subscribe)\b/u,
+  /oryginalny d[źz]wi[ęe]k|original (sound|audio)/u,
+];
+
 function isPageTail(line: string): boolean {
   const n = line.toLowerCase().replace(/[:!]+$/, '').replace(/\s*\(\d+\)$/, '').trim();
   return PAGE_TAIL_HEADERS.has(n) || /^(view all )?\d+ (comments?|komentarz\p{L}*)$/u.test(n);
@@ -354,15 +391,24 @@ function isPageTail(line: string): boolean {
 const NUTRIENT_VALUE =
   /^(białko|bialko|tłuszcze?|tluszcze?|węglowodany|weglowodany|błonnik|blonnik|cukry|kalorie|protein|fat|carbs|carbohydrates?|fib(er|re)|calories)\s*:?\s*\d+([.,]\d+)?\s*(g|mg|kcal)?$/i;
 
+/** A line of site or app chrome the paste parser drops (see `isNoise`). */
+export function isRecipeNoise(line: string): boolean {
+  return isNoise(line.trim());
+}
+
 function isNoise(line: string): boolean {
-  const n = line.toLowerCase().replace(/[:!]+$/, '').trim();
+  // A back chevron in front of a screen title ("< Komentarze") is not text.
+  const n = line.toLowerCase().replace(/^[<‹←]\s*/, '').replace(/[:!]+$/, '').trim();
   if (NOISE_EXACT.has(n)) return true;
   if (NOISE_PREFIX.some((p) => n.startsWith(p))) return true;
   if (isPageTail(line)) return true;
-  if (/^(#\S+\s*)+$/.test(n)) return true; // hashtags; "# Ciasto" is a group heading
+  if (APP_CHROME.some((re) => re.test(n))) return true;
+  // Hashtags, also behind a caption's "mniej"/"more" toggle; "# Ciasto" is a group heading.
+  if (/^(#\S+\s*)+(mniej|wi[ęe]cej|more|less)?$/.test(n)) return true;
   if (/\b(follow|obserwuj)\s+@\S|^save this\b|\blink (in|w) bio\b/.test(n)) return true;
-  if (/^[0-9]+([.,][0-9]+)?\s*kcal$/.test(n)) return true; // "186 kcal"
-  if (/^[0-9]+([.,][0-9]+)?\s*\/\s*[0-9]+/.test(n)) return true; // rating "4.8 / 5 (…)"
+  if (/^(\S\s)?[0-9]+([.,][0-9]+)?\s*kcal$/.test(n)) return true; // "186 kcal", its icon read as a stray character
+  // A rating: "4.8 / 5 (…)". Not "1/2 szklanki mleka" — text follows the fraction.
+  if (/^[0-9]+([.,][0-9]+)?\s*\/\s*[0-9]+([.,][0-9]+)?(\s*\(.*\)|\s+(ocen|g[łl]os|gwiazd|votes?|reviews?|ratings?|stars?)\p{L}*.*)?$/u.test(n)) return true;
   if (/\s[>›»]$/.test(n)) return true; // a button/link label: "EMAIL >", "STERUJ GŁOSEM ›"
   // A chrome label with its icon OCR'd as a stray letter: "DODAJ NOTATKĘ E".
   const iconless = /^(.*\S)\s\S$/.exec(n);
@@ -406,7 +452,9 @@ function extractMinutes(s: string): number | null {
 // "Składniki", also OCR-mangled ("Sktadniki": ł read as t) and carrying the
 // yield ("SKŁADNIKI / 4 PORCJE", "Składniki (4 porcje)").
 const PASTE_INGREDIENT_MAIN =
-  /^(?:sk[łlt]adniki|ingredients|(?:what )?you(?:['’]ll| will)? need|potrzebujesz|b[ęe]dziesz potrzebowa[ćc]|potrzebne sk[łl]adniki)(?:\s*[/(–\-:|·]\s*(\d+)\s*(?:porcj\p{L}*|os\p{L}*|sztuk\p{L}*|servings?|portions?)\)?)?$/u;
+  /^(?:sk[łlt]adniki|ingredients|(?:what )?you(?:['’]ll| will)? need|(?:co |czego )?potrzebujesz|potrzebujemy|potrzebne b[ęe]d[ąa]|b[ęe]dziesz potrzebowa[ćc]|potrzebne sk[łl]adniki)(?:\s*[/(–\-:|·]\s*(\d+)\s*(?:porcj\p{L}*|os\p{L}*|sztuk\p{L}*|servings?|portions?)\)?)?$/u;
+const PASTE_INGREDIENT_LEAD =
+  /^na\s+(\d+)\s+(?:porcj\p{L}*|os[oó]b\p{L}*|sztuk\p{L}*)\s+(?:potrzebujesz|potrzebujemy|potrzebne(?:\s+b[ęe]d[ąa])?|b[ęe]dziesz potrzebowa[ćc])$/u;
 const PASTE_STEP_HEADERS = new Set([
   'przygotowanie', 'sposób przygotowania', 'sposob przygotowania', 'sposób wykonania',
   'sposob wykonania', 'wykonanie', 'sposób przyrządzania', 'instrukcje', 'kroki',
@@ -432,6 +480,9 @@ function classifyPasteHeader(line: string): PasteHeader | null {
   if (lower.startsWith('przepis') && / na$/.test(lower)) return { kind: 'instructions-title' };
   const main = PASTE_INGREDIENT_MAIN.exec(lower);
   if (main) return { kind: 'ingredients-main', servings: main[1] ? parsePositiveInt(main[1]) : null };
+  // A caption's lead-in with the yield in front: "Na 2 porcje potrzebujesz:".
+  const lead = PASTE_INGREDIENT_LEAD.exec(lower);
+  if (lead) return { kind: 'ingredients-main', servings: parsePositiveInt(lead[1]) };
   // No colon in the label: "Składniki na ciasto: 200 g mąki" is an inline
   // header (splitInlineHeader), not a group named "ciasto: 200 g mąki".
   const grp = /^sk[łlt]adniki na ([^:]+)$/.exec(lower);
@@ -521,12 +572,24 @@ const TITLE_CHROME = new Set([
   'sniadania', 'kolacje', 'przystawki', 'sałatki', 'salatki', 'napoje', 'dania główne',
   'dania glowne', 'dania mięsne', 'dania miesne', 'breakfast', 'lunch', 'dinner', 'desserts',
   'soups', 'salads', 'drinks', 'starters', 'main courses',
+  'facebook', 'instagram', 'messenger', 'whatsapp', 'tiktok', 'youtube', 'pinterest',
+  'notatki', 'notes', 'gotowe', 'done',
 ]);
 
+// "Halina Kowalczyk · 3 godz." — a post's author line; OCR loses the dot.
+const AUTHOR_LINE = /^\S+(\s+\S+)+\s+\d+\s*(godz\.?|tyg\.?|dni|mies\.?)$/i;
+// The line under a contact's name in a chat header.
+// Under a group chat's name: its members. Under a sender's name: "Przekazana".
+const CHAT_SUBTITLE = /^((\p{L}+,\s*){2,}(ty|you)|przekazan[ao]|forwarded)$/iu;
+const CHAT_MARK = /^(aa|wiadomo[śs][ćc]|message)$/i;
+const PRESENCE_LINE = /^(online|dost[ęe]pn[ya]|aktywn\p{L}*\s*\(?a?\)?\s.*(temu|teraz)|active (now|\d+.*ago)|(widzian[yao]|last seen)\b.*)$/iu;
+
 function isTitleChrome(line: string): boolean {
-  if (TITLE_CHROME.has(line.toLowerCase())) return true;
+  // A back chevron in front of a screen title: "< Notatki".
+  if (TITLE_CHROME.has(line.toLowerCase().replace(/^[<‹←]\s*/, ''))) return true;
   if (/[·•]\s*\d+\s*(s|m|min|h|d|w|g|godz\.?|dni|tyg\.?)$/i.test(line)) return true; // "name · 2d"
-  if (/^@?[\w.]*[._][\w.]*$/.test(line) || /^@\S+$/.test(line)) return true; // an account name
+  if (/^@?[\w.]*[._][\w.]*$/.test(line) || /^@[\w.]+(\s+[\d\-./]+)?$/.test(line)) return true; // an account name
+  if (AUTHOR_LINE.test(line)) return true;
   return /^[^›»>]+(\s[›»>]\s[^›»>]+)+$/.test(line); // "Home > Recipes > Dinner"
 }
 
@@ -540,8 +603,9 @@ function isSentence(line: string): boolean {
   );
 }
 
+// A leading number is data ("200 g mąki") unless it is a compound ("3-składnikowe ciastka").
 const isTitleData = (line: string) =>
-  new RegExp(`^[${FRACTION}]`).test(line) ||
+  (new RegExp(`^[${FRACTION}]`).test(line) && !/^\d+-\p{L}/u.test(line)) ||
   isPureQuantity(line) ||
   /czas\s+\w+|liczba\s+porcji|^porcje\b|kcal/i.test(line);
 
@@ -551,7 +615,12 @@ const isSectionStart = (line: string) =>
 // A short capitals line over an ordinary one is a book's chapter name.
 function isRunningHead(line: string, next: string | undefined): boolean {
   if (line !== line.toUpperCase() || line === line.toLowerCase()) return false;
-  if (next === undefined || line.split(/\s+/).length > 4) return false;
+  // Up to four words — or six when it was letter-spaced and OCR broke it into
+  // fragments ("ZUP Y I DA NIA …": two-letter pieces side by side). A capitals
+  // title of five words ("PLACKI Z JABŁKAMI I CYNAMONEM") is a title.
+  const words = line.split(/\s+/);
+  const fragmented = words.some((w, i) => i > 0 && w.length <= 2 && words[i - 1].length <= 2);
+  if (next === undefined || words.length > (fragmented ? 6 : 4)) return false;
   if (isSectionStart(next) || isTitleData(next) || isSentence(next)) return false;
   return /^\p{Lu}/u.test(next) && next !== next.toUpperCase();
 }
@@ -590,6 +659,68 @@ function tryMergeQuantity(parts: string[], line: string): boolean {
   return true;
 }
 
+// Splits at commas that separate list items: not inside brackets, not a
+// decimal comma ("1,5 l").
+function splitCommaList(line: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '(') depth++;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0 && line[i + 1] === ' ') {
+      items.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  items.push(current.trim());
+  return items.filter(Boolean);
+}
+
+// "Czas przygotowania: 30 min | Czas pieczenia: 50 min | Porcje: 12" — one
+// label per line, so each is read (the metadata pass takes one per line).
+function splitLabelRow(line: string): string[] {
+  const parts = line.split(/\s+[|·•]\s+/);
+  return parts.length > 1 && parts.every((p) => /^[\p{L} ]{2,30}:\s*\S/u.test(p.trim()))
+    ? parts
+    : [line];
+}
+
+// A line that opens with an amount: "250 g mąki", "2 jajka", "½ banana",
+// "1-2 łyżki". Not a step ("1. Wymieszaj") or a video chapter ("0:45 …").
+const QUANTITY_LINE = new RegExp(
+  `^[${FRACTION}]+(?:[.,/][0-9]+)?(?:\\s*[-–]\\s*[0-9]+)?\\s*\\p{L}`,
+  'u'
+);
+
+/**
+ * The ingredient list of a text without any header — a chat message, a note:
+ * the first stretch of short lines in which at least three open with an
+ * amount. Amount-less items inside it ("sól", "szczypta cukru") belong, and so
+ * do up to three right after it; a sentence ends it. Returns the half-open
+ * line range, or null when there is no such stretch.
+ */
+function findIngredientRun(lines: string[]): { start: number; end: number } | null {
+  const words = (l: string) => l.split(/\s+/).length;
+  const isItem = (l: string) => l.length <= 60 && !(/[.!?]$/.test(l) && words(l) >= 5);
+  const isAmount = (l: string) => isItem(l) && QUANTITY_LINE.test(l);
+  const isPlain = (l: string) => l.length <= 40 && !/[.!?:]$/.test(l) && words(l) <= 5;
+  const start = lines.findIndex(isAmount);
+  if (start < 0) return null;
+  let amounts = 0;
+  let lastAmount = start;
+  let end = start;
+  while (end < lines.length && (isAmount(lines[end]) || isPlain(lines[end]))) {
+    if (isAmount(lines[end])) { amounts++; lastAmount = end; }
+    end++;
+  }
+  if (amounts < 3) return null;
+  return { start, end: Math.min(end, lastAmount + 4) };
+}
+
 /**
  * Best-effort heuristic split of pasted recipe text into title / times /
  * servings / ingredients / instructions / notes (SPEC §5.15). Deterministic,
@@ -603,8 +734,57 @@ function tryMergeQuantity(parts: string[], line: string): boolean {
  * the title (extractTitleServings).
  */
 export function parsePastedRecipe(text: string): ParsedPastedRecipe {
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(/\r?\n/).flatMap(splitLabelRow);
   const consumed = new Array(lines.length).fill(false);
+
+  // A post's caption opens with its author's account name, which the post
+  // header shows on a line of its own above ("kasia.gotuje" … "kasia.gotuje
+  // Placki bananowe"). Everything above the caption is app chrome. A name of
+  // plain letters must be followed by something other than a lowercase word,
+  // so a one-word title repeated in a sentence is left alone.
+  let captionLine = -1;
+  // OCR breaks a name at its underscores and dots ("domowa spizarnia" /
+  // "domowa _spizarnia Ciasto…"), so names are compared without them.
+  const handleKey = (h: string) => h.toLowerCase().replace(/[\s_.@]/g, '');
+  for (let i = 0; i < Math.min(lines.length, 6) && captionLine < 0; i++) {
+    const name = lines[i].trim();
+    if (!/^@?[a-z0-9._]+(\s[a-z0-9._]+){0,2}$/.test(name) || handleKey(name).length < 3) continue;
+    const plain = /^[a-z ]+$/.test(name);
+    for (let j = i + 1; j < Math.min(lines.length, i + 9) && captionLine < 0; j++) {
+      const tokens = lines[j].trim().split(/\s+/);
+      for (let n = 1; n < Math.min(tokens.length, 5); n++) {
+        if (handleKey(tokens.slice(0, n).join('')) !== handleKey(name)) continue;
+        const rest = tokens.slice(n).join(' ');
+        if (plain && /^\p{Ll}/u.test(rest)) continue;
+        // Only in a post: the name carries its dot/underscore/@ somewhere, or
+        // app chrome sits above the caption — and never across a recipe's own
+        // header or amount lines ("pizza" … "pizza Margherita to klasyk").
+        const above = lines.slice(0, j).map((l) => l.trim()).filter(Boolean);
+        const isPost =
+          /[._@]/.test(name) || /[._@]/.test(tokens.slice(0, n).join(' ')) ||
+          above.some((l) => APP_CHROME.some((re) => re.test(l.toLowerCase())));
+        if (!isPost || above.some((l) => isSectionStart(l) || QUANTITY_LINE.test(l))) continue;
+        for (let k = 0; k < j; k++) consumed[k] = true;
+        lines[j] = rest;
+        captionLine = j;
+        break;
+      }
+    }
+  }
+  // A screenshot cropped to the caption has no header line above it.
+  if (captionLine < 0) {
+    const first = lines.findIndex((l) => l.trim());
+    const handle = first < 0 ? null : /^@?[a-z0-9]+[._][a-z0-9._]*\s+(?=\p{Lu})/u.exec(lines[first].trim());
+    if (handle) {
+      lines[first] = lines[first].trim().slice(handle[0].length);
+      captionLine = first;
+    }
+  }
+  // A chat screenshot: the dish is named in the message, not at the top.
+  const chatLike = lines.some((l) => {
+    const t = l.trim();
+    return PRESENCE_LINE.test(t) || CHAT_SUBTITLE.test(t) || CHAT_MARK.test(t);
+  });
 
   // --- metadata pass: prep/cook/servings from labeled lines (removed from body) ---
   let prepTime: number | null = null;
@@ -619,7 +799,8 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
         // an inline header, not prep = 1. "Prep: 5." still reads as a time, and
         // "Prep: 1.5 h" is still recognized as a label (the decimal itself is
         // not parsed — extractMinutes handles integers only).
-        /^\s*(prep|preparation)(\s*time)?\s*[:\-–]?\s*\d(?!\d*[.)]\s+\S)/.test(lower) ||
+        // `t\p{L}{2,5}` — "time", also as OCR spells it ("timne").
+      /^\s*(prep|preparation)(\s*t\p{L}{2,5})?\s*[:\-–]?\s*\d(?!\d*[.)]\s+\S)/u.test(lower) ||
         // PL "Przygotowanie: 15 min" only when the whole line is a duration;
         // "Przygotowanie: Gotuj 15 min." is an inline method header.
         /^\s*przygotowanie\s*[:\-–]\s*(\d+\s*(godz\p{L}*|h|min\p{L}*)\.?\s*)+$/u.test(lower))
@@ -645,6 +826,9 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       }
       const dla = /^dla\s+(\d+)\s+os/.exec(lower);
       if (dla) { servings = parsePositiveInt(dla[1]); consumed[i] = true; continue; }
+      // The yield closing a book's subtitle: "Sycąca zupa na chłodne dni. Dla 6 osób."
+      const tail = /[.!]\s+dla\s+(\d+)\s+os[oó]b\p{L}*\.?$/u.exec(lower);
+      if (tail) servings = parsePositiveInt(tail[1]);
     }
     // Drop any leftover "Czas ... <number>" label line (e.g. a third time we
     // don't map), so it can't leak into the body or be mistaken for a title.
@@ -666,9 +850,20 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
   // --- title detection ---
   let title: string | undefined;
   const takeTitle = (index: number): boolean => {
-    const { title: candidate, rest } = splitTitleLine(lines[index].trim());
-    if (!candidate || isSentence(candidate)) return false;
-    title = candidate;
+    const split = splitTitleLine(lines[index].trim());
+    // Chat markup for bold/italic: "*Sos czosnkowy*".
+    const candidate = split.title.replace(/^[*_]+|[*_]+$/g, '').trim();
+    const rest = split.rest;
+    // A caption's opening line names the dish even with a "!" on it.
+    const judged = index === captionLine ? candidate.replace(/!+$/, '') : candidate;
+    if (!candidate || isSentence(judged)) return false;
+    // An emoji in a caption's opening line reads as a stray letter ("placki
+    // bananowe e bez cukru"); the one-letter words of PL/EN are kept.
+    // Elsewhere only a symbol no alphabet in use here has ("BIGOS Ə przepis").
+    title = (index === captionLine
+      ? candidate.replace(/\s[b-hj-np-tvxyB-HJ-NP-TVXY](?=\s)/g, '')
+      : candidate
+    ).replace(/\s[^\sA-Za-z0-9ĄĆĘŁŃÓŚŹŻąćęłńóśźż&+\-–—/(]{1}(?=\s)/g, '');
     if (rest) lines[index] = rest;
     else consumed[index] = true;
     return true;
@@ -695,8 +890,19 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     for (let k = nextContent(0); k >= 0; k = nextContent(k + 1)) {
       const t = lines[k].trim();
       if (isSectionStart(t) || isTitleData(t)) break;
+      // A contact's name sits over their presence line, a group's over the
+      // post's author line — neither is a dish.
+      const below = lines.slice(k + 1).find((l) => l.trim())?.trim();
+      const isHeaderName =
+        below !== undefined &&
+        (PRESENCE_LINE.test(below) || AUTHOR_LINE.test(below) || POST_META.test(below) ||
+          CHAT_SUBTITLE.test(below));
       const nextIdx = nextContent(k + 1);
-      if (isTitleChrome(t) || isRunningHead(t, nextIdx >= 0 ? lines[nextIdx].trim() : undefined)) {
+      if (
+        isHeaderName ||
+        isTitleChrome(t) ||
+        (k !== captionLine && isRunningHead(t, nextIdx >= 0 ? lines[nextIdx].trim() : undefined))
+      ) {
         consumed[k] = true;
         continue;
       }
@@ -710,6 +916,8 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
   const instructionLines: string[] = [];
   const noteLines: string[] = [];
   const preamble: string[] = [];
+  let afterInlineList = false;
+  let inlineList: string | null = null;
   let current: 'ingredients' | 'instructions' | 'notes' | null = null;
   let firstBoundary: 'ingredients' | 'instructions' | null = null;
 
@@ -723,6 +931,24 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       continue;
     }
     if (isPageTail(line) && instructionLines.some((l) => l.trim())) break;
+    // An ad: its label, and the copy under it when it visibly sells (a price,
+    // a discount, "Kup teraz") — up to three short lines, never past a header,
+    // an amount line, a step or a sentence. Without such a mark only the label
+    // goes: blogs put "Reklama" in the middle of the method.
+    if (/^(reklama|advertisement|sponsored|sponsorowane)$/i.test(line)) {
+      let lastCopy = -1;
+      let seen = 0;
+      for (let k = i + 1; k < lines.length && seen < 3; k++) {
+        const t = lines[k].trim();
+        if (consumed[k] || !t || isNoise(t)) continue;
+        if (isSectionStart(t) || QUANTITY_LINE.test(t) || /^(\d+[.)]\s|[-*•]\s|krok\s+\d|step\s+\d)/i.test(t)) break;
+        if (!isSlogan(t)) break;
+        seen++;
+        if (AD_COPY.test(t)) lastCopy = k;
+      }
+      for (let k = i + 1; k <= lastCopy; k++) consumed[k] = true;
+      continue;
+    }
     if (isNoise(line)) continue;
     if (current !== 'ingredients' && NUTRIENT_VALUE.test(line)) continue;
     // A line repeating the title (a duplicated page heading) is chrome — drop it.
@@ -738,7 +964,19 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     }
     if (header) {
       if (header.kind === 'ingredients-main' || header.kind === 'ingredients-group') {
-        if (firstBoundary === null) { firstBoundary = 'ingredients'; preamble.length = 0; }
+        if (firstBoundary === null) {
+          // In a chat the line right above the list names the dish ("Brownie z
+          // fasoli" / "Składniki: …"); the first line of the screen is small talk.
+          const above = preamble[preamble.length - 1];
+          if (
+            chatLike && above !== undefined && above.split(/\s+/).length <= 6 &&
+            !/[.!?:]$/.test(above) && !isTitleData(above)
+          ) {
+            title = above.replace(/^[*_]+|[*_]+$/g, '').trim() || title;
+          }
+          firstBoundary = 'ingredients';
+          preamble.length = 0;
+        }
         current = 'ingredients';
         if (header.kind === 'ingredients-group') {
           ingredientParts.push(`# ${capitalize(header.label)}`);
@@ -748,13 +986,17 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
           // Peek for a standalone yield line right after "Składniki" (e.g. "2 sztuki").
           const y = nextContent(i + 1);
           if (servings === null && y >= 0) {
-            const ym = /^(\d+)(?:\s*[-–]\s*\d+)?\s*(porcj\p{L}*|sztuk\p{L}*|os\p{L}*)$/u.exec(
+            // `[|/]` — the divider of "SKŁADNIKI / 4 PORCJE" read as its own line.
+            const ym = /^[|/]?\s*(\d+)(?:\s*[-–]\s*\d+)?\s*(porcj\p{L}*|sztuk\p{L}*|os\p{L}*)$/u.exec(
               lines[y].trim().toLowerCase()
             );
             if (ym) { servings = parsePositiveInt(ym[1]); consumed[y] = true; }
           }
         }
         if (inlineRest !== null) ingredientParts.push(inlineRest);
+        if (inlineRest !== null && header.kind === 'ingredients-main') inlineList = inlineRest;
+        // "Składniki: a, b, c" is the whole list — a sentence after it is the method.
+        afterInlineList = inlineRest !== null && inlineRest.split(', ').length >= 3;
         continue;
       }
       if (header.kind === 'instructions' || header.kind === 'instructions-title') {
@@ -801,6 +1043,15 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       continue;
     }
 
+    if (afterInlineList && current === 'ingredients') {
+      afterInlineList = false;
+      if (!QUANTITY_LINE.test(line) && !/^[-*•#]/.test(line) && /[.!?]$/.test(line) && line.split(/\s+/).length >= 4) {
+        current = 'instructions';
+        instructionLines.push(line);
+        continue;
+      }
+    }
+
     // Long paragraph inside ingredients → method has started (no header given).
     // No real ingredient line exceeds 80 chars without a leading quantity, so
     // this reliably catches prose even as the first line after a header.
@@ -814,6 +1065,11 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
       continue;
     }
 
+    // A card's footer or a post's source link is not a step.
+    if (current === 'instructions' && /^(www\.|https?:\/\/)\S+(\s.{0,40})?$/i.test(line)) {
+      noteLines.push(line);
+      continue;
+    }
     if (current === null) { preamble.push(line); continue; }
     if (current === 'ingredients') {
       if (!tryMergeQuantity(ingredientParts, line)) ingredientParts.push(line);
@@ -829,9 +1085,52 @@ export function parsePastedRecipe(text: string): ParsedPastedRecipe {
     instructionLines.pop();
   }
 
-  // No structure found at all → body is the instructions (fallback dump).
+  // No header and no numbered step. A run of amount lines is still an
+  // ingredient list (a chat message, a note): what follows is the method, what
+  // precedes is context for the notes — its last short line the dish's name,
+  // when no title was found. Otherwise the body is the instructions (fallback
+  // dump).
   if (firstBoundary === null && preamble.length) {
-    instructionLines.push(...preamble);
+    const run = findIngredientRun(preamble);
+    if (run) {
+      const before = preamble.slice(0, run.start);
+      const last = before[before.length - 1];
+      if (
+        title === undefined && last !== undefined && last.split(/\s+/).length <= 6 &&
+        !/[.!?:]$/.test(last) && !isTitleData(last)
+      ) {
+        title = last.replace(/^[*_]+|[*_]+$/g, '').trim() || undefined;
+        before.pop();
+      }
+      noteLines.unshift(...before);
+      ingredientParts.push(...preamble.slice(run.start, run.end));
+      instructionLines.push(...preamble.slice(run.end));
+    } else {
+      instructionLines.push(...preamble);
+    }
+  }
+
+  // "Ciasto:" / "Farsz:" over their own items are group labels, not items.
+  const isListItem = (l: string | undefined) =>
+    l !== undefined && (QUANTITY_LINE.test(l) || /^[-*•]\s/.test(l));
+  for (let k = 0; k < ingredientParts.length; k++) {
+    const label = /^(\p{L}[\p{L} ]{1,24})\.?:$/u.exec(ingredientParts[k].trim());
+    const next = ingredientParts.slice(k + 1).find((l) => l.trim());
+    const isRemark = label !== null && /^(uwag[ai]|note|notes|tips?|porad[ay]|wskaz[óo]wk[ai]|ps|np|[źz]r[óo]d[łl]o|source|autor|author)$/i.test(label[1].trim());
+    if (label && !isRemark && isListItem(next?.trim())) ingredientParts[k] = `# ${capitalize(label[1])}`;
+  }
+
+  // A list given whole after its header ("Potrzebujesz: 2 tortille, 150 g
+  // wołowiny, 1/2 cebuli") reads — and shops — better one item per line. Not
+  // one ingredient with its description ("1 kg ziemniaków, obranych,
+  // pokrojonych w kostkę"): a part opening with a participle or adjective form.
+  const at = inlineList === null ? -1 : ingredientParts.indexOf(inlineList);
+  if (at >= 0) {
+    const items = splitCommaList(inlineList!);
+    const describes = (item: string) => /(ych|ich|ego|anej|onej|tej|wej|żej)$/u.test(item.split(/\s+/)[0]);
+    if (items.length >= 3 && items.every((item) => item.length <= 40) && !items.slice(1).some(describes)) {
+      ingredientParts.splice(at, 1, ...items);
+    }
   }
 
   // Servings in the title ("Shakshuka (serves 2)"): the bracket is removed

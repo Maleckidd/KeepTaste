@@ -630,7 +630,8 @@ describe('parsePastedRecipe', () => {
     const rest = 'flour, sugar, butter, eggs, milk, vanilla, baking powder, salt, lemon zest, cream';
     expect(rest.length).toBeGreaterThan(80);
     const r = parsePastedRecipe(`Ingredients: ${rest}`);
-    expect(r.ingredients).toBe(rest);
+    // …and, being one comma-separated line, is split into one item per line.
+    expect(r.ingredients).toBe(rest.split(', ').join('\n'));
     expect(r.instructions).toBe('');
   });
 
@@ -1261,5 +1262,315 @@ describe('parseRecipeHtml', () => {
 
   it('nothing structured -> null', () => {
     expect(parseRecipeHtml('<html><body><h1>Przepis</h1></body></html>')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rules found on real phone screenshots and copied posts (SPEC.md §5.15):
+// app chrome, captions, chats and notes without headers.
+// ---------------------------------------------------------------------------
+describe('parsePastedRecipe — posts, captions, chats and notes', () => {
+  const parse = (...lines: string[]) => parsePastedRecipe(lines.join('\n'));
+
+  it('keeps an ingredient that opens with a fraction; a rating is still noise', () => {
+    const r = parse('Pancakes', '4.8 / 5 (126 ocen)', '4,5/5', 'Ingredients', '1/2 cup sugar', '1 / 2 szklanki mleka', '1 egg');
+    expect(r.ingredients).toBe('1/2 cup sugar\n1 / 2 szklanki mleka\n1 egg');
+  });
+
+  it('drops what a social app draws around a post', () => {
+    const r = parse(
+      'Zupa ogórkowa',
+      'Składniki:',
+      '1 l bulionu',
+      'Wykonanie:',
+      'Ugotuj wszystko razem.',
+      'Liczba polubień: 1 234',
+      '3 482 polubienia',
+      'Zobacz wszystkie komentarze: 56',
+      'Wyświetl wszystkie komentarze (128)',
+      '2 dni temu Zobacz tłumaczenie',
+      '5 godzin temu',
+      '2 tyg. Lubię to! Odpowiedz 14',
+      '37 komentarzy 12 udostępnień',
+      'Lubię to! Komentarz',
+      'Skomentuj',
+      'Napisz komentarz...',
+      '184 tys. wyświetleń 3 mies. temu #zupa',
+      'Subskrybuj kanał, żeby nie przegapić nowych przepisów!',
+      '#zupa #obiad mniej',
+      'oryginalny dźwięk - smaczna.chwila',
+      'Edytowano 12 wrz'
+    );
+    expect(r.instructions).toBe('Ugotuj wszystko razem.');
+  });
+
+  it('keeps recipe lines that only resemble chrome', () => {
+    const r = parse('Tosty', 'Składniki', '2 kromki chleba', 'Notes', 'Like a French toast, but savoury.');
+    expect(r.notes).toBe('Like a French toast, but savoury.');
+  });
+
+  it('takes a caption\'s title from the line that opens with the account name', () => {
+    const r = parse(
+      'kasia.gotuje',
+      'Warszawa',
+      'Liczba polubień: 1 234',
+      'kasia.gotuje Najprostsze placki bananowe e bez cukru!',
+      'Składniki:',
+      '2 banany',
+      'Przygotowanie:',
+      'Usmaż.'
+    );
+    expect(r.title).toBe('Najprostsze placki bananowe bez cukru!');
+    expect(r.ingredients).toBe('2 banany');
+  });
+
+  it('matches an account name OCR broke at its underscore', () => {
+    const r = parse('domowa spizarnia', 'domowa _spizarnia Ciasto marchewkowe z kremem', 'Składniki:', '300 g marchewki');
+    expect(r.title).toBe('Ciasto marchewkowe z kremem');
+  });
+
+  it('strips an account name from a caption cropped to its text', () => {
+    expect(parse('kasia.gotuje Placki bananowe', 'Składniki:', '2 banany').title).toBe('Placki bananowe');
+  });
+
+  it('does not take a repeated one-word title for an account name', () => {
+    const r = parse('sernik', 'sernik pieczemy 50 minut w 170 stopniach', 'Składniki', '1 kg twarogu');
+    expect(r.title).toBe('sernik');
+  });
+
+  it('reads a caption\'s lead-in with the yield as the ingredients header', () => {
+    const r = parse('MAKARON', 'Na 2 porcje potrzebujesz:', '200 g makaronu', '2 ząbki czosnku', 'Przygotowanie:', 'Ugotuj.');
+    expect(r.servings).toBe(2);
+    expect(r.ingredients).toBe('200 g makaronu\n2 ząbki czosnku');
+  });
+
+  it('reads every label of a "|" row', () => {
+    const r = parse('Szarlotka', 'Czas przygotowania: 30 min | Czas pieczenia: 50 min | Porcje: 12', 'Składniki', '300 g mąki');
+    expect([r.prepTime, r.cookTime, r.servings]).toEqual([30, 50, 12]);
+  });
+
+  it('reads the yield that closes a subtitle and skips a letter-spaced running head', () => {
+    const r = parse('ZUP Y I DA NIA JEDNOGARNKOWE', 'Krupnik na żeberkach', 'Sycąca zupa na chłodne dni. Dla 6 osób.', 'SKŁADNIKI', '500 g żeberek');
+    expect(r.title).toBe('Krupnik na żeberkach');
+    expect(r.servings).toBe(6);
+  });
+
+  it('skips the page name over a post\'s date and the group over its author', () => {
+    expect(
+      parse('Kuchnia pani Krysi', 'Wczoraj o 18:22', 'BIGOS STAROPOLSKI', 'SKŁADNIKI:', '1 kg kapusty', 'SPOSÓB PRZYGOTOWANIA:', 'Duś.').title
+    ).toBe('BIGOS STAROPOLSKI');
+    expect(
+      parse('facebook', 'Domowe przepisy naszych babć', 'Halina Kowalczyk 3 godz.', 'Zupa ogórkowa', 'Składniki:', '1 l bulionu').title
+    ).toBe('Zupa ogórkowa');
+  });
+
+  describe('a text without any header', () => {
+    it('finds the ingredient list by its amounts: a chat', () => {
+      const r = parse(
+        'Mama',
+        'Aktywny(a) 5 min temu',
+        'Mamo, podasz przepis na te kopytka?',
+        'Kopytka',
+        '1 kg ziemniaków',
+        '300 g mąki pszennej',
+        '1 jajko',
+        'łyżeczka soli',
+        'Ziemniaki ugotuj dzień wcześniej i przeciśnij przez praskę. Dodaj mąkę, jajko i sól.',
+        'Nie dawaj za dużo mąki',
+        'Aa'
+      );
+      expect(r.title).toBe('Kopytka');
+      expect(r.ingredients).toBe('1 kg ziemniaków\n300 g mąki pszennej\n1 jajko\nłyżeczka soli');
+      expect(r.instructions).toBe(
+        'Ziemniaki ugotuj dzień wcześniej i przeciśnij przez praskę. Dodaj mąkę, jajko i sól.\nNie dawaj za dużo mąki'
+      );
+      expect(r.notes).toBe('Mamo, podasz przepis na te kopytka?');
+    });
+
+    it('finds it in a note, keeping the lines above it as notes', () => {
+      const r = parse(
+        'Chleb bananowy',
+        'Piekarnik 175 stopni, 50-60 minut',
+        '3 banany',
+        '2 jajka',
+        '100 g masła',
+        'szczypta soli',
+        'Banany rozgnieść, wymieszać z jajkami i masłem.',
+        'Nie otwierać piekarnika!'
+      );
+      expect(r.title).toBe('Chleb bananowy');
+      expect(r.notes).toBe('Piekarnik 175 stopni, 50-60 minut');
+      expect(r.ingredients).toBe('3 banany\n2 jajka\n100 g masła\nszczypta soli');
+      expect(r.instructions).toBe('Banany rozgnieść, wymieszać z jajkami i masłem.\nNie otwierać piekarnika!');
+    });
+
+    it('needs three amount lines: otherwise the body stays the instructions', () => {
+      const r = parse('Sos', 'Wymieszaj jogurt z czosnkiem.', '2 łyżki majonezu', 'Dopraw solą.');
+      expect(r.ingredients).toBe('');
+      expect(r.instructions).toBe('Wymieszaj jogurt z czosnkiem.\n2 łyżki majonezu\nDopraw solą.');
+    });
+
+    it('does not take steps or video chapters for amounts', () => {
+      const r = parse('Leczo', '0:45 Podsmaż kiełbasę.', '1:30 Dodaj paprykę.', '2:10 Duś 20 minut.');
+      expect(r.ingredients).toBe('');
+    });
+  });
+
+  it('in a chat takes the line above the ingredients for the title', () => {
+    const r = parse(
+      'Asia Kowalska',
+      'Aktywna teraz',
+      'masz ten przepis na brownie?',
+      'Jasne',
+      'Brownie z fasoli',
+      'Składniki: puszka fasoli, 3 jajka, 3 łyżki kakao',
+      'Zblenduj wszystko i piecz 30 minut.'
+    );
+    expect(r.title).toBe('Brownie z fasoli');
+    expect(r.ingredients).toBe('puszka fasoli\n3 jajka\n3 łyżki kakao');
+  });
+
+  it('skips a group chat\'s header and the forwarded label', () => {
+    const r = parse(
+      'Rodzinka',
+      'Babcia, Mama, Ola, Ty',
+      'Babcia',
+      'Przekazana',
+      'Pierogi ruskie',
+      'Ciasto:',
+      '- 500 g mąki',
+      '- 250 ml wody',
+      'Farsz:',
+      '- 600 g ziemniaków',
+      'Wykonanie:',
+      'Ugotuj ziemniaki.'
+    );
+    expect(r.title).toBe('Pierogi ruskie');
+    expect(r.ingredients).toBe('# Ciasto\n- 500 g mąki\n- 250 ml wody\n# Farsz\n- 600 g ziemniaków');
+  });
+
+  it('turns a label over its own items into a group heading, not an inline one', () => {
+    const r = parse('Ciasto', 'Składniki', '300 g mąki', 'Krem:', '250 g mascarpone', 'do namoczenia: mleko');
+    expect(r.ingredients).toBe('300 g mąki\n# Krem\n250 g mascarpone\ndo namoczenia: mleko');
+  });
+
+  it('splits a one-line comma list into items, minding brackets and decimals', () => {
+    expect(parse('Tortilla', 'Potrzebujesz: 2 tortille, 150 g wołowiny, 1/2 cebuli, 1,5 l wody').ingredients).toBe(
+      '2 tortille\n150 g wołowiny\n1/2 cebuli\n1,5 l wody'
+    );
+    expect(parse('Leczo', 'Składniki: 3 papryki (czerwona, żółta, zielona), 2 cebule, sól').ingredients).toBe(
+      '3 papryki (czerwona, żółta, zielona)\n2 cebule\nsól'
+    );
+    expect(parse('Sos', 'Składniki: jogurt, czosnek').ingredients).toBe('jogurt, czosnek');
+  });
+
+  it('drops an ad\'s copy along with its label', () => {
+    const r = parse(
+      'Zupa',
+      'Składniki',
+      '1 kg dyni',
+      'sól',
+      'REKLAMA',
+      '186 kcal',
+      'Nowy blender TurboMix 3000',
+      'Kup teraz -30%',
+      'Przygotowanie',
+      'Ugotuj dynię.'
+    );
+    expect(r.ingredients).toBe('1 kg dyni\nsól');
+    expect(r.instructions).toBe('Ugotuj dynię.');
+  });
+
+  it('reads the divider of "SKŁADNIKI / 4 PORCJE" on its own line and a misspelt "Prep time"', () => {
+    expect(parse('Schabowe', 'SKŁADNIKI', '|4 PORCJE', '600 g schabu').servings).toBe(4);
+    expect(parse('Bread', 'Prep timne: 15 min', 'Ingredients', '3 bananas').prepTime).toBe(15);
+  });
+
+  it('strips chat bold markup from a title and routes a footer link to notes', () => {
+    const r = parse('*Sos czosnkowy*', 'Składniki', '200 g jogurtu', 'Przygotowanie', 'Wymieszaj.', 'www.przepisy.example zapisz');
+    expect(r.title).toBe('Sos czosnkowy');
+    expect(r.instructions).toBe('Wymieszaj.');
+    expect(r.notes).toBe('www.przepisy.example zapisz');
+  });
+});
+
+// Review findings: the screenshot rules must not cost ordinary pasted text anything.
+describe('parsePastedRecipe — screenshot rules leave ordinary text alone', () => {
+  const parse = (...lines: string[]) => parsePastedRecipe(lines.join('\n'));
+
+  it('does not take a lowercase one-word title for an account name', () => {
+    const r = parse('pizza', 'Składniki', '500 g mąki', 'Przygotowanie', 'Wyrób ciasto.', 'pizza Margherita to klasyk, piecz ją krótko.');
+    expect(r.title).toBe('pizza');
+    expect(r.ingredients).toBe('500 g mąki');
+    expect(r.instructions).toBe('Wyrób ciasto.\npizza Margherita to klasyk, piecz ją krótko.');
+  });
+
+  it('takes a plain account name only with app chrome around it', () => {
+    const r = parse('bakewithmia', 'Liczba polubień: 23 481', 'bakewithmia PEANUT BUTTER COOKIES', 'INGREDIENTS', '1 egg');
+    expect(r.title).toBe('PEANUT BUTTER COOKIES');
+  });
+
+  it('keeps the method under an ad label: only copy that sells is dropped', () => {
+    const r = parse(
+      'Pierogi', 'Składniki', '500 g mąki', 'Przygotowanie', 'Zagnieć ciasto.', 'Reklama',
+      'Rozwałkuj cienko i wykrawaj krążki.', 'Nałóż farsz i sklej brzegi.', 'Gotuj 3 minuty.'
+    );
+    expect(r.instructions).toBe('Zagnieć ciasto.\nRozwałkuj cienko i wykrawaj krążki.\nNałóż farsz i sklej brzegi.\nGotuj 3 minuty.');
+  });
+
+  it('keeps an amount-less ingredient that follows an ad label', () => {
+    const r = parse('Zupa', 'Składniki', '1 kg dyni', 'Reklama', 'sól', 'pieprz', 'Przygotowanie', 'Ugotuj.');
+    expect(r.ingredients).toBe('1 kg dyni\nsól\npieprz');
+  });
+
+  it('keeps a capitals title of five words over a subtitle', () => {
+    const r = parse('PLACKI Z JABŁKAMI I CYNAMONEM', 'Najlepsze placki mojej babci', 'Składniki', '2 jabłka');
+    expect(r.title).toBe('PLACKI Z JABŁKAMI I CYNAMONEM');
+  });
+
+  it('does not split one ingredient at the commas of its description', () => {
+    expect(parse('Zupa', 'Składniki', '1 kg ziemniaków, obranych, pokrojonych w kostkę').ingredients).toBe(
+      '1 kg ziemniaków, obranych, pokrojonych w kostkę'
+    );
+    expect(parse('Zupa', 'Składniki: 1 kg ziemniaków, obranych, pokrojonych w kostkę').ingredients).toBe(
+      '1 kg ziemniaków, obranych, pokrojonych w kostkę'
+    );
+    // A plain line under a header is not an inline list either.
+    expect(parse('Sos', 'Składniki', 'sól, pieprz, słodka papryka').ingredients).toBe('sól, pieprz, słodka papryka');
+  });
+
+  it('does not make a group heading of a remark', () => {
+    const r = parse('Ciasto', 'Składniki', '300 g mąki', 'Uwaga:', '2 jajka muszą być zimne');
+    expect(r.ingredients).toBe('300 g mąki\nUwaga:\n2 jajka muszą być zimne');
+  });
+
+  it('after an inline list keeps a long plain ingredient among the ingredients', () => {
+    const r = parse('Sos', 'Składniki: jogurt, czosnek, sól', 'szczypta soli morskiej i skórka otarta z jednej cytryny');
+    expect(r.ingredients).toBe('jogurt\nczosnek\nsól\nszczypta soli morskiej i skórka otarta z jednej cytryny');
+  });
+});
+
+describe('parsePastedRecipe — an ad label never costs recipe lines', () => {
+  const parse = (...lines: string[]) => parsePastedRecipe(lines.join('\n'));
+
+  it('keeps steps and a blog footer link under an ad label', () => {
+    const r = parse(
+      'Pierogi', 'Składniki', '500 g mąki', 'Przygotowanie', 'Zagnieć ciasto.', 'Reklama',
+      'Rozwałkuj cienko i wykrawaj krążki.', 'Ugotuj w osolonej wodzie.', 'Więcej przepisów na www.mojblog.pl'
+    );
+    // Nothing but the label goes — the footer is kept like any unclassified line.
+    expect(r.instructions).toBe(
+      'Zagnieć ciasto.\nRozwałkuj cienko i wykrawaj krążki.\nUgotuj w osolonej wodzie.\nWięcej przepisów na www.mojblog.pl'
+    );
+  });
+
+  it('keeps a sentence that merely mentions ordering', () => {
+    const r = parse('Ciasto', 'Składniki', '500 g mąki', 'Przygotowanie', 'Wymieszaj.', 'Reklama', 'Możesz też zamówić gotowe ciasto w piekarni.', 'Piecz 30 minut.');
+    expect(r.instructions).toBe('Wymieszaj.\nMożesz też zamówić gotowe ciasto w piekarni.\nPiecz 30 minut.');
+  });
+
+  it('still drops a product line and its call to action', () => {
+    const r = parse('Zupa', 'Składniki', '1 kg dyni', 'REKLAMA', 'Nowy blender TurboMix 3000', 'Kup teraz -30%', 'Przygotowanie', 'Ugotuj dynię.');
+    expect(r.ingredients).toBe('1 kg dyni');
   });
 });
