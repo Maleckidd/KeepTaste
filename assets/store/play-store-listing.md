@@ -189,6 +189,12 @@ Do not claim "never connects to the internet" in the listing.
 
 ## Release notes
 
+**1.3.1 — EN:**
+Importing a recipe from a photo or screenshot is much more accurate. Screenshots of Instagram, Facebook, Messenger, WhatsApp, notes and recipe sites come through cleaner: wrapped lines are joined back together, the status bar, likes, comments and message times are left out, and Polish letters the text recognition often misreads (ł, ś, ą) are restored. Pasted recipes also split better into ingredients and steps.
+
+**1.3.1 — PL:**
+Import przepisu ze zdjęcia lub zrzutu ekranu działa znacznie dokładniej. Zrzuty z Instagrama, Facebooka, Messengera, WhatsAppa, notatek i stron z przepisami przychodzą czyściej: zawinięte linie są z powrotem łączone, pasek stanu, polubienia, komentarze i godziny wiadomości są pomijane, a polskie litery, które rozpoznawanie tekstu często myli (ł, ś, ą), wracają na miejsce. Wklejone przepisy też lepiej dzielą się na składniki i kroki.
+
 **1.3.0 — EN:**
 Cooking timers now ring even when the app is closed or the screen is locked, and keep ringing until you stop them. A live countdown in your notifications shows how much time is left. To ring on time, allow "Alarms & reminders" when the app asks. Also new: a "New cookbook" tile, creating a cookbook straight from the recipe form, and a smoother shopping list where checked items move to "In cart" in the order you picked them.
 

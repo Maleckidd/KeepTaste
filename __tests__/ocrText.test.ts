@@ -6,6 +6,7 @@ import {
   ocrBlocksToText,
   normalizeOcrText,
   OcrBlock,
+  reflowBlockLines,
 } from '@/utils/ocrText';
 import { parsePastedRecipe } from '@/utils/recipeImport';
 
@@ -279,7 +280,7 @@ describe('ocrBlocksToText — column-aware reading order', () => {
 
 describe('normalizeOcrText', () => {
   it('maps diacritics Polish does not use to the Polish letter ML Kit misread', () => {
-    expect(normalizeOcrText('Drožd že, lyžką, Žurek')).toBe('Drożd że, lyżką, Żurek');
+    expect(normalizeOcrText('Drožd že, lyžką, Žurek')).toBe('Drożd że, łyżką, Żurek');
     expect(normalizeOcrText('mạki, Ạ, kawẹ, podawaị')).toBe('mąki, Ą, kawę, podawaj');
     expect(normalizeOcrText('šliwki, čwierć, koň, kOŚcİ')).toBe('śliwki, ćwierć, koń, kości');
   });
@@ -312,7 +313,7 @@ describe('normalizeOcrText', () => {
 
   it('maps "ö" to "ó" and a "9" after a gram-sized quantity to "g"', () => {
     expect(normalizeOcrText('pöt łyżeczki\nserek 150 9\n-88 9 białka')).toBe(
-      'pót łyżeczki\nserek 150 g\n-88 g białka'
+      'pół łyżeczki\nserek 150 g\n- 88 g białka'
     );
     expect(normalizeOcrText('Krok 9\n1 9 jajek\n150 90')).toBe('Krok 9\n1 9 jajek\n150 90');
   });
@@ -371,9 +372,13 @@ describe('real ML Kit output → normalizeOcrText → parsePastedRecipe', () => 
     expect(r.servings).toBe(4);
     expect(r.ingredients).toBe(
       '2 szklanki mąki pszennej\n3 jajka\n500 ml mleka\nSzczypta soli\n' +
-        '250 g twarogu półttustego\n2 yżki cukru'
+        '250 g twarogu półtłustego\n2 łyżki cukru'
     );
     expect(r.instructions.startsWith('1. Mąkę wymieszaj')).toBe(true);
+    // The wrapped tail ML Kit returned as its own block rejoins its step.
+    expect(r.instructions).toContain(
+      '2. Odstaw na 15 minut, a następnie smaż cienkie placki na rozgrzanej patelni.\n3. Twaróg'
+    );
   });
 
   it('tilted photo: method header and paragraph overlap vertically yet stay in order', () => {
@@ -395,7 +400,12 @@ describe('real ML Kit output → normalizeOcrText → parsePastedRecipe', () => 
     expect(r.ingredients).toBe(
       '500 g mąki\n25 g drożdży\n250 ml ciepłego mleka\n80 g masła\n100 g cukru\n1 kg śliwek węgierek'
     );
-    expect(r.instructions.startsWith('Drożdże rozpuść w mleku z lyżką cukru. Dodaj mąkę')).toBe(true);
+    expect(r.instructions.startsWith('Drożdże rozpuść w mleku z łyżką cukru. Dodaj mąkę')).toBe(true);
+    expect(r.instructions).toBe(
+      'Drożdże rozpuść w mleku z łyżką cukru. Dodaj mąkę, roztopione masło i resztę cukru, ' +
+        'wyrób ciasto. Odstaw do wyrośnięcia na godzinę. Rozłóż na blasze, ułóż połówki śliwek i ' +
+        'piecz w 180°C.'
+    );
   });
 });
 
@@ -448,9 +458,21 @@ describe('real ML Kit output of recipe-site screenshots', () => {
     ]);
     expect(r.servings).toBe(4);
     expect(r.ingredients.split('\n')[0]).toBe('600 g schabu bez kości');
-    expect(r.ingredients).toContain('do smażenia: 6 łyżek smalcu lub');
+    expect(r.ingredients).toBe(
+      '600 g schabu bez kości\nsól i pieprz\ndo namoczenia: mleko\ndo obtoczenia: 2 łyżki mąki, 2 jajka, ' +
+        '5 łyżek bułki tartej\ndo smażenia: 6 łyżek smalcu lub masła klarowanego'
+    );
     expect(r.instructions.startsWith('Schab opłukać, osuszyć i oczyścić')).toBe(true);
     expect(r.instructions).not.toContain('600 g schabu');
+    // Each soft-wrapped paragraph block reflows into one line.
+    const steps = r.instructions.split('\n');
+    const starts = [
+      'Schab opłukać', 'Kotlety włożyć', 'Mięso wyjąć',
+      'Na patelni rozgrzać', 'Kotlety można', 'Gotowe kotlety',
+    ];
+    starts.forEach((start, i) => expect(steps[i].startsWith(start)).toBe(true));
+    expect(steps[0].endsWith('z wyttoczoną kratką.')).toBe(true);
+    expect(steps[3].endsWith('na świeżym smalcu.')).toBe(true);
   });
 
   it('przepisy.pl: quantities stay on their ingredient, site chrome is dropped', () => {
@@ -508,7 +530,7 @@ describe('real ML Kit output of recipe-site screenshots', () => {
       'schab bez kości 800 gramów',
       'Przyprawa do mięs Knorr noy 2 łyżki',
       'jajka 3 sztuki',
-      'butka tarta 200 gramów',
+      'bułka tarta 200 gramów',
       'mąka 100 gramów',
     ]);
     expect(r.ingredients).toContain('olej roślinny 2 łyżki\nświeży koperek 2 łyżki');
@@ -516,6 +538,10 @@ describe('real ML Kit output of recipe-site screenshots', () => {
     expect(r.ingredients).not.toContain('EMAIL');
     expect(r.instructions.split('\n')[0]).toBe('Krok 1');
     expect(r.instructions).toContain('Schab pokrój na plastry ok. 1,5 cm');
+    expect(r.instructions).toContain(
+      'Krok 1\nSchab pokrój na plastry ok. 1,5 cm i rozbij tłuczkiem na grubość ok. 3 mm. Roztrzep jajka.\n' +
+        'Krok 2\nBułkę tartą połącz z przyprawą do mięs. Kotlety obtocz kolejno w mące, jajku i bułeczce.'
+    );
     expect(r.instructions).not.toContain('STERUJ');
     expect(r.notes).toContain('Do jajek dodaj 100 ml mleka');
   });
@@ -554,7 +580,7 @@ describe('real ML Kit output of recipe-site screenshots', () => {
     ]);
     expect(r.ingredients).toBe(
       '2 jaja\ntwarog chudy 250 g\nserek Grani proteinowy 150 g\nbudyń waniliowy bez cukru\n' +
-        'pót lyżeczki pronzku do pieczeria\nerytrytol do smaku\n15g kremu Lotus Biscoff\n(do posmarowaria)'
+        'pół łyżeczki pronzku do pieczeria\nerytrytol do smaku\n15g kremu Lotus Biscoff (do posmarowaria)'
     );
     expect(r.instructions.startsWith('Wszyatie sfadrikh')).toBe(true);
   });
@@ -679,5 +705,837 @@ describe('dropClippedEdgeLines', () => {
     const lines = text.split('\n');
     expect(lines[lines.length - 1]).toBe('Zimny schab przetóż do lodówki na noc.');
     expect(text).not.toMatch(/Dah|Lat/);
+    // Soft-wrapped lines reflow inside each block; the manual break before
+    // "Zimny schab" (a full sentence ending well short of the margin) stays.
+    expect(text).toBe(
+      [
+        'Do dużego garnka nalej 2 litry wody, wsyp 60 g soli, 12 ziaren pieprzu, 4 ziarna ziela angielskiego, 2 liście laurowe, 6 ząbków czOsnku, 2 łyżki majeranku, 1 tyżkę ziół, 1 tyżkę kminku, 70 gmajonezu oraz 60g musztardy. Wszystko razem wymieszaj i zagotuj.',
+        'Do wrzącego wywaru włóż 1 kg surowego schabu w jednym kawatku, przykryj i gotuj dokładnie 5 minut.',
+        'Potem zgaś ogień i zostaw mięso w garnku, aż wywar zupełnie wystygnie- najlepiej zostaw je na kilka godzin albo do rana.',
+        'Wtedy zagotuj wywar jeszcze raz ze schabem, nie wyjmując go, i gotuj pod pokrywką przez następne 5 minut, licząc od momentu wrzenia.',
+        'Znów zgaś ogień i zostaw mięso w wywarze aż do zupełnego wystygnięcia wywaru.',
+        'Zimny schab przetóż do lodówki na noc.',
+      ].join('\n')
+    );
+  });
+});
+
+// A multi-line block with a full box (no per-line frames): line geometry is
+// estimated from the block box.
+const blk = (
+  lines: string[],
+  left: number,
+  width: number,
+  top = 0,
+  height = 30 * lines.length
+): OcrBlock => ({
+  text: lines.join('\n'),
+  lines: lines.map((text) => ({ text })),
+  frame: { top, left, width, height },
+});
+
+// A block whose lines carry their own frames: [text, top, left, width, height].
+const framedBlk = (
+  rows: [string, number, number, number, number][],
+  frame: { top: number; left: number; width: number; height: number }
+): OcrBlock => ({
+  text: rows.map(([text]) => text).join('\n'),
+  lines: rows.map(([text, top, left, width, height]) => ({ text, frame: { top, left, width, height } })),
+  frame,
+});
+
+describe('reflowBlockLines', () => {
+  const unchanged = (lines: string[], left: number, width: number, margin?: number) =>
+    expect(reflowBlockLines(blk(lines, left, width), margin)).toEqual(lines);
+
+  describe('joins soft-wrapped lines', () => {
+    it('appends a parenthetical continuation, even far from the margin', () => {
+      const b = blk(['• 15g kremu Lotus Biscoff', '(do posmarowaria)'], 39, 356);
+      expect(reflowBlockLines(b)).toEqual(['• 15g kremu Lotus Biscoff (do posmarowaria)']);
+      expect(reflowBlockLines(b, 2000)).toEqual(['• 15g kremu Lotus Biscoff (do posmarowaria)']);
+    });
+
+    it('rejoins a hyphenated word without the hyphen or a space', () => {
+      expect(reflowBlockLines(blk(['1 kg młodych ziem-', 'niaków'], 0, 180))).toEqual([
+        '1 kg młodych ziemniaków',
+      ]);
+    });
+
+    it('keeps a hyphenated line that does not reach the margin', () => {
+      unchanged(['1 kg młodych ziem-', 'niaków'], 0, 180, 1000);
+    });
+
+    it('keeps a hyphen before an uppercase continuation (a compound, not a wrap)', () => {
+      unchanged(['Dodaj biało-', 'Czerwone'], 0, 180);
+    });
+
+    it('joins after an open-ended function word ("lub") only when the line is full', () => {
+      const lines = ['do smażenia: 6 łyżek smalcu lub', 'masła klarowanego'];
+      expect(reflowBlockLines(blk(lines, 29, 358), 423)).toEqual([
+        'do smażenia: 6 łyżek smalcu lub masła klarowanego',
+      ]);
+      unchanged(lines, 29, 358, 2000);
+    });
+
+    it('joins after a trailing comma', () => {
+      expect(
+        reflowBlockLines(blk(['sól, pieprz, słodka papryka,', 'ostra papryka i oregano'], 0, 300))
+      ).toEqual(['sól, pieprz, słodka papryka, ostra papryka i oregano']);
+    });
+
+    it('joins after an unbalanced opening parenthesis', () => {
+      expect(reflowBlockLines(blk(['ser żółty (najlepiej gouda', 'albo edamski)'], 0, 300))).toEqual([
+        'ser żółty (najlepiej gouda albo edamski)',
+      ]);
+    });
+
+    it('joins after a spaced dash', () => {
+      expect(reflowBlockLines(blk(['mąka pszenna –', 'tortowa typ 450'], 0, 160))).toEqual([
+        'mąka pszenna – tortowa typ 450',
+      ]);
+    });
+
+    it('joins after an English function word', () => {
+      expect(reflowBlockLines(blk(['salt and', 'pepper'], 0, 90))).toEqual(['salt and pepper']);
+    });
+
+    it('keeps a labelled comma list together, even onto a line starting with a quantity', () => {
+      // "do obtoczenia: 2 łyżki mąki, 2 jajka, 5 łyżek bułki tartej" is one item on the page.
+      expect(
+        reflowBlockLines(blk(['do obtoczenia: 2 łyżki mąki, 2 jajka,', '5 łyżek bułki tartej'], 29, 394))
+      ).toEqual(['do obtoczenia: 2 łyżki mąki, 2 jajka, 5 łyżek bułki tartej']);
+      // Without a label the amount starts a new item.
+      unchanged(['sól, pieprz, słodka papryka,', '5 łyżek bułki tartej'], 29, 300);
+    });
+
+    it('joins a 4-line prose paragraph into one line', () => {
+      const lines = [
+        'Schab opłukać, osuszyć i oczyścić z błon oraz tłuszczu. Pokroić w poprzek',
+        'na 4 kawałki. Położyć każdy między dwoma arkuszami folii i rozbić na cienki',
+        'płat (mięso mocno się rozciągnie, prawie do wielkości dłoni). Najlepiej',
+        'uderzać od środka ku brzegom, płaską stroną tłuczka z wyttoczoną kratką.',
+      ];
+      expect(reflowBlockLines(blk(lines, 487, 865))).toEqual([lines.join(' ')]);
+    });
+
+    it('joins 2-line prose whose first line is long (>= 45 chars)', () => {
+      const lines = [
+        'Schab pokrój na plastry ok. 1,5 cm i rozbij tłuczkiem na grubość ok. 3 mm. Roztrzep',
+        'jajka.',
+      ];
+      expect(reflowBlockLines(blk(lines, 889, 736))).toEqual([lines.join(' ')]);
+    });
+
+    it('joins 2-line prose whose first line holds a sentence boundary', () => {
+      expect(
+        reflowBlockLines(blk(['Wymieszaj. Odstaw na godzinę', 'pod przykryciem w chłodzie.'], 0, 300))
+      ).toEqual(['Wymieszaj. Odstaw na godzinę pod przykryciem w chłodzie.']);
+    });
+
+    it('reflows a text-only block (no lines[]) split on \\n', () => {
+      const parts = [
+        'Drożdże rozpuść w mleku z łyżką cukru. Dodaj mąkę, roztopione masło i resztę cukru,',
+        'wyrób ciasto. Odstaw do wyrośnięcia na godzinę. Rozłóż na blasze, ułóż połówki śliwek i',
+        'piecz w 180°C.',
+      ];
+      const b: OcrBlock = {
+        text: parts.join('\n'),
+        frame: { top: 920, left: 340, width: 1470, height: 272 },
+      };
+      expect(reflowBlockLines(b)).toEqual([parts.join(' ')]);
+    });
+
+    it('uses real line frames when every line has them', () => {
+      const b = framedBlk(
+        [
+          ['Do wrzącego wywaru włóż 1 kg surowego', 344, 147, 658, 33],
+          ['schabu w jednym kawatku, przykryj i gotuj', 384, 146, 677, 37],
+          ['dokładnie 5 minut.', 427, 153, 265, 38],
+        ],
+        { top: 344, left: 146, width: 677, height: 121 }
+      );
+      expect(reflowBlockLines(b, 888)).toEqual([
+        'Do wrzącego wywaru włóż 1 kg surowego schabu w jednym kawatku, przykryj i gotuj dokładnie 5 minut.',
+      ]);
+    });
+
+    it('keeps a manual break after a short line, judged by real line frames', () => {
+      const b = framedBlk(
+        [
+          ['Znów zgaś ogień i zostaw mięso w wywarze', 779, 146, 684, 36],
+          ['aż do zupełnego wystygnięcia wywaru.', 823, 145, 588, 33],
+          ['Zimny schab przetóż do lodówki na noc.', 866, 148, 640, 34],
+        ],
+        { top: 779, left: 145, width: 685, height: 121 }
+      );
+      expect(reflowBlockLines(b, 888)).toEqual([
+        'Znów zgaś ogień i zostaw mięso w wywarze aż do zupełnego wystygnięcia wywaru.',
+        'Zimny schab przetóż do lodówki na noc.',
+      ]);
+    });
+
+    it('drops a whitespace-only line, then joins its neighbours', () => {
+      const b: OcrBlock = {
+        text: 'Dodaj sól i\n  \npieprz',
+        lines: [{ text: 'Dodaj sól i' }, { text: '  ' }, { text: 'pieprz' }],
+        frame: { top: 0, left: 0, width: 110, height: 90 },
+      };
+      expect(reflowBlockLines(b)).toEqual(['Dodaj sól i pieprz']);
+    });
+  });
+
+  describe('not prose / no join', () => {
+    it('joins a 2-line sentence broken in mid-sentence, keeps two short lines apart', () => {
+      expect(
+        reflowBlockLines(blk(['Wszystko dokładnie wymieszaj', 'i odstaw do lodówki na noc.'], 0, 300))
+      ).toEqual(['Wszystko dokładnie wymieszaj i odstaw do lodówki na noc.']);
+      unchanged(['Wszystko wymieszaj', 'i odstaw na noc.'], 0, 200);
+    });
+
+    it('keeps full lines without any sentence punctuation (not prose)', () => {
+      unchanged(
+        [
+          'sól i pieprz do smaku według uznania',
+          'olej roślinny do smażenia na patelni',
+          'świeży koperek posiekany drobno',
+        ],
+        0,
+        360
+      );
+    });
+
+    it('keeps short one-sentence lines (mean length < 30)', () => {
+      unchanged(['Wymieszaj mąkę.', 'Dodaj jajka.', 'Upiecz.'], 0, 150);
+    });
+
+    it('keeps a list-like block of quantity lines', () => {
+      unchanged(
+        [
+          '2 łyżki oliwy z oliwek extra virgin najlepszej jakości.',
+          '1 łyżeczka soli morskiej drobnej lub gruboziarnistej.',
+        ],
+        0,
+        540
+      );
+    });
+
+    // The first line ends on a plain word ("ewentualnie"), so no join rule
+    // applies — this does not reach the 80-char cap (see the cap tests below).
+    it('does not join after a plain word in a non-prose block', () => {
+      unchanged(
+        [
+          '2 łyżki drobno posiekanej natki pietruszki albo koperku, ewentualnie',
+          'szczypiorku lub kolendry do posypania gotowego dania',
+        ],
+        0,
+        680
+      );
+    });
+
+    it('joins an all-caps line onto an all-caps line', () => {
+      expect(reflowBlockLines(blk(['PROSTO, ZDROWO I', 'OBŁĘDNIE PYSZNIE!'], 0, 170))).toEqual([
+        'PROSTO, ZDROWO I OBŁĘDNIE PYSZNIE!',
+      ]);
+    });
+  });
+
+  describe('parenthetical join is gated', () => {
+    // A header + parenthetical joined into "Składniki (na 4 porcje)" is no
+    // longer a section header for parsePastedRecipe.
+    it('keeps a header word above a parenthetical when nothing else ties them', () => {
+      unchanged(['Składniki', '(na 4 porcje)'], 40, 300, 2000);
+      unchanged(['Przygotowanie', '(ok. 30 min)'], 40, 300, 2000);
+      unchanged(['SKŁADNIKI', '(na 4 porcje)'], 40, 300, 2000);
+    });
+
+    // ML Kit boxes hug the text, so a short header over a longer parenthetical
+    // always looks "full" — reaching the margin must not be enough to join.
+    it('keeps the header apart in a tight box, where the header line counts as full', () => {
+      unchanged(['Składniki', '(na 4 porcje)'], 0, 130);
+      unchanged(['Przygotowanie', '(ok. 30 min)'], 0, 130);
+      unchanged(['Składniki na ciasto', '(tortownica o średnicy)'], 0, 230);
+      const framed = framedBlk(
+        [['Składniki', 0, 0, 90, 30], ['(na 4 porcje)', 34, 0, 130, 30]],
+        { top: 0, left: 0, width: 130, height: 64 }
+      );
+      expect(reflowBlockLines(framed)).toEqual(['Składniki', '(na 4 porcje)']);
+    });
+
+    it('joins a parenthetical onto an open end that is not full', () => {
+      const b = blk(['smalcu lub', '(ewentualnie masła)'], 0, 300);
+      expect(reflowBlockLines(b, 2000)).toEqual(['smalcu lub (ewentualnie masła)']);
+    });
+
+    it('end to end: a two-column card whose header blocks are the rightmost in their column', () => {
+      const r = parsePastedRecipe(
+        normalizeOcrText(
+          ocrBlocksToText([
+            blk(['Składniki', '(na 4 porcje)'], 0, 130, 0),
+            blk(['200 g mąki', '2 jajka'], 0, 100, 80),
+            blk(['Przygotowanie', '(ok. 30 min)'], 300, 130, 0),
+            blk(['Wymieszaj.'], 300, 100, 80, 30),
+          ])
+        )
+      );
+      expect(r.ingredients).toBe('(na 4 porcje)\n200 g mąki\n2 jajka');
+      expect(r.instructions).toBe('(ok. 30 min)\nWymieszaj.');
+    });
+
+    it('end to end: header blocks with a parenthetical keep the section split', () => {
+      const lb = (lines: string[], top: number, width: number) => blk(lines, 40, width, top);
+      const r = parsePastedRecipe(
+        normalizeOcrText(
+          ocrBlocksToText([
+            lb(['Naleśniki'], 0, 600),
+            lb(['Składniki', '(na 4 porcje)'], 60, 200),
+            lb(['200 g mąki', '2 jajka'], 140, 150),
+            lb(['Przygotowanie', '(ok. 30 min)'], 220, 200),
+            lb(['Wymieszaj wszystko.'], 300, 300),
+          ])
+        )
+      );
+      expect(r.title).toBe('Naleśniki');
+      expect(r.ingredients).toContain('200 g mąki');
+      expect(r.ingredients).toContain('2 jajka');
+      expect(r.ingredients).not.toContain('Wymieszaj');
+      expect(r.instructions).toContain('Wymieszaj wszystko.');
+      expect(r.instructions).not.toContain('200 g mąki');
+      // Exact pre-reflow output (verified against parsePastedRecipe).
+      expect(r.ingredients).toBe('(na 4 porcje)\n200 g mąki\n2 jajka');
+      expect(r.instructions).toBe('(ok. 30 min)\nWymieszaj wszystko.');
+    });
+  });
+
+  describe('open end does not swallow a quantity start', () => {
+    const first = 'sól, pieprz i trochę oregano,';
+    it('a range', () => unchanged([first, '2-3 ząbki czosnku'], 0, 300));
+    it('a mixed fraction', () => unchanged([first, '1 1/2 szklanki mleka'], 0, 300));
+    it('an "ok." approximation', () => unchanged([first, 'ok. 200 g sera'], 0, 300));
+    it('a fraction glyph', () => unchanged([first, '½ szklanki mleka'], 0, 300));
+    it('a fraction-glyph range', () => unchanged([first, '½-1 szklanki mleka'], 0, 300));
+
+    it('counts range / "ok." starts as list items, so the block is not prose', () => {
+      unchanged(
+        ['1 1/2 szklanki mleka pełnotłustego, najlepiej prosto od krowy. Sól', 'ok. 200 g sera żółtego.'],
+        0,
+        660
+      );
+    });
+  });
+
+  describe('80-char cap on item joins', () => {
+    it('skips an otherwise-allowed open-end join that would exceed 80 chars', () => {
+      unchanged(
+        ['drobno posiekana natka pietruszki albo koperek, ewentualnie szczypiorek albo', 'kolendra do posypania gotowego dania'],
+        0,
+        760
+      );
+    });
+
+    it('joins the same kind of open end when the result stays within 80 chars', () => {
+      expect(
+        reflowBlockLines(blk(['drobno posiekana natka pietruszki albo', 'koperek do posypania gotowego dania'], 0, 380))
+      ).toEqual(['drobno posiekana natka pietruszki albo koperek do posypania gotowego dania']);
+    });
+
+    it('does not cap a prose join: a long hyphenated wrap still drops the hyphen', () => {
+      expect(
+        reflowBlockLines(
+          blk(['Ugotuj w osolonej wodzie do miękkości wszystkie obrane i pokrojone w kostkę ziem-', 'niaki. Odcedź je i odstaw.'], 0, 830)
+        )
+      ).toEqual(['Ugotuj w osolonej wodzie do miękkości wszystkie obrane i pokrojone w kostkę ziemniaki. Odcedź je i odstaw.']);
+    });
+  });
+
+  describe('prose detection', () => {
+    it('ends a paragraph at a line that did not reach the margin', () => {
+      const b = framedBlk(
+        [
+          ['Rozgrzej piekarnik do dwustu stopni i przygotuj blachę wyłożoną papierem', 0, 100, 700, 30],
+          ['Odstaw ciasto na pół godziny.', 40, 100, 290, 30],
+          ['Piecz przez czterdzieści minut aż wierzch ładnie się zarumieni.', 80, 100, 650, 30],
+        ],
+        { top: 0, left: 100, width: 700, height: 110 }
+      );
+      expect(reflowBlockLines(b)).toEqual([
+        'Rozgrzej piekarnik do dwustu stopni i przygotuj blachę wyłożoną papierem Odstaw ciasto na pół godziny.',
+        'Piecz przez czterdzieści minut aż wierzch ładnie się zarumieni.',
+      ]);
+    });
+  });
+
+  describe('never-join guards', () => {
+    it('after a punctuation-only line, even in a full prose block', () =>
+      // Line 1 is the longest (full) and >= 45 chars, line 2 ends a sentence:
+      // without the guard this 2-line block is prose and would join.
+      unchanged(['*'.repeat(50), 'Wymieszaj wszystko i odstaw.'], 0, 500));
+
+    it('before a typographic bullet', () => unchanged(['Dodaj sól i', '• pieprz'], 0, 110));
+    it('before a Markdown list marker', () => unchanged(['Dodaj sól i', '- pieprz'], 0, 110));
+    it('before a numbered step', () =>
+      unchanged(['Wymieszaj wszystkie składniki w dużej misce i', '2. Odstaw na godzinę.'], 0, 450));
+    it('before "Krok N"', () =>
+      unchanged(['Wymieszaj wszystkie składniki w dużej misce i', 'Krok 2'], 0, 450));
+    it('after a line ending with ":"', () =>
+      unchanged(
+        ['Przygotuj wszystkie składniki wcześniej. Potrzebne będą:', 'mąka, jajka, mleko i szczypta soli do ciasta.'],
+        0,
+        560
+      ));
+    it('before a line ending with ":"', () =>
+      unchanged(['Wymieszaj wszystko dokładnie. Odstaw na godzinę do lodówki.', 'Sposób podania na ciepło:'], 0, 590));
+    it('before a short "Label:" line', () =>
+      unchanged(['Gotuj na małym ogniu przez 20 minut,', 'Liczba porcji: 4'], 0, 360));
+    it('before a line with no letter or digit', () =>
+      unchanged(['Wymieszaj wszystko dokładnie. Odstaw na godzinę do lodówki,', '*********'], 0, 590));
+    it('before an all-caps line under a mixed-case line', () =>
+      unchanged(['Na koniec posyp natką pietruszki i', 'SMACZNEGO'], 0, 340));
+    it('before a short heading under a finished sentence', () =>
+      unchanged(['Wymieszaj wszystkie składniki dokładnie w misce. Odstaw do lodówki.', 'Sposób przygotowania'], 0, 680));
+  });
+
+  describe('must stay and degenerate input', () => {
+    it('keeps a short ingredient list', () => unchanged(['sól i pieprz', 'olej roślinny', 'świeży koperek'], 72, 158));
+
+    it('keeps two short ingredient lines in a wide column', () =>
+      unchanged(['•pöt lyżeczki pronzku do pieczeria', 'erytrytol do smaku'], 39, 469, 732));
+
+    it('keeps "Label: value" lines of a text-only block', () => {
+      const b: OcrBlock = {
+        text: 'Czas smnaženia: 25 min\nLiczba porcji: 4',
+        frame: { top: 323, left: 140, width: 438, height: 105 },
+      };
+      expect(reflowBlockLines(b)).toEqual(['Czas smnaženia: 25 min', 'Liczba porcji: 4']);
+    });
+
+    it('returns lines unchanged without a full block box', () => {
+      const b: OcrBlock = {
+        text: 'Dodaj sól i\npieprz',
+        lines: [{ text: 'Dodaj sól i' }, { text: 'pieprz' }],
+        frame: { top: 0 },
+      };
+      expect(reflowBlockLines(b)).toEqual(['Dodaj sól i', 'pieprz']);
+    });
+
+    it('returns a single line as-is', () => {
+      expect(reflowBlockLines(blk(['jedna linia'], 0, 100))).toEqual(['jedna linia']);
+    });
+  });
+});
+
+describe('ocrBlocksToText — in-block reflow', () => {
+  const lb = (lines: string[], left: number, top: number, width: number) => blk(lines, left, width, top);
+
+  it('reflows a soft-wrapped block on the column-aware path', () => {
+    expect(ocrBlocksToText([lb(['Dodaj sól i', 'pieprz'], 40, 0, 120)])).toBe('Dodaj sól i pieprz');
+  });
+
+  it('uses the widest box in the same column as the margin', () => {
+    expect(
+      ocrBlocksToText([
+        lb(['Dodaj sól i', 'pieprz'], 40, 0, 120),
+        lb(['Wymieszaj wszystkie składniki w dużej misce.'], 40, 100, 600),
+      ])
+    ).toBe('Dodaj sól i\npieprz\nWymieszaj wszystkie składniki w dużej misce.');
+  });
+
+  it('takes the margin per column, not from a wider neighbouring column', () => {
+    expect(
+      ocrBlocksToText([
+        lb(['do obtoczenia: 2 łyżki mąki, 2 jajka,', '5 łyżek butki tartej'], 29, 443, 394),
+        lb(['do smażenia: 6 łyżek smalcu lub', 'masła klarowanego'], 29, 533, 358),
+        lb(['Na patelni rozgrzać smalec i smażyć po 2 kotlety naraz, 2 minuty z każdej strony.'], 487, 443, 865),
+      ])
+    ).toBe(
+      'do obtoczenia: 2 łyżki mąki, 2 jajka, 5 łyżek butki tartej\n' +
+        'do smażenia: 6 łyżek smalcu lub masła klarowanego\n' +
+        'Na patelni rozgrzać smalec i smażyć po 2 kotlety naraz, 2 minuty z każdej strony.'
+    );
+  });
+
+  it('does not reflow on the top-only fallback path', () => {
+    expect(
+      ocrBlocksToText([lb(['Dodaj sól i', 'pieprz'], 40, 0, 120), { text: 'x', frame: { top: 100 } }])
+    ).toBe('Dodaj sól i\npieprz\nx');
+  });
+
+  it('does not reflow an unframed block', () => {
+    expect(
+      ocrBlocksToText([{ text: 'a', lines: [{ text: 'Dodaj sól i' }, { text: 'pieprz' }] }])
+    ).toBe('Dodaj sól i\npieprz');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rules found on real phone screenshots (see ocrScreens.test.ts for the
+// end-to-end fixtures these were reduced from).
+// ---------------------------------------------------------------------------
+
+// One block per line, each with its own line frame — how ML Kit returns most
+// screenshot text. [text, top, left, right, height]
+type Row = [string, number, number, number, number?];
+const rowsToBlocks = (rows: Row[]): OcrBlock[] =>
+  rows.map(([text, top, left, right, height = 40]) => {
+    const frame = { top, left, width: right - left, height };
+    return { text, lines: [{ text, frame }], frame };
+  });
+const flow = (rows: Row[]) => ocrBlocksToText(rowsToBlocks(rows));
+
+describe('ocrBlocksToText — reflow across blocks', () => {
+  it('rejoins a wrapped tail ML Kit returned as its own block', () => {
+    expect(
+      flow([
+        ['200 g zimnego masła', 0, 100, 476],
+        ['1 łyżeczka proszku do', 56, 102, 479],
+        ['pieczenia', 112, 99, 262],
+        ['1,5 kg kwaśnych', 168, 102, 384],
+        ['jabłek', 224, 96, 207],
+        ['2 łyżki cukru', 280, 100, 324],
+      ])
+    ).toBe('200 g zimnego masła\n1 łyżeczka proszku do pieczenia\n1,5 kg kwaśnych jabłek\n2 łyżki cukru');
+  });
+
+  it('does not take an item of its own for a wrapped tail', () => {
+    // "sól" could not have fitted after "pudru" either — but it opens like an item.
+    expect(
+      flow([
+        ['200 g zimnego masła i mleka', 0, 100, 479],
+        ['100 g cukru pudru', 56, 100, 425],
+        ['sól', 112, 100, 150],
+        ['2 jajka', 168, 100, 220],
+        ['wanilia', 224, 100, 230],
+      ])
+    ).toBe('200 g zimnego masła i mleka\n100 g cukru pudru\nsól\n2 jajka\nwanilia');
+  });
+
+  it('ends a stretch at a blank line: an open end does not reach across it', () => {
+    expect(
+      flow([
+        ['Dodaj sól i', 0, 40, 160],
+        ['pieprz', 120, 40, 110],
+      ])
+    ).toBe('Dodaj sól i\npieprz');
+    expect(
+      flow([
+        ['Dodaj sól i', 0, 40, 160],
+        ['pieprz', 56, 40, 110],
+      ])
+    ).toBe('Dodaj sól i pieprz');
+  });
+
+  it('reads an indented line as an item start: an emoji bullet or number was dropped there', () => {
+    expect(
+      flow([
+        ['Przygotowanie:', 0, 40, 330],
+        ['Banany rozgnieć widelcem, dodaj jajka i wymieszaj.', 56, 93, 1074],
+        ['Dodaj płatki, cynamon i proszek do pieczenia. Odstaw', 112, 93, 1133],
+        ['na 5 minut.', 168, 39, 249],
+      ])
+    ).toBe(
+      'Przygotowanie:\nBanany rozgnieć widelcem, dodaj jajka i wymieszaj.\n' +
+        'Dodaj płatki, cynamon i proszek do pieczenia. Odstaw na 5 minut.'
+    );
+  });
+
+  it('gives keycap step numbers read as bare digits their dot back', () => {
+    expect(
+      flow([
+        ['1 Banany rozgnieć widelcem, dodaj jajka i wymieszaj.', 0, 40, 1074],
+        ['2 Dodaj płatki, cynamon i proszek do pieczenia. Odstaw', 56, 40, 1133],
+        ['na 5 minut.', 112, 40, 249],
+        ['3 Smaż na suchej patelni.', 168, 40, 560],
+      ])
+    ).toBe(
+      '1. Banany rozgnieć widelcem, dodaj jajka i wymieszaj.\n' +
+        '2. Dodaj płatki, cynamon i proszek do pieczenia. Odstaw na 5 minut.\n3. Smaż na suchej patelni.'
+    );
+    // Not a lone number, and not amounts.
+    expect(flow([['3 Smaż na suchej patelni.', 0, 40, 560]])).toBe('3 Smaż na suchej patelni.');
+    expect(
+      flow([
+        ['1 jajko', 0, 40, 180],
+        ['2 marchewki', 56, 40, 260],
+      ])
+    ).toBe('1 jajko\n2 marchewki');
+  });
+
+  it('keeps a heading apart from the paragraph under it', () => {
+    expect(
+      flow([
+        ['Sposób przygotowania', 0, 537, 1054, 54],
+        ['Mąkę z proszkiem posiekaj z', 78, 535, 1040, 51],
+        ['masłem, dodaj cukier puder i', 146, 560, 1055, 46],
+        ['żółtka. Szybko zagnieć ciasto.', 209, 537, 1068, 40],
+      ])
+    ).toBe('Sposób przygotowania\nMąkę z proszkiem posiekaj z masłem, dodaj cukier puder i żółtka. Szybko zagnieć ciasto.');
+  });
+
+  it('joins a capitals title wrapped onto a second line, past the account name', () => {
+    expect(
+      flow([
+        ['bakewithmia 3-INGREDIENT PEANUT BUTTER', 0, 39, 944, 33],
+        ['COOKIES (makes 12)', 58, 39, 490, 38],
+        ['Liczba polubień: 23 481 i jeszcze kilka słów', 300, 40, 1100, 40],
+      ])
+    ).toBe('bakewithmia 3-INGREDIENT PEANUT BUTTER COOKIES (makes 12)\nLiczba polubień: 23 481 i jeszcze kilka słów');
+  });
+
+  it('joins a centered heading set larger than the body text', () => {
+    const title: OcrBlock = {
+      text: 'Szarlotka na kruchym\ncieście',
+      lines: [
+        { text: 'Szarlotka na kruchym', frame: { top: 0, left: 115, width: 939, height: 78 } },
+        { text: 'cieście', frame: { top: 107, left: 441, width: 282, height: 65 } },
+      ],
+      frame: { top: 0, left: 115, width: 939, height: 172 },
+    };
+    const body = rowsToBlocks([
+      ['300 g mąki pszennej', 400, 100, 465],
+      ['200 g zimnego masła', 456, 101, 476],
+      ['100 g cukru pudru', 512, 106, 425],
+      ['3 żółtka', 568, 99, 236],
+    ]);
+    expect(ocrBlocksToText([title, ...body])).toBe(
+      'Szarlotka na kruchym cieście\n300 g mąki pszennej\n200 g zimnego masła\n100 g cukru pudru\n3 żółtka'
+    );
+  });
+
+  it('lets a numbered step and a video chapter run on to the next one', () => {
+    expect(
+      flow([
+        ['1. Preheat the oven to 350°F and line a baking sheet', 0, 39, 1042],
+        ['with parchment paper.', 59, 37, 466],
+        ['2. Mix everything in a bowl until smooth.', 113, 39, 900],
+      ])
+    ).toBe(
+      '1. Preheat the oven to 350°F and line a baking sheet with parchment paper.\n' +
+        '2. Mix everything in a bowl until smooth.'
+    );
+    expect(
+      flow([
+        ['1:30 Dodaj pokrojoną paprykę, duś 5 minut.', 0, 40, 900],
+        ['2:10 Dodaj cukinię, pomidory, koncentrat i', 56, 40, 1000],
+        ['przyprawy. Duś pod przykryciem 20 minut.', 112, 40, 960],
+      ])
+    ).toBe(
+      '1:30 Dodaj pokrojoną paprykę, duś 5 minut.\n' +
+        '2:10 Dodaj cukinię, pomidory, koncentrat i przyprawy. Duś pod przykryciem 20 minut.'
+    );
+  });
+
+  it('keeps a labelled inline list on one line, however long', () => {
+    expect(
+      flow([
+        ['Potrzebujesz: 2 tortille, 150g mielonej wołowiny, 1/2', 0, 46, 1094],
+        ['cebuli, 4 łyżki salsy, garść startego sera, sałata', 59, 44, 1007],
+        ['lodowa', 120, 45, 185],
+      ])
+    ).toBe('Potrzebujesz: 2 tortille, 150g mielonej wołowiny, 1/2 cebuli, 4 łyżki salsy, garść startego sera, sałata lodowa');
+  });
+
+  it('keeps app chrome under a caption on a line of its own', () => {
+    expect(
+      flow([
+        ['Wsyp mąkę z proszkiem i cynamonem, wymieszaj krótko i piecz', 0, 40, 1040],
+        ['45 minut w 175°C.', 56, 40, 380],
+        ['Zobacz wszystkie komentarze: 56', 112, 40, 693],
+      ])
+    ).toBe(
+      'Wsyp mąkę z proszkiem i cynamonem, wymieszaj krótko i piecz 45 minut w 175°C.\n' +
+        'Zobacz wszystkie komentarze: 56'
+    );
+  });
+});
+
+describe('ocrBlocksToText — a phone screen is not a two-column page', () => {
+  it('reads a right-aligned chat bubble in its place, not as a second column', () => {
+    expect(
+      flow([
+        ['21:37', 34, 48, 117, 27],
+        ['5G 82%', 34, 850, 1040, 27],
+        ['Asia Kowalska', 135, 36, 329, 32],
+        ['masz ten przepis na brownie?', 300, 463, 1019, 39],
+        ['Jasne', 417, 61, 171, 32],
+        ['Brownie z fasoli', 533, 63, 353, 32],
+      ])
+    ).toBe('Asia Kowalska\nmasz ten przepis na brownie?\nJasne\nBrownie z fasoli');
+  });
+
+  it('still reads real columns: text side by side', () => {
+    expect(
+      flow([
+        ['500 g mąki', 0, 40, 300],
+        ['Mąkę przesiej do miski.', 0, 500, 1000],
+        ['2 jajka', 120, 40, 200],
+        ['Dodaj jajka i wymieszaj.', 120, 500, 1010],
+      ])
+    ).toBe('500 g mąki\n2 jajka\nMąkę przesiej do miski.\nDodaj jajka i wymieszaj.');
+  });
+});
+
+describe('normalizeOcrText — screen chrome and Polish misreads', () => {
+  it('drops the status bar and chat timestamps', () => {
+    expect(normalizeOcrText('21:37\n5G I 82%\nKopytka\n17:15\n17:20 vv\n1 kg ziemniaków')).toBe(
+      'Kopytka\n1 kg ziemniaków'
+    );
+    // Without a sign of a chat a trailing time stays: it may be the recipe's own.
+    expect(normalizeOcrText('Możesz dodać koperek 17:15')).toBe('Możesz dodać koperek 17:15');
+    expect(normalizeOcrText('17:02 ✔\nMożesz dodać koperek 17:15')).toBe('Możesz dodać koperek');
+    // A post's date keeps its time; amounts and percentages are not a battery.
+    expect(normalizeOcrText('Wczoraj o 18:22')).toBe('Wczoraj o 18:22');
+    expect(normalizeOcrText('śmietana 18%\n0:45 Podsmaż cebulę.')).toBe('śmietana 18%\n0:45 Podsmaż cebulę.');
+  });
+
+  it('puts a misread "ł" back in cooking words whose misread form is no word', () => {
+    expect(normalizeOcrText('1 tyżka masta, pót szklanki mleka')).toBe('1 łyżka masła, pół szklanki mleka');
+    expect(normalizeOcrText('2 lyżeczki, 300 g kietbasy, 2 jabtka, żóttko')).toBe(
+      '2 łyżeczki, 300 g kiełbasy, 2 jabłka, żółtko'
+    );
+    expect(normalizeOcrText('Tyżkę oleju, dojrzate banany, orzechy wtoskie')).toBe(
+      'Łyżkę oleju, dojrzałe banany, orzechy włoskie'
+    );
+    expect(normalizeOcrText('2 yżki cukru Iub miodu, 300 g kiebasy')).toBe('2 łyżki cukru lub miodu, 300 g kiełbasy');
+    expect(normalizeOcrText('twaróg półttusty, na matym ogniu, catą noc')).toBe(
+      'twaróg półtłusty, na małym ogniu, całą noc'
+    );
+  });
+
+  it('puts "ś" and "ą" back where the word is unmistakable', () => {
+    expect(normalizeOcrText('Smietanę zahartuj. Makę przesiej, 300 g maki pszennej')).toBe(
+      'Śmietanę zahartuj. Mąkę przesiej, 300 g mąki pszennej'
+    );
+  });
+
+  it('leaves real words alone', () => {
+    const real = 'maki i makowiec, butki dla lalki, stoik, walki, maty, cala, wioska, lato, tata, polowa kuchnia';
+    expect(normalizeOcrText(real)).toBe(real);
+  });
+
+  it('reads a zero between letters as the letter', () => {
+    expect(normalizeOcrText('p0syp serem\nPRZYG0TOWANIE\n100 g, typ 450')).toBe('posyp serem\nPRZYGOTOWANIE\n100 g, typ 450');
+  });
+
+  it('restores a space swallowed before "i" where the word cannot end that way', () => {
+    expect(normalizeOcrText('wlej śmietankęi wsyp ser, z boczkiemi cebulą, na oczkachi podsmaż')).toBe(
+      'wlej śmietankę i wsyp ser, z boczkiem i cebulą, na oczkach i podsmaż'
+    );
+    expect(normalizeOcrText('do ziemi, palniki, dopraw i usmaż')).toBe('do ziemi, palniki, dopraw i usmaż');
+  });
+
+  it('spaces a list dash or an amount glued to what follows', () => {
+    expect(normalizeOcrText('-1 marchewka\n- 2 cebule\n1tyżeczka sody\n1ząbek czosnku\n300g mąki')).toBe(
+      '- 1 marchewka\n- 2 cebule\n1 łyżeczka sody\n1 ząbek czosnku\n300g mąki'
+    );
+    expect(normalizeOcrText('-\n100 ml śmietany')).toBe('- 100 ml śmietany');
+    expect(normalizeOcrText('11/2 cups flour\nbake at 35o°F')).toBe('1 1/2 cups flour\nbake at 350°F');
+  });
+
+  it('strips icons and checkboxes read as letters in front of an item', () => {
+    expect(normalizeOcrText('O1 kg dyni\nO 2 ząbki czosnku\nD pieprz 2 szczypty\nV½ łyżeczki kminu\n. 60 ml soku')).toBe(
+      '1 kg dyni\n2 ząbki czosnku\npieprz 2 szczypty\n½ łyżeczki kminu\n60 ml soku'
+    );
+    const sentences = 'Dodaj jajka i wymieszaj.\nO smaku tej zupy decyduje przede wszystkim dobry bulion.';
+    expect(normalizeOcrText(sentences)).toBe(sentences);
+  });
+
+  it('puts labels a bar separated, with the bar read as "I", one per line', () => {
+    expect(normalizeOcrText('Czas przygotowania: 30 min I Czas pieczenia: 50 min I\nPorcje: 12')).toBe(
+      'Czas przygotowania: 30 min\nCzas pieczenia: 50 min\nPorcje: 12'
+    );
+    expect(normalizeOcrText('4 Porcje: 4')).toBe('Porcje: 4');
+  });
+
+  it('is idempotent', () => {
+    const once = normalizeOcrText('21:37\n-1 tyżka masta\nśmietankęi 1ząbek, p0syp\nO sól\nCzas: 3 min I Porcje: 2');
+    expect(normalizeOcrText(once)).toBe(once);
+  });
+});
+
+// Review findings: the cleanup must not cost recipe content anything.
+describe('normalizeOcrText — leaves recipe content alone', () => {
+  const same = (text: string) => expect(normalizeOcrText(text)).toBe(text);
+
+  it('keeps gram and percentage lines: they are not a signal or battery indicator', () => {
+    same('500 g mąki\n7g drożdży\n3g soli\n5g cukru');
+    same('czekolada\n70%\nśmietanka 30 %');
+    same('LTE\nWi-Fi hasło');
+    expect(normalizeOcrText('5G I 82%\nLTE 67%\nKopytka')).toBe('Kopytka');
+  });
+
+  it('keeps a time that is the recipe\'s own', () => {
+    same('Czas pieczenia\n1:30');
+    same('Piecz do 18:30');
+    same('Rozmrażaj do 12:00\nBake until 18:30\nGodzina 17:15');
+    same('Kopytka\n20:00\nPodaj na ciepło');
+  });
+
+  it('drops message times only in a chat: a time with delivery ticks, or several bare ones', () => {
+    expect(normalizeOcrText('Ciociu, jak robisz sos?\n17:02 ✔\nMożesz dodać koperek 17:15\n17:20')).toBe(
+      'Ciociu, jak robisz sos?\nMożesz dodać koperek'
+    );
+    expect(normalizeOcrText('Kopytka\n17:15\n1 kg ziemniaków\n17:16\nDzięki!')).toBe('Kopytka\n1 kg ziemniaków\nDzięki!');
+    // A clock on the very first line is the status bar.
+    expect(normalizeOcrText('21:37\nKopytka')).toBe('Kopytka');
+  });
+
+  it('does not rewrite English or real Polish words into cooking ones', () => {
+    same('Make the batter. MAKE sure to mix. Use Watkins vanilla.');
+    same('kawalkada smaków, na matej, potowy');
+    expect(normalizeOcrText('makę przesiej, kawatek masła, kawalki')).toBe('mąkę przesiej, kawałek masła, kawałki');
+  });
+});
+
+describe('ocrBlocksToText — only the status bar is dropped before layout', () => {
+  it('keeps a time or a small amount in the page body', () => {
+    const lines = flow([
+      ['Sernik', 200, 40, 300],
+      ['Czas pieczenia', 400, 40, 330],
+      ['1:30', 400, 500, 580],
+      ['3g soli', 520, 40, 200],
+    ]).split('\n');
+    // (The value sits in a column of its own, so only presence is checked.)
+    expect([...lines].sort()).toEqual(['1:30', '3g soli', 'Czas pieczenia', 'Sernik']);
+  });
+
+  it('drops the clock and the battery in the top row', () => {
+    expect(
+      flow([
+        ['21:37', 34, 48, 117, 27],
+        ['5G 82%', 34, 850, 1040, 27],
+        ['Sernik', 200, 40, 300],
+      ])
+    ).toBe('Sernik');
+  });
+
+  it('leaves a short numbered list of names alone: keycap steps are sentences', () => {
+    expect(
+      flow([
+        ['1 Cebula', 0, 40, 220],
+        ['2 Marchewki', 56, 40, 290],
+        ['3 Ziemniaki', 112, 40, 280],
+      ])
+    ).toBe('1 Cebula\n2 Marchewki\n3 Ziemniaki');
+  });
+
+  it('keeps app chrome apart even under a full line of prose', () => {
+    expect(
+      flow([
+        ['Wsyp mąkę z proszkiem i cynamonem, wymieszaj krótko. Piecz 45 minut.', 0, 40, 1040],
+        ['Zobacz wszystkie komentarze: 56', 56, 40, 693],
+      ])
+    ).toBe('Wsyp mąkę z proszkiem i cynamonem, wymieszaj krótko. Piecz 45 minut.\nZobacz wszystkie komentarze: 56');
+  });
+});
+
+describe('normalizeOcrText — what makes a text a chat', () => {
+  it('keeps the times of a baking schedule: hours apart, no delivery ticks', () => {
+    const schedule = 'Chleb na zakwasie\n08:00\nDokarm zakwas.\n20:00\nWymieszaj mąkę i wodę.';
+    expect(normalizeOcrText(schedule)).toBe(schedule);
+  });
+
+  it('counts delivery ticks at the end of a message too', () => {
+    expect(normalizeOcrText('Ania\nMasz przepis? 17:02 ✓✓\nTak! 200 g mąki i 2 jajka 17:05\nPiecz 30 min w 180°C 17:06')).toBe(
+      'Ania\nMasz przepis?\nTak! 200 g mąki i 2 jajka\nPiecz 30 min w 180°C'
+    );
   });
 });
