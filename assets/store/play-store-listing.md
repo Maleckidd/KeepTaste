@@ -189,6 +189,12 @@ Do not claim "never connects to the internet" in the listing.
 
 ## Release notes
 
+**1.3.2 — EN:**
+Fixed the cooking-timer chip in the instructions sometimes overlapping the next word, most noticeable with a larger system font size.
+
+**1.3.2 — PL:**
+Naprawiono etykietę stopera w instrukcjach, która czasem zachodziła na kolejne słowo — najbardziej widoczne przy większej systemowej czcionce.
+
 **1.3.1 — EN:**
 Importing a recipe from a photo or screenshot is much more accurate. Screenshots of Instagram, Facebook, Messenger, WhatsApp, notes and recipe sites come through cleaner: wrapped lines are joined back together, the status bar, likes, comments and message times are left out, and Polish letters the text recognition often misreads (ł, ś, ą) are restored. Pasted recipes also split better into ingredients and steps.
 
