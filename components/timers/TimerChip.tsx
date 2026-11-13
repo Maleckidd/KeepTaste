@@ -3,7 +3,7 @@
 // the chip shows the live countdown (tap → bar controls) and finally "Time's
 // up" (tap → dismiss). Rendered as an inline view inside the paragraph <Text>.
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, Typography, Spacing, Radius, Touch } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
@@ -50,6 +50,7 @@ export default function TimerChip({
 
   const fontSize = Typography.size.reading * fontScale;
   const lineHeight = Math.round(fontSize * Typography.lineHeight.tight);
+  const iconSize = Math.round(fontSize * ICON_SCALE);
   // Grow the touch area to Touch.min without changing the line's layout.
   const slop = Math.max(0, Math.ceil((Touch.min - lineHeight - 2 * CHIP_PADDING_V) / 2));
 
@@ -98,7 +99,13 @@ export default function TimerChip({
         pressed && styles.pressed,
       ]}
     >
-      <Ionicons name={icon} size={Math.round(fontSize * ICON_SCALE)} color={fg} />
+      {/* Fixed box: Ionicons renders an empty <Text /> until its font loads
+          (it is not embedded), and on Android the paragraph keeps the inline
+          chip's first-measured width — so a zero-width icon left the chip
+          wider than its slot, covering the following words. */}
+      <View style={{ width: iconSize, height: iconSize }}>
+        <Ionicons name={icon} size={iconSize} color={fg} />
+      </View>
       <Text
         style={[
           styles.label,
