@@ -2,7 +2,7 @@
 # persona-lab config for a study of recipe import only. Everything comes from
 # ../config/config.sh except what is below.
 #
-#   caffeinate -i bash persona-lab/engine/run.sh persona-lab/config-import \
+#   caffeinate -i bash persona-lab/run.sh persona-lab/config-import \
 #     --personas-file persona-lab/config-import/personas.json
 #
 # Each state is one import path: the persona starts with the real thing on the

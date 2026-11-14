@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# persona-lab config for KeepTaste. Sourced by persona-lab/engine/*.sh with
+# persona-lab config for KeepTaste. Sourced by the persona-lab engine with
 # CONFIG_DIR set to this directory. Everything app-specific lives here; the
 # engine stays generic.
 

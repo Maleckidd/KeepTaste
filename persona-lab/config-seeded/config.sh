@@ -5,7 +5,7 @@
 # that can be compared between engine versions, models and persona sets.
 #
 #   bash persona-lab/config-seeded/build.sh          # builds runs/seeded/app-seeded.apk
-#   bash persona-lab/engine/run.sh persona-lab/config-seeded \
+#   bash persona-lab/run.sh persona-lab/config-seeded \
 #     --seeded persona-lab/config-seeded/seeded.json
 #
 # Everything comes from ../config/config.sh except what is below.

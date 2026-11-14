@@ -3,7 +3,7 @@
 # for where the app could go, not for how to polish what it is. Everything comes
 # from ../config/config.sh except what is below.
 #
-#   caffeinate -i bash persona-lab/engine/run.sh persona-lab/config-research \
+#   caffeinate -i bash persona-lab/run.sh persona-lab/config-research \
 #     --personas-file persona-lab/config-research/personas.json
 #
 # The team must not know the product's intended limits, or it stays inside them.
