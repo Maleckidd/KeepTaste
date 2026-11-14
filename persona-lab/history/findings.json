@@ -1,0 +1,742 @@
+{
+  "next": 24,
+  "findings": [
+    {
+      "id": "F-001",
+      "kind": "problem",
+      "title": "Pole Składniki zasłonięte przy wpisywaniu nowego przepisu (duża czcionka)",
+      "priority": "P2",
+      "status": "open",
+      "where": [
+        "components/recipe/RecipeForm.tsx:281",
+        "components/recipe/RecipeForm.tsx:478"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 1,
+          "personas": [
+            "babcia-zeszyt-sernik"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 2,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 3,
+          "personas": [
+            "oliver-sourdough-grams",
+            "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-002",
+      "kind": "problem",
+      "title": "Wyszukiwanie po kilku składnikach nic nie zwraca i nie podpowiada, co dalej",
+      "priority": "P2",
+      "status": "open",
+      "where": [
+        "utils/search.ts:91",
+        "app/cookbook/[id].tsx:444"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 1,
+          "personas": [
+            "fridge-skeptic-weeknight"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 2,
+          "personas": [
+            "jamal-fridge-rush"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-003",
+      "kind": "problem",
+      "title": "Udostępnianie przepisu schowane w menu ···",
+      "priority": "P2",
+      "status": "open",
+      "where": [
+        "app/recipe/[id].tsx:254",
+        "app/recipe/[id].tsx:268"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-114007",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 1,
+          "personas": [
+            "babcia-zeszyt-sernik"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-004",
+      "kind": "problem",
+      "title": "W widoku książki nie ma pola wyszukiwania",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:381"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-114007",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "babcia-zeszyt-sernik"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-005",
+      "kind": "problem",
+      "title": "Dodawanie wielu produktów naraz: Paste a whole list niezauważone",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "app/shopping/[id].tsx:584",
+        "app/shopping/[id].tsx:630",
+        "components/shopping/PasteListSheet.tsx:45"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "fridge-skeptic-weeknight"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 2,
+          "personas": [
+            "jamal-fridge-rush"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-006",
+      "kind": "wish",
+      "title": "Co ugotuję z tego, co mam — ranking według brakujących składników",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "utils/search.ts:67"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "fridge-skeptic-weeknight"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "jamal-fridge-rush"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-007",
+      "kind": "wish",
+      "title": "Brakujące składniki na listę zakupów jednym przyciskiem",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "app/recipe/add-to-list.tsx"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-114007",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "fridge-skeptic-weeknight"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-008",
+      "kind": "wish",
+      "title": "Ostrzeżenie o duplikacie na liście zakupów",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "app/recipe/add-to-list.tsx"
+      ],
+      "first_seen": "20261112-114007",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-114007",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "fridge-skeptic-weeknight"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "oliver-sourdough-grams"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-009",
+      "kind": "problem",
+      "title": "Aplikacja przestaje odpowiadać (ANR) po zapisaniu przepisu",
+      "priority": "P1",
+      "status": "open",
+      "where": [
+        "app/recipe/new.tsx:94",
+        "app/(tabs)/index.tsx:255"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-160835",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P1",
+          "runs": 1,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "not_reproduced",
+          "priority": null,
+          "runs": null,
+          "personas": [],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-010",
+      "kind": "problem",
+      "title": "Nowo zapisany przepis Bez książki jest niewidoczny po zapisie",
+      "priority": "P2",
+      "status": "open",
+      "where": [
+        "app/recipe/new.tsx:94",
+        "app/recipe/new.tsx:99",
+        "components/ui/SnackbarProvider.tsx:54"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 2,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 4,
+          "personas": [
+            "oliver-sourdough-grams",
+            "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-011",
+      "kind": "problem",
+      "title": "Przypisanie do książki: pole w formularzu niezauważone, przeniesienie tylko przez ··· → Edytuj",
+      "priority": "P2",
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:321",
+        "app/cookbook/[id].tsx:512",
+        "app/recipe/[id].tsx:253"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 2,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 2,
+          "personas": [
+            "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-012",
+      "kind": "problem",
+      "title": "Import z linku: zły adres bez walidacji, 404 komunikowane jako blokada strony",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "utils/recipeImportFetch.ts:37",
+        "components/recipe/ImportSheet.tsx:255",
+        "components/recipe/ImportSheet.tsx:463"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-160835",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 2,
+          "personas": [
+            "marek-60-sekund"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-013",
+      "kind": "problem",
+      "title": "Klawiatura otwiera się sama w Wszystkie przepisy",
+      "priority": "P2",
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:395",
+        "app/(tabs)/index.tsx:187"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 4,
+          "personas": [
+            "oliver-sourdough-grams",
+            "kasia-ksiazka-na-prezent",
+            "jamal-fridge-rush"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-014",
+      "kind": "problem",
+      "title": "Ikona aparatu bez podpisu w formularzu nowej książki",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "components/cookbook/CookbookForm.tsx:194"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-015",
+      "kind": "wish",
+      "title": "Awaryjny zapis tytułu i linku, gdy import zawiedzie",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "components/recipe/ImportSheet.tsx:241",
+        "components/recipe/ImportSheet.tsx:255"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-160835",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marek-60-sekund"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-016",
+      "kind": "wish",
+      "title": "Przycisk Wklej ze schowka w polu URL",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "components/recipe/ImportSheet.tsx:463"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-160835",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marek-60-sekund"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-017",
+      "kind": "wish",
+      "title": "Nazwa książki widoczna w widoku przepisu",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "app/recipe/[id].tsx:287"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-160835",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "halina-zeszyt-babci"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-018",
+      "kind": "wish",
+      "title": "Informacja, które strony działają, albo lepsze pobieranie przy blokadzie",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "utils/recipeImportFetch.ts:37"
+      ],
+      "first_seen": "20261112-160835",
+      "last_seen": "20261112-160835",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-160835",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "marek-60-sekund"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-019",
+      "kind": "problem",
+      "title": "Autokapitalizacja zmienia pierwsze litery linii w składnikach",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "components/recipe/RecipeForm.tsx:418"
+      ],
+      "first_seen": "20261112-185244",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 2,
+          "personas": [
+            "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-020",
+      "kind": "problem",
+      "title": "Droga do zakładki Zakupy z wyszukiwania lub przepisu wymaga kilku cofnięć",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:395",
+        "app/recipe/[id].tsx"
+      ],
+      "first_seen": "20261112-185244",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 3,
+          "personas": [
+            "jamal-fridge-rush",
+            "oliver-sourdough-grams"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-021",
+      "kind": "problem",
+      "title": "Pole Qty nie pokazuje fokusu",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "components/ui/Input.tsx:26",
+        "app/shopping/[id].tsx:606"
+      ],
+      "first_seen": "20261112-185244",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "oliver-sourdough-grams"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-022",
+      "kind": "wish",
+      "title": "Skalowanie przepisu z przeliczeniem gramów (poza zakresem, SPEC §7)",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261112-185244",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "oliver-sourdough-grams"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-023",
+      "kind": "wish",
+      "title": "Podgląd PDF książki przed wysłaniem",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:307",
+        "utils/cookbookPdf.ts"
+      ],
+      "first_seen": "20261112-185244",
+      "last_seen": "20261112-185244",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261112-185244",
+          "version": "1.3.0",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    }
+  ]
+}
