@@ -71,15 +71,31 @@ Two checks use them:
   are regular expressions and involve no model;
 - a judge: one tool-free model call, isolated like a persona, that gets the
   needs, the materials and both states and answers per need `met`, `partly`,
-  `not_met` or `unverifiable`.
+  `not_met` or `unverifiable`, and, from the persona's closing words alone,
+  whether the persona believes that need was achieved (`claimed`).
 
 `summary.json` then has `verified` (`met` / `partly` / `not_met` /
 `unverifiable`, or `none` when nothing was checked) and `self_report`.
-`overclaimed` means the persona said done and the end state disagrees. That is
-the most expensive kind of usability problem (the user leaves believing it
+`overclaimed` means the persona left with a belief the end state contradicts:
+it stopped with `done`, and a need it does not itself call a failure has
+nothing in the app, or one of the owner's patterns for such a need fails. That
+is the most expensive kind of usability problem (the user leaves believing it
 worked), and no report written by the persona can contain it. The synthesis
 reports each one. The judge is a model reading a screen capture, so the
 synthesis is told to open `state.md` itself before repeating a verdict.
+
+Two things are deliberately not an overclaim. `done` with a reason that says
+"I only got the eggs onto the list" claims nothing about the rest: the action
+means "I am finished, successfully or not". And `partly` alone lowers
+`verified` without flagging the run, because the judge gives it for an
+inference it could not confirm as readily as for a missing step. The first
+session with the check (iteration 11) flagged both of its runs under the older
+rule, "done and not fully met", and neither persona had believed anything
+false.
+
+The check sees only what `capture_state` reads. A part of the app the hook
+does not visit comes out as `not_met` for every need that lives there, so when
+a verdict looks wrong, look at what the hook covers before blaming the judge.
 
 **The rig.** A turn that takes minutes instead of seconds means the host slept
 or a call hung. The engine records the time of every turn and of the setup
@@ -310,8 +326,12 @@ runs/<session-id>/
   seeded-score.md, .json         recall on planted defects (sessions run with --seeded)
 ```
 
-A run costs about two minutes more than before: reading the app's state takes
-close to a minute each time, and the judge is one more model call.
+The outcome check adds two reads of the app's state and one model call (the
+judge) to every run. A read is slow because each look at the screen is a UI
+dump of 3–4 seconds: on KeepTaste's demo library one read takes a little over
+three minutes (about 200 s measured on 2026-11-12, 50 s of it the four
+cookbooks), so a run in that state is six to seven minutes longer than without
+the hook. A fresh install has less to read.
 
 Every synthesis is also archived to **`history/`** — tracked in git, unlike
 `runs/` — as `NN-YYYY-MM-DD.md` (iteration number, date, app version, outcomes,
@@ -344,10 +364,20 @@ number. `run.sh <config> --archive-only <session-dir>` rewrites one entry.
 - `capture_state` in `config/config.sh` reads the end state through the UI,
   because the release build is not debuggable: a cold start into "all recipes"
   by deep link (`keeptaste://cookbook/all`), the full text of the three most
-  recently changed recipes, the recipe titles, the shopping lists and the first
-  list. It taps recipe cards, list rows and Back, nothing else. It finds cards
-  by shape (the only tall tappable elements on that screen), so a redesign of
-  the recipe list needs a look at it.
+  recently changed recipes, the recipe titles, every cookbook on the home
+  screen with the recipes in it, the shopping lists and the first list. It
+  taps recipe cards, cookbook tiles, list rows and Back, nothing else. It finds
+  cards and tiles by shape (the only tall tappable elements on the recipe
+  list; tappable squares half the screen wide on the home screen), so a
+  redesign of either screen needs a look at it. The "new cookbook" tile has
+  the shape of a cookbook and is skipped by its label (`CAPTURE_SKIP_TILES`),
+  which has to follow `home.newCookbook` in `i18n/dictionary.ts`.
+  Lists are read as card titles only, the first `CAPTURE_TITLES` (12) of each,
+  so that two reads of the same list come out the same. The search field of
+  "all recipes" takes focus by itself and brings the keyboard up over the
+  lower cards; the hook closes it (`keyboard_hide`) before every tap and
+  scroll there. Before that a tap on the third card typed a letter into the
+  search, and a scroll glide-typed a word.
 - `config-import/personas.json` has `expect` patterns for every import path
   (the recipe is there, ingredients have their own section, the mother's
   private notes are gone, no hashtags), so that study's outcomes no longer
