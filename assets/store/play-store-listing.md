@@ -189,6 +189,12 @@ Do not claim "never connects to the internet" in the listing.
 
 ## Release notes
 
+**1.3.3 — EN:**
+Pasting products into a shopping list now also works with one-line lists: products separated by commas, semicolons or periods ("milk, bread, butter") are split into separate items, not just one per line. Decimals like "2.5 kg" and text in brackets stay intact.
+
+**1.3.3 — PL:**
+Wklejanie produktów do listy zakupów działa teraz także z listami w jednej linii: produkty oddzielone przecinkami, średnikami lub kropkami („mleko, chleb, masło”) trafiają na listę osobno, a nie tylko po jednym w linii. Ułamki takie jak „2,5 kg” i tekst w nawiasach zostają w całości.
+
 **1.3.2 — EN:**
 Fixed the cooking-timer chip in the instructions sometimes overlapping the next word, most noticeable with a larger system font size.
 
