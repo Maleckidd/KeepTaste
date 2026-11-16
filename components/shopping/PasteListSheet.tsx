@@ -26,7 +26,7 @@ import {
 import { useT } from '@/i18n/LanguageProvider';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { parseIngredients } from '@/utils/ingredients';
+import { parsePastedProducts } from '@/utils/ingredients';
 import { createShoppingItems } from '@/db/shoppingLists';
 import { pluralPl } from '@/utils/i18n';
 import type { TranslationKey } from '@/i18n/dictionary';
@@ -53,7 +53,8 @@ const addKeys: Record<ReturnType<typeof pluralPl>, TranslationKey> = {
 
 // Paste-products sheet (SPEC §5.16). Mirrors ImportSheet's overlay pattern
 // (no native <Modal>) so it stacks reliably; must be a direct child of the
-// screen root. Reuses parseIngredients + createShoppingItems wholesale.
+// screen root. Parses with parsePastedProducts (lines + inline separators)
+// and inserts with createShoppingItems.
 export default function PasteListSheet({
   visible,
   listId,
@@ -169,7 +170,7 @@ export default function PasteListSheet({
   const allChecked = candidates.length > 0 && checkedCount === candidates.length;
 
   const handleNext = () => {
-    const parsed = parseIngredients(text);
+    const parsed = parsePastedProducts(text);
     if (parsed.length === 0) {
       setError(t('pasteList.empty'));
       return;

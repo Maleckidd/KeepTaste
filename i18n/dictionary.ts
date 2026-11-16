@@ -504,8 +504,8 @@ export const dictionary = {
   // --- Paste products into a shopping list (components/shopping/PasteListSheet.tsx, §5.16) ---
   'pasteList.title': { en: 'Paste products', pl: 'Wklej produkty' },
   'pasteList.placeholder': {
-    en: 'Paste products, one per line',
-    pl: 'Wklej produkty, każdy w nowej linii',
+    en: 'Paste products – one per line or separated by commas',
+    pl: 'Wklej produkty – każdy w nowej linii lub po przecinku',
   },
   'pasteList.next': { en: 'Next', pl: 'Dalej' },
   'pasteList.empty': {

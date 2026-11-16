@@ -424,6 +424,38 @@ describe('utils/shoppingList — classifyAddRowChange', () => {
     });
   });
 
+  describe('a paste with inline separators -> paste', () => {
+    it.each([
+      ['', 'Milk, Bread, Eggs', ['Milk', 'Bread', 'Eggs']],
+      ['', 'mleko; chleb', ['mleko', 'chleb']],
+      ['', 'mleko, chleb\nmasło', ['mleko', 'chleb', 'masło']],
+      // Pasted next to typed text: the whole field value is parsed.
+      ['Ser', 'Ser, mleko, chleb', ['Ser', 'mleko', 'chleb']],
+    ] as const)('(%p, %p) -> paste %p', (prev, next, products) => {
+      expect(classifyAddRowChange(prev, next)).toEqual({
+        kind: 'paste',
+        products: [...products],
+      });
+    });
+  });
+
+  describe('typing a separator never splits -> text next', () => {
+    it.each([
+      // Typed comma.
+      ['Milk', 'Milk,'],
+      ['Milk, Bread', 'Milk, Bread,'],
+      ['Milk, Brea', 'Milk, Bread'],
+      // Keyboard autocorrect replacing the last word and appending ", ".
+      ['chleb, mlek', 'chleb, mleko, '],
+      // Decimal comma.
+      ['2', '2,5 kg'],
+      // Pasted chunk that is a single product.
+      ['', 'mąka (typ 650, 1 kg)'],
+    ])('(%p, %p) -> text next', (prev, next) => {
+      expect(classifyAddRowChange(prev, next)).toEqual({ kind: 'text', value: next });
+    });
+  });
+
   describe('a paste parsing to exactly one product -> text with that product', () => {
     it.each([
       ['', 'Milk\n', 'Milk'],

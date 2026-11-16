@@ -765,24 +765,26 @@ A convenience entry into §5.15's import flow: from any app's **Share** menu (a 
 
 ### 5.16 Pasting products into a shopping list
 
-A fast way to fill an existing shopping list from text the user already has (a note, a message, a recipe copied from elsewhere): paste the whole block, review the parsed products, add the ones they want. Same philosophy as §5.12 — line-based, deterministic, no AI — and it **reuses §5.12's machinery wholesale**: the `parseIngredients(text)` parser (`utils/ingredients.ts`) and the `createShoppingItems(listId, names)` bulk insert (`db/shoppingLists.ts`). No new parser, DB helper, schema, or migration.
+A fast way to fill an existing shopping list from text the user already has (a note, a message, a recipe copied from elsewhere): paste the whole block, review the parsed products, add the ones they want. Same philosophy as §5.12 — deterministic, no AI — and it builds on §5.12's machinery: `parsePastedProducts(text)` (`utils/ingredients.ts`) runs §5.12's line parser (`parseIngredientLines`: markers, blank lines, `#` headings) and then splits each line at **inline separators** (`splitInlineProducts`), so `mleko, chleb; masło` works as well as one product per line; the `createShoppingItems(listId, names)` bulk insert (`db/shoppingLists.ts`) is reused as is. No new DB helper, schema, or migration.
+
+**Inline separators:** `,` `;` `|` `•` and a `.` that ends a word (followed by a space or the end of the line), all only outside `()`/`[]`/`{}` (`mąka (typ 650, 1 kg)` stays one product). A `,` or `.` between two digits is a decimal (`2,5 kg`, `1.5 l`); a `.` after a known abbreviation (`szt.`, `ok.`, `op.`, `łyż.`, `tbsp.`, …) splits only when a capital letter follows (`2 szt. jajek` stays one product); a number alone before a `.` is a list marker (`1. mleko, 2. chleb`). Recipe ingredients (§5.12, §5.4) stay **line-based** — `sól, pieprz do smaku` is one ingredient there.
 
 **Scope:** paste targets the **currently open list only** — there is no list-picker and no "create a new list from a paste" path (unlike §5.12's recipe bridge, which must choose a destination). To start a fresh list the user creates it first (§5.10), then pastes into it.
 
 **Entry points:**
 - a **"Paste products"** item (`clipboard-outline`) in the "⋯" header menu of the list detail view (§5.10), between "Rename" and "Delete list". It opens the `PasteListSheet` on its Paste step;
 - a **"Paste a whole list"** text link right under the add row (add mode only, not while editing a product). Same as the menu item;
-- **auto-detect** in the add row's name field (§5.10): a paste with line breaks that parses to 2+ products clears the field and opens the `PasteListSheet` **directly on its Review step** with those products (pure `classifyAddRowChange` in `utils/shoppingList.ts`, unit-tested).
+- **auto-detect** in the add row's name field (§5.10): a paste with line breaks that parses to 2+ products clears the field and opens the `PasteListSheet` **directly on its Review step** with those products (pure `classifyAddRowChange` in `utils/shoppingList.ts`, unit-tested). A paste **without** line breaks does the same when the inserted chunk alone already parses to 2+ products (`mleko, chleb, masło` from the clipboard); typing a comma by hand, or a keyboard autocorrect inserting `word, `, never splits.
 
 **`PasteListSheet` (`components/shopping/PasteListSheet.tsx`):** a bottom sheet modeled on `ImportSheet` (§5.15) — overlay (no native `<Modal>`), `translateY` animation, keyboard-height lift, hardware-back handling — with two steps:
-1. **Paste** — a multiline input (placeholder "Paste products, one per line") and a "Next" button (disabled while empty). The input takes focus as soon as the sheet has slid open, so the keyboard is up without an extra tap (iteration 3: a persona started typing into a sheet with nothing focused). On Next: `parseIngredients(text)`. Zero candidates → inline "No products found", stay on step 1.
+1. **Paste** — a multiline input (placeholder "Paste products – one per line or separated by commas") and a "Next" button (disabled while empty). The input takes focus as soon as the sheet has slid open, so the keyboard is up without an extra tap (iteration 3: a persona started typing into a sheet with nothing focused). On Next: `parsePastedProducts(text)`. Zero candidates → inline "No products found", stay on step 1.
 2. **Review** — the candidates as a checklist, **all checked by default** (same row markup and "Select all / none" toggle as §5.12); a confirm button "Add N" with the live checked count and Polish plurals, disabled at 0 checked.
 
 **On confirm:** `createShoppingItems(listId, selectedNames)` — products added **unchecked**, `quantity = NULL`, list `updated_at` touched once; quantities embedded in a line stay in the name (§5.12 parsing rules). **Duplicates are allowed** — no merging with existing items (consistent with §5.8/§5.12). The sheet closes; the list reloads and a snackbar confirms the add (reusing §5.12's `added.*` strings).
 
 **i18n:** new `pasteList.*` strings (sheet title, placeholder, "Next", empty message) and a `shoppingList.pasteProducts` menu label get EN+PL entries (§5.11); the checklist, select-all toggle, and confirmation reuse the existing `addToList.*` strings.
 
-**Testing:** `parseIngredients` is pure → its existing `__tests__/` coverage is extended with loose-paste cases (numbered lines, bullets, blank lines between items, `#` headings skipped); the sheet UI is verified by running the app.
+**Testing:** `parseIngredients`, `parsePastedProducts`, `splitInlineProducts` and `classifyAddRowChange` are pure → `__tests__/ingredients.test.ts` / `__tests__/shoppingList.test.ts` cover loose-paste cases (numbered lines, bullets, blank lines, `#` headings, inline separators, decimals, brackets, abbreviations, typed vs pasted commas); the sheet UI is verified by running the app.
 
 ---
 

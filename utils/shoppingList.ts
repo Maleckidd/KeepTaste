@@ -1,7 +1,7 @@
 // Pure helpers for the Shopping lists feature (SPEC.md §5.10).
 // No native imports, no DB access.
 
-import { parseIngredients } from './ingredients';
+import { parsePastedProducts } from './ingredients';
 
 export interface ItemInput {
   name: string;
@@ -171,25 +171,54 @@ export type AddRowChange =
   | { kind: 'paste'; products: string[] };
 
 /**
+ * The text inserted by a field change: `next` minus the prefix and suffix it
+ * shares with `prev`. "" when the change only deleted.
+ */
+function insertedText(prev: string, next: string): string {
+  let start = 0;
+  const max = Math.min(prev.length, next.length);
+  while (start < max && prev[start] === next[start]) start++;
+  let end = 0;
+  while (
+    end < max - start &&
+    prev[prev.length - 1 - end] === next[next.length - 1 - end]
+  ) {
+    end++;
+  }
+  return next.slice(start, next.length - end);
+}
+
+/**
  * Classifies a change of the single-line add-row name field (SPEC.md §5.10):
- * - no line break in `next` → plain typing, keep `next`;
  * - exactly one typed line break (next is prev plus one break) → swallow it,
  *   keep `prev`;
- * - otherwise a paste: the WHOLE field value is parsed — 2+ products open the
- *   Review sheet, a single product goes into the field (one line is not a
- *   list), zero products stay as typed text with line breaks collapsed.
+ * - a change with line breaks is a paste: the WHOLE field value is parsed
+ *   with {@link parsePastedProducts} — 2+ products open the Review sheet, a
+ *   single product goes into the field (one line is not a list), zero
+ *   products stay as typed text with line breaks collapsed;
+ * - without a line break, the change is a paste only when the inserted chunk
+ *   ALONE is already a list ("mleko, chleb, masło" from the clipboard) —
+ *   typing a comma, or a keyboard autocorrect inserting "word, ", never
+ *   splits; then the whole field value is parsed as above;
+ * - anything else is plain typing, keep `next`.
  * Detection doesn't depend on growth: a paste over a selection that shortens
  * the field still counts.
  */
 export function classifyAddRowChange(prev: string, next: string): AddRowChange {
-  if (!/[\r\n]/.test(next)) return { kind: 'text', value: next };
+  if (!/[\r\n]/.test(next)) {
+    if (parsePastedProducts(insertedText(prev, next)).length >= 2) {
+      const products = parsePastedProducts(next);
+      if (products.length >= 2) return { kind: 'paste', products };
+    }
+    return { kind: 'text', value: next };
+  }
   if (
     next.length === prev.length + 1 &&
     next.replace(/[\r\n]/g, '') === prev
   ) {
     return { kind: 'text', value: prev };
   }
-  const products = parseIngredients(next.replace(/\r\n?/g, '\n'));
+  const products = parsePastedProducts(next.replace(/\r\n?/g, '\n'));
   if (products.length >= 2) return { kind: 'paste', products };
   if (products.length === 1) return { kind: 'text', value: products[0] };
   return { kind: 'text', value: collapseLineBreaks(next) };

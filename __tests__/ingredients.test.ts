@@ -4,6 +4,8 @@
 import {
   parseIngredients,
   parseIngredientLines,
+  parsePastedProducts,
+  splitInlineProducts,
 } from '../utils/ingredients';
 
 describe('parseIngredients — basics', () => {
@@ -225,5 +227,90 @@ describe('parseIngredientLines', () => {
     );
     expect(items.map((i) => i.text)).toEqual(parseIngredients(text));
     expect(items.map((i) => i.index)).toEqual([0, 1, 2, 3, 4]);
+  });
+});
+
+// Pasting into a shopping list (§5.16) splits at inline separators as well as
+// line breaks; recipe ingredients (§5.12) stay line-based.
+describe('splitInlineProducts', () => {
+  it.each([
+    ['mleko, chleb, masło', ['mleko', 'chleb', 'masło']],
+    ['mleko; chleb;masło', ['mleko', 'chleb', 'masło']],
+    ['mleko | chleb', ['mleko', 'chleb']],
+    ['mleko • chleb • masło', ['mleko', 'chleb', 'masło']],
+    ['Mleko. Chleb. Masło.', ['Mleko', 'Chleb', 'Masło']],
+    ['mleko. chleb', ['mleko', 'chleb']],
+    ['mleko,,  , chleb,', ['mleko', 'chleb']],
+  ] as const)('%p -> %p', (line, expected) => {
+    expect(splitInlineProducts(line)).toEqual([...expected]);
+  });
+
+  it('keeps decimal commas and periods', () => {
+    expect(splitInlineProducts('2,5 kg ziemniaków, 1.5 l mleka')).toEqual([
+      '2,5 kg ziemniaków',
+      '1.5 l mleka',
+    ]);
+  });
+
+  it('does not split inside brackets', () => {
+    expect(splitInlineProducts('mąka (typ 650, 1 kg), cukier [biały; drobny]')).toEqual([
+      'mąka (typ 650, 1 kg)',
+      'cukier [biały; drobny]',
+    ]);
+  });
+
+  it('keeps a period after an abbreviation unless a capital follows', () => {
+    expect(splitInlineProducts('2 szt. jajek, ok. 1 kg jabłek')).toEqual([
+      '2 szt. jajek',
+      'ok. 1 kg jabłek',
+    ]);
+    expect(splitInlineProducts('jajka 10 szt. Mleko')).toEqual(['jajka 10 szt', 'Mleko']);
+  });
+
+  it('keeps a period with no space after it (e.g. a domain or initials)', () => {
+    expect(splitInlineProducts('sok Tymbark.pl')).toEqual(['sok Tymbark.pl']);
+  });
+
+  it('returns [] for separators only', () => {
+    expect(splitInlineProducts(' , ; . ')).toEqual([]);
+  });
+});
+
+describe('parsePastedProducts', () => {
+  it('splits a one-line comma list', () => {
+    expect(parsePastedProducts('mleko, chleb, masło, 6 jajek')).toEqual([
+      'mleko',
+      'chleb',
+      'masło',
+      '6 jajek',
+    ]);
+  });
+
+  it('mixes lines, markers and inline separators', () => {
+    const text = ['# Nabiał', '- mleko, jogurt', '• ser; masło', '', '1. chleb'].join('\n');
+    expect(parsePastedProducts(text)).toEqual([
+      'mleko',
+      'jogurt',
+      'ser',
+      'masło',
+      'chleb',
+    ]);
+  });
+
+  it('strips a list marker that starts an inline piece', () => {
+    expect(parsePastedProducts('1. mleko, 2. chleb')).toEqual(['mleko', 'chleb']);
+  });
+
+  it('still parses one product per line like parseIngredients', () => {
+    const text = 'mleko 2l\n\n- chleb\n• masło\n2) ser żółty';
+    expect(parsePastedProducts(text)).toEqual(parseIngredients(text));
+  });
+
+  it('keeps duplicates', () => {
+    expect(parsePastedProducts('mleko, mleko')).toEqual(['mleko', 'mleko']);
+  });
+
+  it('leaves recipe ingredient parsing line-based', () => {
+    expect(parseIngredients('sól, pieprz do smaku')).toEqual(['sól, pieprz do smaku']);
   });
 });
