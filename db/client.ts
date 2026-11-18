@@ -61,7 +61,7 @@ export function runMigrations() {
   // after the timed ones. Same duplicate-column swallow as v2.
   if (from < 3) {
     try {
-      // sqlite.execSync(`ALTER TABLE shopping_items ADD COLUMN checked_at TEXT`);
+      sqlite.execSync(`ALTER TABLE shopping_items ADD COLUMN checked_at TEXT`);
     } catch {
       // column already exists (fresh DB created by the baseline DDL)
     }
