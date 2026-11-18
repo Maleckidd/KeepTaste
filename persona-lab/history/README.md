@@ -1,6 +1,6 @@
 # Historia testów z personami — KeepTaste
 
-Jedna iteracja = jedna sesja `persona-lab/engine/run.sh`. Pliki powstają automatycznie po syntezie.
+Jedna iteracja = jedna sesja persona-lab (`engine/run.sh`). Pliki powstają automatycznie po syntezie.
 Zrzuty ekranu i wideo zostają lokalnie w `runs/` (poza gitem).
 
 „Cel według persony” to deklaracja persony. „Potwierdzone” to przebiegi, w których stan końcowy aplikacji pokazuje osiągnięty cel
@@ -23,3 +23,4 @@ Znaleziska ze stałymi identyfikatorami i statusem: [findings.md](findings.md).
 | 11 | 2026-11-12 | 1.3.0 | 2 | 2 | 0 | 0 | 0 | [11-2026-11-12.md](11-2026-11-12.md) |
 | 12 | 2026-11-12 | 1.3.0 | 4 | 1 | 0 | 3 | 1 | [12-2026-11-12.md](12-2026-11-12.md) |
 | 13 | 2026-11-12 | 1.3.0 | 6 | 4 | 0 | 0 | 0 | [13-2026-11-12.md](13-2026-11-12.md) |
+| 14 | 2026-11-14 | 1.3.1 | 10 | 1 | 2 | 8 | 3 | [14-2026-11-14.md](14-2026-11-14.md) |

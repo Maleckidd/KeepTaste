@@ -1,5 +1,5 @@
 {
-  "next": 24,
+  "next": 36,
   "findings": [
     {
       "id": "F-001",
@@ -9,10 +9,10 @@
       "status": "open",
       "where": [
         "components/recipe/RecipeForm.tsx:281",
-        "components/recipe/RecipeForm.tsx:478"
+        "components/recipe/RecipeForm.tsx:477"
       ],
       "first_seen": "20261112-114007",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -46,6 +46,19 @@
           "personas": [
             "oliver-sourdough-grams",
             "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 3,
+          "personas": [
+            "halina-zeszyt",
+            "kuba-60-sekund",
+            "daniel-sourdough"
           ],
           "status_before": "open"
         }
@@ -178,6 +191,15 @@
             "jamal-fridge-rush"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "not_reproduced",
+          "priority": null,
+          "runs": null,
+          "personas": [],
+          "status_before": "open"
         }
       ]
     },
@@ -191,7 +213,7 @@
         "utils/search.ts:67"
       ],
       "first_seen": "20261112-114007",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -215,6 +237,17 @@
             "jamal-fridge-rush"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marta-lodowka"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -228,7 +261,7 @@
         "app/recipe/add-to-list.tsx"
       ],
       "first_seen": "20261112-114007",
-      "last_seen": "20261112-114007",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -241,6 +274,17 @@
             "fridge-skeptic-weeknight"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marta-lodowka"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -251,10 +295,10 @@
       "priority": null,
       "status": "open",
       "where": [
-        "app/recipe/add-to-list.tsx"
+        "components/shopping/PasteListSheet.tsx"
       ],
       "first_seen": "20261112-114007",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -278,6 +322,17 @@
             "oliver-sourdough-grams"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marta-lodowka"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -288,11 +343,10 @@
       "priority": "P1",
       "status": "open",
       "where": [
-        "app/recipe/new.tsx:94",
-        "app/(tabs)/index.tsx:255"
+        "app/cookbook/new.tsx:19"
       ],
       "first_seen": "20261112-160835",
-      "last_seen": "20261112-160835",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -314,6 +368,17 @@
           "runs": null,
           "personas": [],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P1",
+          "runs": 1,
+          "personas": [
+            "sophie-gift-book"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -321,15 +386,16 @@
       "id": "F-010",
       "kind": "problem",
       "title": "Nowo zapisany przepis Bez książki jest niewidoczny po zapisie",
-      "priority": "P2",
+      "priority": "P1",
       "status": "open",
       "where": [
         "app/recipe/new.tsx:94",
-        "app/recipe/new.tsx:99",
-        "components/ui/SnackbarProvider.tsx:54"
+        "app/recipe/new.tsx:98",
+        "components/ui/SnackbarProvider.tsx:54",
+        "app/(tabs)/index.tsx:255"
       ],
       "first_seen": "20261112-160835",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -354,6 +420,19 @@
             "kasia-ksiazka-na-prezent"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P1",
+          "runs": 6,
+          "personas": [
+            "halina-zeszyt",
+            "kuba-60-sekund",
+            "daniel-sourdough"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -361,15 +440,16 @@
       "id": "F-011",
       "kind": "problem",
       "title": "Przypisanie do książki: pole w formularzu niezauważone, przeniesienie tylko przez ··· → Edytuj",
-      "priority": "P2",
+      "priority": "P1",
       "status": "open",
       "where": [
-        "app/cookbook/[id].tsx:321",
-        "app/cookbook/[id].tsx:512",
-        "app/recipe/[id].tsx:253"
+        "app/recipe/[id].tsx:262",
+        "components/recipe/RecipeForm.tsx:349",
+        "app/cookbook/[id].tsx:447",
+        "app/cookbook/[id].tsx:512"
       ],
       "first_seen": "20261112-160835",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -391,6 +471,18 @@
           "runs": 2,
           "personas": [
             "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P1",
+          "runs": 3,
+          "personas": [
+            "halina-zeszyt",
+            "sophie-gift-book"
           ],
           "status_before": "open"
         }
@@ -431,11 +523,10 @@
       "priority": "P2",
       "status": "open",
       "where": [
-        "app/cookbook/[id].tsx:395",
-        "app/(tabs)/index.tsx:187"
+        "app/cookbook/[id].tsx:395"
       ],
       "first_seen": "20261112-160835",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -461,6 +552,18 @@
             "jamal-fridge-rush"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 3,
+          "personas": [
+            "halina-zeszyt",
+            "daniel-sourdough"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -474,7 +577,7 @@
         "components/cookbook/CookbookForm.tsx:194"
       ],
       "first_seen": "20261112-160835",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -496,6 +599,17 @@
           "runs": 1,
           "personas": [
             "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "halina-zeszyt"
           ],
           "status_before": "open"
         }
@@ -535,10 +649,11 @@
       "priority": null,
       "status": "open",
       "where": [
-        "components/recipe/ImportSheet.tsx:463"
+        "components/recipe/ImportSheet.tsx:463",
+        "components/shopping/PasteListSheet.tsx:45"
       ],
       "first_seen": "20261112-160835",
-      "last_seen": "20261112-160835",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -549,6 +664,18 @@
           "runs": 2,
           "personas": [
             "marek-60-sekund"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 3,
+          "personas": [
+            "kuba-60-sekund",
+            "marta-lodowka"
           ],
           "status_before": "open"
         }
@@ -616,7 +743,7 @@
         "components/recipe/RecipeForm.tsx:418"
       ],
       "first_seen": "20261112-185244",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -629,6 +756,17 @@
             "kasia-ksiazka-na-prezent"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "daniel-sourdough"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -639,11 +777,10 @@
       "priority": "P3",
       "status": "open",
       "where": [
-        "app/cookbook/[id].tsx:395",
-        "app/recipe/[id].tsx"
+        "app/cookbook/[id].tsx:395"
       ],
       "first_seen": "20261112-185244",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -657,6 +794,17 @@
             "oliver-sourdough-grams"
           ],
           "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 2,
+          "personas": [
+            "marta-lodowka"
+          ],
+          "status_before": "open"
         }
       ]
     },
@@ -664,14 +812,13 @@
       "id": "F-021",
       "kind": "problem",
       "title": "Pole Qty nie pokazuje fokusu",
-      "priority": "P3",
+      "priority": "P2",
       "status": "open",
       "where": [
-        "components/ui/Input.tsx:26",
-        "app/shopping/[id].tsx:606"
+        "components/ui/Input.tsx:17"
       ],
       "first_seen": "20261112-185244",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -682,6 +829,18 @@
           "runs": 1,
           "personas": [
             "oliver-sourdough-grams"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P2",
+          "runs": 3,
+          "personas": [
+            "halina-zeszyt",
+            "sophie-gift-book"
           ],
           "status_before": "open"
         }
@@ -695,7 +854,7 @@
       "status": "open",
       "where": [],
       "first_seen": "20261112-185244",
-      "last_seen": "20261112-185244",
+      "last_seen": "20261114-200122",
       "note": "",
       "sightings": [
         {
@@ -706,6 +865,17 @@
           "runs": 2,
           "personas": [
             "oliver-sourdough-grams"
+          ],
+          "status_before": "open"
+        },
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "daniel-sourdough"
           ],
           "status_before": "open"
         }
@@ -733,6 +903,313 @@
           "runs": 2,
           "personas": [
             "kasia-ksiazka-na-prezent"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-024",
+      "kind": "problem",
+      "title": "Chipy minutnika przy pierwszym renderze: czas znika, kreska przecina inne słowa",
+      "priority": "P1",
+      "status": "open",
+      "where": [
+        "components/timers/timerMarkdownRules.tsx:32",
+        "components/timers/TimerChip.tsx:90"
+      ],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P1",
+          "runs": 4,
+          "personas": [
+            "halina-zeszyt",
+            "daniel-sourdough",
+            "sophie-gift-book"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-025",
+      "kind": "problem",
+      "title": "Przełącznik Do wypróbowania schowany na dnie formularza, brak w menu przepisu",
+      "priority": "P1",
+      "status": "open",
+      "where": [
+        "components/recipe/RecipeForm.tsx:457",
+        "app/recipe/[id].tsx:266",
+        "app/cookbook/[id].tsx:412"
+      ],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P1",
+          "runs": 2,
+          "personas": [
+            "daniel-sourdough"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-026",
+      "kind": "problem",
+      "title": "Przykładowa książka Śniadania zaskakuje na świeżej instalacji",
+      "priority": "P3",
+      "status": "open",
+      "where": [
+        "db/seed.ts"
+      ],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": "P3",
+          "runs": 1,
+          "personas": [
+            "halina-zeszyt"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-027",
+      "kind": "wish",
+      "title": "Dodaj zapisane przepisy z widoku książki",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:447"
+      ],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "halina-zeszyt",
+            "sophie-gift-book"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-028",
+      "kind": "wish",
+      "title": "Podgląd przepisu przed zapisem",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "halina-zeszyt",
+            "sophie-gift-book"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-029",
+      "kind": "wish",
+      "title": "Wyjaśnienie lub wyłączenie chipów minutnika",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "components/timers/TimerChip.tsx"
+      ],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "daniel-sourdough"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-030",
+      "kind": "wish",
+      "title": "Większy maksymalny rozmiar tekstu",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "daniel-sourdough"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-031",
+      "kind": "wish",
+      "title": "Podsumowanie po imporcie",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "kuba-60-sekund"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-032",
+      "kind": "wish",
+      "title": "Wysyłanie listy tylko z nowymi pozycjami",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marta-lodowka"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-033",
+      "kind": "wish",
+      "title": "Łatwiejszy odbiorca / Kopiuj listę",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 2,
+          "personas": [
+            "marta-lodowka"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-034",
+      "kind": "wish",
+      "title": "PDF łatwy do znalezienia z wnętrza książki",
+      "priority": null,
+      "status": "open",
+      "where": [
+        "app/cookbook/[id].tsx:512"
+      ],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "sophie-gift-book"
+          ],
+          "status_before": "open"
+        }
+      ]
+    },
+    {
+      "id": "F-035",
+      "kind": "wish",
+      "title": "Zachować wpisany tekst przy zamknięciu aplikacji",
+      "priority": null,
+      "status": "open",
+      "where": [],
+      "first_seen": "20261114-200122",
+      "last_seen": "20261114-200122",
+      "note": "",
+      "sightings": [
+        {
+          "session": "20261114-200122",
+          "version": "1.3.1",
+          "result": "reproduced",
+          "priority": null,
+          "runs": 1,
+          "personas": [
+            "sophie-gift-book"
           ],
           "status_before": "open"
         }
