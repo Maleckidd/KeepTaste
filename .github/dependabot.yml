@@ -1,0 +1,44 @@
+# Dependabot: weekly, grouped, so updates arrive as a handful of PRs rather
+# than one per package. Expo SDK majors (expo, expo-*, react-native, react)
+# move together and need a native rebuild and on-device checks
+# (docs/upgrade-sdk-57.md), so their major bumps are ignored here and done
+# by hand as an SDK upgrade.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      expo-sdk:
+        patterns: ['expo', 'expo-*', '@expo/*', 'react-native', 'react-native-*', '@react-native/*', 'react', 'react-dom']
+      dev-tooling:
+        dependency-type: development
+      runtime:
+        dependency-type: production
+    ignore:
+      - dependency-name: 'expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'expo-*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@expo/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'eslint-config-expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-native'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'react'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'react-dom'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
