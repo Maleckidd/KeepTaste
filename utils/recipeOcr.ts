@@ -32,7 +32,9 @@ let mlkit: TextRecognitionModule | null = null;
 // returns a Proxy that throws on use. Gate on the native module being present.
 if (Platform.OS !== 'web' && NativeModules.TextRecognition != null) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // Lazy require: importing the module where the native side is missing
+    // would hand back a Proxy that throws (see above).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     mlkit = require('@react-native-ml-kit/text-recognition').default;
   } catch {
     mlkit = null;

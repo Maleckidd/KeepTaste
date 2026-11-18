@@ -307,7 +307,7 @@ export default function CookbookScreen() {
       await shareCookbookPdf(cookbook, t, t('cookbook.sharePdfTitle'), () =>
         setPdfPreparing(false)
       );
-    } catch (e) {
+    } catch {
       setPdfPreparing(false);
       Alert.alert(
         t('cookbook.exportFailedTitle'),

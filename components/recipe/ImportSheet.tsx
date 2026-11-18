@@ -170,6 +170,9 @@ export default function ImportSheet({
     }).start();
     const timer = setTimeout(() => setRendered(false), Motion.duration.fast + 50);
     return () => clearTimeout(timer);
+    // initialImport is deliberately not a dependency: it seeds the sheet only
+    // when it opens; a later change must not reset an open sheet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, progress]);
 
   useEffect(() => {

@@ -5,12 +5,13 @@ import {
   parseIsoDuration,
   parseRecipeJsonLd,
   parsePastedRecipe,
-} from '../utils/recipeImport';
-// Package D (SPEC.md §5.15): inline headers + servings in the title.
-import { extractTitleServings } from '@/utils/recipeImport';
+  // Package D (SPEC.md §5.15): inline headers + servings in the title.
+  extractTitleServings,
+  // Iteration 7 of persona-lab (SPEC.md §5.15): real-world paste and link fixes.
+  parseRecipeHtml,
+  parseRecipeMicrodata,
+} from '@/utils/recipeImport';
 import { cleanAiResponse } from '@/utils/aiTranscribe';
-// Iteration 7 of persona-lab (SPEC.md §5.15): real-world paste and link fixes.
-import { parseRecipeHtml, parseRecipeMicrodata } from '@/utils/recipeImport';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

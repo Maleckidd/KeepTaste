@@ -18,8 +18,6 @@ function r(title: string, ingredients = '', toTry = 0): R {
   return { id: nextId++, title, ingredients, toTry };
 }
 
-const titles = (matches: { recipe: R }[]) => matches.map((m) => m.recipe.title);
-
 describe('STEM_MIN_LENGTH', () => {
   it('is 5', () => {
     expect(STEM_MIN_LENGTH).toBe(5);

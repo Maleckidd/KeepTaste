@@ -88,6 +88,7 @@ export default function SendListSheet({
     return () => clearTimeout(timer);
     // items is deliberately not a dependency: a later change must not reset an
     // open sheet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, progress]);
 
   useEffect(() => {
