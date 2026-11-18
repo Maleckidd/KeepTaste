@@ -311,6 +311,7 @@ export default function RecipeForm({
             <Field label={t('recipeForm.title')}>
               <Input
                 large
+                testID="recipe-title"
                 placeholder={t('recipeForm.titlePlaceholder')}
                 value={form.title}
                 onChangeText={(v) => {
@@ -369,6 +370,7 @@ export default function RecipeForm({
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.prep')}>
               <Input
+                testID="recipe-prep"
                 placeholder={t('recipeForm.prepPlaceholder')}
                 value={form.prepTime}
                 onChangeText={(v) => set('prepTime', v)}
@@ -381,6 +383,7 @@ export default function RecipeForm({
           <View style={{ flex: 1 }}>
             <Field label={t('recipeForm.cook')}>
               <Input
+                testID="recipe-cook"
                 placeholder={t('recipeForm.cookPlaceholder')}
                 value={form.cookTime}
                 onChangeText={(v) => set('cookTime', v)}
@@ -393,6 +396,7 @@ export default function RecipeForm({
           <View style={{ flex: 0.7 }}>
             <Field label={t('recipeForm.servings')}>
               <Input
+                testID="recipe-servings"
                 placeholder={t('recipeForm.servingsPlaceholder')}
                 value={form.servings}
                 onChangeText={(v) => set('servings', v)}
@@ -412,6 +416,7 @@ export default function RecipeForm({
           onLinkPress={() => setFormatHelpOpen(true)}
         >
           <Input
+            testID="recipe-ingredients"
             placeholder={t('recipeForm.ingredientsPlaceholder')}
             value={form.ingredients}
             onChangeText={(v) => set('ingredients', v)}
@@ -427,6 +432,7 @@ export default function RecipeForm({
         >
           <Input
             style={styles.inputMultilineTall}
+            testID="recipe-instructions"
             placeholder={t('recipeForm.instructionsPlaceholder')}
             value={form.instructions}
             onChangeText={(v) => set('instructions', v)}
@@ -440,6 +446,7 @@ export default function RecipeForm({
           hint={t('recipeForm.notesHint')}
         >
           <Input
+            testID="recipe-notes"
             placeholder={t('recipeForm.notesPlaceholder')}
             value={form.notes}
             onChangeText={(v) => set('notes', v)}
