@@ -4,6 +4,22 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>'],
   testMatch: ['**/__tests__/**/*.test.ts'],
+  // Coverage is measured over every source file in the logic layers, not only
+  // the files a test happens to import — an untested file counts as 0%.
+  // Thin native wrappers (utils/timerAlarm.ts, utils/haptics.ts, …) are in
+  // the denominator on purpose; they are verified on-device, see
+  // docs/TESTING.md.
+  collectCoverageFrom: [
+    'db/**/*.{ts,tsx}',
+    'utils/**/*.{ts,tsx}',
+    'i18n/**/*.{ts,tsx}',
+  ],
+  coverageReporters: ['text-summary', 'lcov', 'json-summary'],
+  // A floor just under the measured level (2026-11-18): coverage may go up,
+  // CI fails if it drops. Raise it as tests are added.
+  coverageThreshold: {
+    global: { statements: 79, branches: 85, functions: 75, lines: 79 },
+  },
   moduleNameMapper: {
     // Local native module — mapped before the generic @/ alias so tests get the
     // stub instead of requireNativeModule('Safwriter') (which throws under node).

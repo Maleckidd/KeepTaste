@@ -79,3 +79,6 @@ assets/store/promo/
 
 # e2e test runs (reports, traces, videos, replay cache, Metro log)
 /.e2e/
+
+# jest --coverage output
+/coverage/

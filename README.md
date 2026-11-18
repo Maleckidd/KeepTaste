@@ -1,5 +1,7 @@
 # KeepTaste
 
+[![CI](https://github.com/Maleckidd/KeepTaste/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Maleckidd/KeepTaste/actions/workflows/ci.yml)
+
 > **Your recipes. Your device. No cloud required.**
 
 ---
