@@ -46,6 +46,41 @@ export function buildBackupJson(content: BackupContent): string {
   );
 }
 
+/** Folder inside the archive that holds every photo. */
+export const ARCHIVE_IMAGES_DIR = 'images/';
+
+/**
+ * The only image path shape a restore accepts: one flat file name under
+ * images/, made of letters, digits, `.`, `_` and `-`, and not `.` or `..`.
+ *
+ * Security (SECURITY.md): the restore copies `${extractedDir}${path}` into
+ * documentDirectory, so a path from a crafted backup.json such as
+ * `images/../databases/recipes.db` would copy any file of the app sandbox.
+ * Slashes, backslashes, `%` (a file:// URI is percent-decoded natively), `?`
+ * and `#` (URI query/fragment) are all outside the allowed set.
+ */
+export function isSafeArchiveImagePath(path: unknown): path is string {
+  if (typeof path !== 'string') return false;
+  const match = /^images\/([A-Za-z0-9._-]+)$/.exec(path);
+  return match != null && !/^\.+$/.test(match[1]);
+}
+
+/**
+ * File name to store a photo under in the archive's images/ folder, derived
+ * from the stored file's name. Our own files (`img-<time>-<rand>.<ext>`) pass
+ * unchanged; any other character becomes `_`, so the archive never holds a
+ * name its own restore would refuse. Collisions are the caller's job.
+ */
+export function archiveImageName(fileName: string): string {
+  const safe = fileName.replace(/[^A-Za-z0-9._-]/g, '_');
+  return /^\.*$/.test(safe) ? 'image' : safe;
+}
+
+/** A restorable image path, or null for anything else (missing photo). */
+function safeImagePath(path: unknown): string | null {
+  return isSafeArchiveImagePath(path) ? path : null;
+}
+
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
@@ -113,6 +148,18 @@ export function parseBackupJson(text: string): ParseBackupJsonResult {
   if (!isRestorable(content)) {
     return { ok: false, error: 'This backup file is incomplete or corrupted.' };
   }
+
+  // An unsafe image path is dropped, not fatal: the row restores without its
+  // photo, the same outcome as a photo missing from the archive. Rejecting the
+  // whole file would leave a user with an odd file name unable to restore.
+  content.cookbooks = content.cookbooks.map((cb) => ({
+    ...cb,
+    coverImagePath: safeImagePath(cb.coverImagePath),
+  }));
+  content.recipes = content.recipes.map((r) => ({
+    ...r,
+    imagePath: safeImagePath(r.imagePath),
+  }));
 
   return { ok: true, schemaVersion: version, content };
 }
