@@ -13,6 +13,7 @@ npm install          # install deps
 npx expo start       # dev server (scan QR in Expo Go — non-backup work)
 npm run android      # Android emulator/device
 npm run web          # web build — agent/E2E test environment ONLY, not a product platform
+npm run e2e:build && npm run e2e   # Playwright on the static web export (dist/), offline, chromium
 npx tsc --noEmit     # type check (strict mode)
 npm run lint         # ESLint (eslint-config-expo, flat config), zero warnings allowed
 npm test             # jest (ts-jest, logic-only tests in __tests__/)
