@@ -1,8 +1,20 @@
 # KeepTaste
 
 [![CI](https://github.com/Maleckidd/KeepTaste/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Maleckidd/KeepTaste/actions/workflows/ci.yml)
+[![Security](https://github.com/Maleckidd/KeepTaste/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/Maleckidd/KeepTaste/actions/workflows/security.yml)
+[![CodeQL](https://github.com/Maleckidd/KeepTaste/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Maleckidd/KeepTaste/actions/workflows/codeql.yml)
+![Expo SDK 57](https://img.shields.io/badge/Expo_SDK-57-000020?logo=expo)
+![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 > **Your recipes. Your device. No cloud required.**
+
+> **Project status:** feature-complete and live on Google Play. This is a
+> personal project published as a portfolio case study in **quality,
+> security and controlled AI-assisted development**: see
+> [how it is tested](docs/TESTING.md), [its threat model](SECURITY.md) and
+> [how it was built with AI](docs/AI-WORKFLOW.md). It is not actively
+> developed, and contributions are not accepted ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ---
 
@@ -33,10 +45,14 @@ cloud-synced folder *you* control.
 
 ## Why KeepTaste?
 
-- **Truly offline.** Works on a plane, in a basement kitchen, on a phone with no
-  SIM. There is no network code to fail.
-- **Private by design.** No account, no analytics, no tracking. The app never
-  talks to a server because there isn't one.
+- **Works offline.** On a plane, in a basement kitchen, on a phone with no
+  SIM. The only thing that needs a connection is importing a recipe from a
+  link: the phone fetches that page directly from the recipe site.
+- **Private by design.** No account, no analytics, no tracking, and no
+  KeepTaste server. Your library stays on the phone unless you export, share
+  or back it up yourself. (One known exception, a fix for which is
+  proposed: an image link written into a recipe's Markdown is loaded when
+  the recipe is shown. See [SECURITY.md](SECURITY.md#threat-model).)
 - **No lock-in, guaranteed.** One tap exports everything to Markdown you can
   read in any text editor — and import back later.
 - **Fast and focused.** Built for the two moments that matter: saving a recipe
@@ -53,8 +69,8 @@ cloud-synced folder *you* control.
   reads it into the form — all parsed on your phone, no server.
 - **To-try list** — mark a recipe "to try"; it sinks to a "To try" section and a
   filter chip answers "what should I cook next?"
-- **Smart search** — diacritics-safe title search (finds "żurek" when you type
-  "zurek").
+- **Smart search** — diacritics-safe search over titles and ingredients
+  (finds "żurek" when you type "zurek").
 
 ### 👨‍🍳 Cook
 - **Reading-friendly recipe view** with the screen kept awake while you cook.
@@ -90,8 +106,70 @@ KeepTaste is React Native + **Expo SDK 57** with **Expo Router**, TypeScript
 strict mode, and a deliberately boring architecture: no global state manager —
 screens load from SQLite on focus and reload after mutations.
 
-See [SPEC.md](SPEC.md) for the full living product spec and
-[TESTING.md](TESTING.md) for the manual test plan.
+| Read | For |
+|---|---|
+| [SPEC.md](SPEC.md) | The living product spec: every feature, rule and out-of-scope decision |
+| [docs/TESTING.md](docs/TESTING.md) | Test strategy: unit, SQLite integration, E2E, personas, manual plan |
+| [SECURITY.md](SECURITY.md) | Threat model, supply-chain controls, the justified audit allowlist |
+| [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md) | Spec → agents → reviewer gate → tests, and what the history shows |
+| [docs/case-studies/persona-lab.md](docs/case-studies/persona-lab.md) | Usability testing with simulated users ([engine](https://github.com/Maleckidd/persona-lab)) |
+| [CLAUDE.md](CLAUDE.md) | The repository rules the AI agent works under |
+
+### Architecture
+
+```mermaid
+flowchart TB
+  subgraph UI["app/ + components/"]
+    S[Expo Router screens + UI kit<br/>load on focus, mutate, reload]
+  end
+  subgraph Logic["utils/ + i18n/ · pure"]
+    P[Parsers & builders<br/>import, Markdown, backup.json,<br/>search, timers, i18n]
+  end
+  subgraph Native["native wrappers"]
+    W[backupArchiveFs, recipeOcr,<br/>timerAlarm, recipeImportFetch,<br/>cookbookPdf · verified on device]
+  end
+  subgraph Data["db/ · data access"]
+    D[Drizzle query helpers]
+    C[client.ts<br/>DDL + user_version ladder<br/>run at import]
+  end
+  S --> D
+  S --> P
+  S --> W
+  W --> P
+  W --> D
+  D --> C
+  C --> SQ[(expo-sqlite<br/>on device)]
+  C -. web test build .-> SJ[(sql.js in memory<br/>client.web.ts)]
+  W --> FS[[expo-file-system, zip, SAF,<br/>ML Kit, notifications]]
+  W --> NET{{HTTPS GET<br/>link import only}}
+```
+
+No global state manager: each screen loads what it needs from SQLite when it
+gains focus, calls a `db/` function to change data, and reloads. Logic that
+can be pure is pure (`utils/`), so it is tested in plain Node. Native
+modules sit behind thin wrappers.
+
+### How this was built with AI
+
+The code was written with an AI coding agent (Claude Code) inside guard
+rails, not by prompting until it looked right:
+
+1. **Spec first.** Every feature is a section of [SPEC.md](SPEC.md), with
+   an explicit out-of-scope list.
+2. **Repository rules.** [CLAUDE.md](CLAUDE.md) holds the architecture and
+   domain rules the agent must follow, including lessons from real
+   incidents.
+3. **Four agents per feature** ([`.claude/agents/`](.claude/agents/)): a
+   read-only *planner*, a *tester* that writes failing tests first, a
+   *coder* that may not weaken them, and a read-only *reviewer* that ends
+   with APPROVED or CHANGES REQUIRED.
+4. **Tests and CI as the safety net.** Lint, strict types, unit tests with a
+   coverage floor, SQLite integration tests that upgrade every shipped
+   schema, offline E2E, secret scanning and a dependency-audit gate on every
+   pull request.
+
+The details, including what the git history does *not* look good on, are
+in [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md).
 
 ### Tech stack
 
@@ -178,13 +256,16 @@ target follows the SDK default (36 on SDK 57); see
 ### Testing
 
 ```bash
-npm test             # unit tests (pure logic: db helpers, utils)
-npx tsc --noEmit     # strict type check
-npm run web          # web build — browser smoke-test environment only
+npm run lint                       # ESLint, zero warnings
+npx tsc --noEmit                   # strict type check
+npm run test:unit                  # pure logic (db helpers, utils, i18n)
+npm run test:integration           # db/ on real SQLite: migrations, SQL rules, backup round-trip
+npm run e2e:build && npm run e2e   # Playwright on the web export, offline
 ```
 
-Unit tests cover pure logic only; native behavior (Alerts, image picker, file
-persistence, share sheet) follows the manual plan in [TESTING.md](TESTING.md).
+Native behaviour (file system, share sheet, camera, notifications) is
+verified on a device; see [docs/TESTING.md](docs/TESTING.md) for what is
+covered where, and why there are no component tests.
 
 ### Markdown export format
 
@@ -219,17 +300,32 @@ recipes        (id, cookbook_id FK, title, prep_time, cook_time,
                 servings, image_path, ingredients, instructions,
                 notes, to_try, created_at, updated_at)
 shopping_lists (id, name, created_at, updated_at)
-shopping_items (id, list_id FK CASCADE, name, quantity, checked, created_at)
+shopping_items (id, list_id FK CASCADE, name, quantity, checked,
+                checked_at, created_at)
 app_settings   (key, value)
 ```
 
 Deleting a cookbook sets `cookbook_id` to NULL on its recipes — they survive
-under "All recipes". Deleting a shopping list cascades to its items.
+under "All recipes". Deleting a shopping list cascades to its items. Schema
+changes are hand-written: `db/ddl.ts` for new installs plus a
+`PRAGMA user_version` step in `db/client.ts` for existing ones, and the
+integration suite upgrades every schema that ever shipped.
 
-### Roadmap
+### Status and roadmap
 
-Open items live in [SPEC.md §8](SPEC.md); deliberate out-of-scope decisions in §7.
+The app is feature-complete and not actively developed. Remaining ideas are
+in [SPEC.md §8](SPEC.md), deliberate out-of-scope decisions in §7, and open
+usability findings in the
+[persona-lab ledger](persona-lab/history/findings.md).
+
+## Credits
+
+The demo food photos in `assets/store/` and the cookbook covers shown in
+the screenshots are **AI-generated** images, not photographs of real
+dishes.
 
 ## License
 
-[MIT](LICENSE)
+The source code is [MIT](LICENSE). The KeepTaste name, logo and store art
+are not covered by that license; see the note at the end of
+[LICENSE](LICENSE).
