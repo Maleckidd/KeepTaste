@@ -104,8 +104,24 @@ function normalize(content: BackupContent) {
   };
 }
 
+/**
+ * What utils/backupArchiveFs.ts does on export before building backup.json:
+ * every photo is copied into the archive and its path rewritten to the
+ * archive-relative `images/<file>` (the copy itself is native, not run here).
+ * On restore the native side copies them back and makes the paths absolute
+ * again; without it they stay relative, which is what the assertions expect.
+ */
+function asArchived(content: BackupContent): BackupContent {
+  const rel = (p: string | null) => (p ? `images/${p.slice(p.lastIndexOf('/') + 1)}` : null);
+  return {
+    ...content,
+    cookbooks: content.cookbooks.map((c) => ({ ...c, coverImagePath: rel(c.coverImagePath) })),
+    recipes: content.recipes.map((r) => ({ ...r, imagePath: rel(r.imagePath) })),
+  };
+}
+
 async function exportFrom(db: Db): Promise<string> {
-  return buildBackupJson(await db.backup.getFullBackupData());
+  return buildBackupJson(asArchived(await db.backup.getFullBackupData()));
 }
 
 async function restoreIntoNewPhone(json: string) {
@@ -122,7 +138,7 @@ describe('full backup round-trip', () => {
     await openTestDb();
     const oldPhone = loadDb();
     await buildLibrary(oldPhone);
-    const exported = await oldPhone.backup.getFullBackupData();
+    const exported = asArchived(await oldPhone.backup.getFullBackupData());
     const json = buildBackupJson(exported);
 
     const { db: newPhone } = await restoreIntoNewPhone(json);
@@ -134,6 +150,8 @@ describe('full backup round-trip', () => {
     expect(after.recipes).toEqual(before.recipes);
     expect(after.shoppingLists).toEqual(before.shoppingLists);
     expect(after.shoppingItems).toEqual(before.shoppingItems);
+    expect(after.recipes.find((r) => r.title === 'Tomato soup')?.imagePath).toBe('images/recipe-1.jpg');
+    expect(after.cookbooks.find((c) => c.name === 'Soups')?.coverImagePath).toBe('images/cover-1.jpg');
   });
 
   it('preserves timestamps instead of stamping the restore time', async () => {
