@@ -34,7 +34,7 @@ provide.
 | **Import from a link** (`utils/recipeImportFetch.ts`) | The HTML of a page whose address the user pasted or shared | This is the app's only intentional network call: one `GET`, from the phone straight to that site, 15 s timeout. The HTML is parsed as data by pure parsers (`utils/recipeImport.ts`: JSON-LD, microdata, text). There is no WebView and no script execution. The result only pre-fills the form. | The response body is read without a size cap (memory pressure on a hostile page). Browser-like headers are sent so recipe sites answer. |
 | **`.zip` backup restore** (`utils/backupArchiveFs.ts`, `utils/backupArchive.ts`, `db/backup.ts`) | An archive from anywhere: email, a cloud folder, another phone | Unzip is guarded against path traversal by react-native-zip-archive (ZipSecurity). `backup.json` is validated before anything is wiped: schema version, required ids and names. **Image paths are restricted to a flat file name under `images/`**; anything else restores without a photo. Rows go in through Drizzle's parameterised queries. A Replace restore writes a safety backup of the current library first. | A crafted but valid archive can still fill the library with junk. That is a restore the user chose, and the safety backup undoes it. |
 | **`.md` import** (`utils/importMarkdown.ts`, `db/import.ts`) | Markdown text | Parsed as plain text into fields; never executed. | — |
-| **Markdown rendering** (`react-native-markdown-display`) | Recipe ingredients, instructions and notes | Rendered to native views, never HTML: the parser has `html: false` and `linkify: false`. Links open only when tapped. | **Markdown images are fetched.** The renderer loads `![](https://…)` images by default, so a recipe text holding an image URL (pasted, imported, or restored from someone else's backup) makes a request to that host whenever the recipe is shown. A fix that disables remote images is proposed. Quadratic-time parser advisories: see the allowlist below. |
+| **Markdown rendering** (`react-native-markdown-display`, through `components/recipe/RecipeMarkdown.tsx`) | Recipe ingredients and instructions | Rendered to native views, never HTML: the parser has `html: false` and `linkify: false`. Links open only when tapped. **Images are never fetched:** the library would load any `![](https://…)` URL, which works as a tracking pixel in a pasted, imported or restored recipe. The wrapper renders an image as its alt text instead, and ESLint (`no-restricted-imports`) keeps other files from using the renderer directly. Covered by `e2e/privacy.spec.ts`. | Quadratic-time parser advisories: see the allowlist below. |
 | **Deep links** (`keeptaste://` scheme, Expo Router) | A route such as `keeptaste://cookbook/all` | Navigation only. Every write needs taps in the UI. Deletes wait behind a 5-second Undo, and recipes and cookbooks also ask for confirmation first. | A crafted query string can stall the router (decode-uri-component advisory below). |
 | **AI transcription** (`utils/aiTranscribe.ts`) | An answer the user pastes back from an assistant of their choice | The app builds the prompt and cleans the pasted answer. It makes no AI or network call itself. | — |
 
@@ -89,7 +89,7 @@ new advisory in the same package still fails CI.
 ### Reaches the shipped app
 
 **markdown-it 10 / linkify-it 2**, through `react-native-markdown-display@7`,
-which renders recipe ingredients, instructions and notes.
+which renders recipe ingredients and instructions.
 
 | Advisory | Severity | Reachable? |
 |---|---|---|

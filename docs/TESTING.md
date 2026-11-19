@@ -88,8 +88,9 @@ migrations, drizzle's `expo-sqlite` driver, the `db/` helpers.
 
 Playwright drives the static web export (`playwright.config.ts`, `e2e/`). It
 covers the seeded first launch, creating a recipe, the title-only
-validation, numeric fields that must never save `NaN` (SPEC.md §5.5), and
-diacritic search over titles and ingredients (§5.3).
+validation, numeric fields that must never save `NaN` (SPEC.md §5.5),
+diacritic search over titles and ingredients (§5.3), and that a Markdown
+image in a recipe is shown as text and never fetched (`privacy.spec.ts`).
 
 Two properties make these tests trustworthy rather than flaky:
 

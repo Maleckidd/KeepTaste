@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Markdown from 'react-native-markdown-display';
+import RecipeMarkdown from '@/components/recipe/RecipeMarkdown';
 import { parseIngredientLines } from '@/utils/ingredients';
 import { lightTap } from '@/utils/haptics';
 import {
@@ -89,11 +89,11 @@ export default function IngredientChecklist({
               color={checked.has(line.index) ? c.primary : c.textMuted}
             />
             <View style={styles.rowBody}>
-              <Markdown
+              <RecipeMarkdown
                 style={checked.has(line.index) ? itemStylesChecked : itemStyles}
               >
                 {line.text}
-              </Markdown>
+              </RecipeMarkdown>
             </View>
           </Pressable>
         )
