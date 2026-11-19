@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/IBM/audit-ci/main/docs/schema.json",
+  // Fail CI on any advisory of moderate severity or above…
+  "moderate": true,
+  // …except these. Each entry is justified in SECURITY.md ("Dependency audit
+  // allowlist"): what pulls it in, whether shipped code reaches it, and why
+  // there is no non-breaking fix. Advisory ids, not package names, so a NEW
+  // advisory in the same package still fails the build. Remove an entry as
+  // soon as a fix is available — audit-ci reports entries it no longer finds.
+  "allowlist": [
+    // Runtime — react-native-markdown-display@7 pins markdown-it@^10 (no fix
+    // without replacing the renderer). Input: the user's own recipe text.
+    "GHSA-r7fv-28h4-cvq7", // markdown-it: quadratic smartquotes (high)
+    "GHSA-6v5v-wf23-fmfq", // markdown-it: quadratic smartquotes replaceAt (moderate)
+    "GHSA-6vfc-qv3f-vr6c", // markdown-it: uncontrolled resource consumption (moderate)
+    "GHSA-253c-mchw-3w2r", // markdown-it: linkify quadratic paths — linkify is off
+    "GHSA-22p9-wv53-3rq4", // linkify-it: quadratic scan — linkify is off
+    "GHSA-v245-v573-v5vm", // linkify-it: mailto: quadratic — linkify is off
+
+    // Runtime — expo-router@57 → query-string@7 → decode-uri-component@0.2.
+    // The fix is decode-uri-component@0.5 (ESM-only major); expo-router@58
+    // needs Expo SDK 58.
+    "GHSA-qr28-fpjm-wq7f", // decode-uri-component: quadratic replacement (high)
+    "GHSA-vcc3-ghjq-m6fr", // decode-uri-component: exponential decoding (moderate)
+
+    // Build tooling only — never shipped in the app bundle.
+    "GHSA-5p2g-fcmc-qvqq", // image-size via metro: JXL/HEIF parser loop (high)
+    "GHSA-w3rx-r6r6-pgpr", // image-size via metro: ICNS parser loop (high)
+    "GHSA-g3hv-75wg-m249"  // minimatch via eslint/jest/@expo/fingerprint (moderate)
+  ]
+}
