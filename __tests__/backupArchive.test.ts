@@ -4,7 +4,9 @@
 // schema-version guard.
 import {
   BACKUP_SCHEMA_VERSION,
+  archiveImageName,
   buildBackupJson,
+  isSafeArchiveImagePath,
   parseBackupJson,
   type BackupContent,
 } from '../utils/backupArchive';
@@ -194,5 +196,126 @@ describe('parseBackupJson', () => {
       expect(result.content.shoppingItems).toEqual([]);
       expect(result.content.settings).toEqual([]);
     }
+  });
+});
+
+// Security: backup.json image paths (SPEC.md §5.17.1, SECURITY.md). The
+// restore copies `${extractedDir}${path}` into documentDirectory, so a crafted
+// archive with `images/../…` could copy any file in the app sandbox (e.g. the
+// SQLite database) into the documents folder. Only a flat file name under
+// images/ is accepted; anything else restores as "no photo".
+describe('image paths in backup.json', () => {
+  const TRAVERSAL_OR_FOREIGN = [
+    'images/../databases/recipes.db',
+    '../databases/recipes.db',
+    'images/../../shared_prefs/x.xml',
+    'images/..',
+    'images/.',
+    'images/',
+    'images/sub/dir.jpg',
+    'images\\..\\recipes.db',
+    'images/%2e%2e%2fdatabases%2frecipes.db',
+    'images/a.jpg?x=../../y',
+    'images/a.jpg#../../y',
+    '/data/user/0/com.damianmalecki.keeptaste/databases/recipes.db',
+    'file:///data/user/0/com.damianmalecki.keeptaste/databases/recipes.db',
+    'content://media/external/images/media/1',
+    'cover.jpg',
+    'IMAGES/cover.jpg',
+    ' images/cover.jpg',
+    'images/cover.jpg\n',
+  ];
+
+  function withPaths(cover: unknown, photo: unknown): string {
+    const content = sampleContent();
+    const raw = JSON.parse(buildBackupJson(content));
+    raw.cookbooks[0].coverImagePath = cover;
+    raw.recipes[0].imagePath = photo;
+    return JSON.stringify(raw);
+  }
+
+  it.each(TRAVERSAL_OR_FOREIGN)('drops %j from recipes and cookbook covers', (path) => {
+    const result = parseBackupJson(withPaths(path, path));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content.cookbooks[0].coverImagePath).toBeNull();
+      expect(result.content.recipes[0].imagePath).toBeNull();
+    }
+  });
+
+  it('keeps the rest of the archive when a path is dropped', () => {
+    const result = parseBackupJson(withPaths('images/../x', 'images/../y'));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content.recipes[0].title).toBe('Tart');
+      expect(result.content.cookbooks[0].name).toBe('Desserts');
+      expect(result.content.shoppingItems).toHaveLength(1);
+    }
+  });
+
+  it('drops a non-string path instead of passing it through', () => {
+    const result = parseBackupJson(withPaths(42, { evil: true }));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content.cookbooks[0].coverImagePath).toBeNull();
+      expect(result.content.recipes[0].imagePath).toBeNull();
+    }
+  });
+
+  it.each([
+    'images/img-1731900000000-123456789.jpg',
+    'images/dup-2-img-1731900000000-1.jpeg',
+    'images/cover.png',
+    'images/a_b-c.d.heic',
+  ])('keeps the app\'s own path %j', (path) => {
+    const result = parseBackupJson(withPaths(path, path));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content.cookbooks[0].coverImagePath).toBe(path);
+      expect(result.content.recipes[0].imagePath).toBe(path);
+    }
+  });
+
+  it('keeps null paths null', () => {
+    const result = parseBackupJson(withPaths(null, null));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content.cookbooks[0].coverImagePath).toBeNull();
+      expect(result.content.recipes[0].imagePath).toBeNull();
+    }
+  });
+
+  describe('isSafeArchiveImagePath', () => {
+    it.each(TRAVERSAL_OR_FOREIGN)('rejects %j', (path) => {
+      expect(isSafeArchiveImagePath(path)).toBe(false);
+    });
+
+    it('accepts a flat file name under images/', () => {
+      expect(isSafeArchiveImagePath('images/img-1-2.jpg')).toBe(true);
+    });
+  });
+
+  // Export side: the name written into the archive must always pass the
+  // restore check, whatever the stored file is called (a picker fallback can
+  // leave a content:// URI whose last segment holds %3A, spaces, etc.).
+  describe('archiveImageName', () => {
+    it.each([
+      ['img-1731900000000-123456789.jpg', 'img-1731900000000-123456789.jpg'],
+      ['IMG 2024 (1).jpg', 'IMG_2024__1_.jpg'],
+      ['image%3A1234', 'image_3A1234'],
+      ['zdjęcie.jpg', 'zdj_cie.jpg'],
+      ['..', 'image'],
+      ['.', 'image'],
+      ['', 'image'],
+    ])('%j → %j', (input, expected) => {
+      expect(archiveImageName(input)).toBe(expected);
+    });
+
+    it.each(['..', '.', '', 'a/b', 'a\\b', '%2e%2e', 'x?y', 'x#y', 'IMG 1.jpg'])(
+      'always yields a restorable path for %j',
+      (input) => {
+        expect(isSafeArchiveImagePath(`images/${archiveImageName(input)}`)).toBe(true);
+      }
+    );
   });
 });

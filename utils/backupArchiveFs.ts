@@ -20,7 +20,13 @@ import {
   getLatestDataChangeAt,
 } from '../db/recipes';
 import { getSetting, setSetting } from '../db/settings';
-import { buildBackupJson, parseBackupJson, type BackupContent } from './backupArchive';
+import {
+  ARCHIVE_IMAGES_DIR,
+  archiveImageName,
+  buildBackupJson,
+  parseBackupJson,
+  type BackupContent,
+} from './backupArchive';
 import { buildBackupMarkdown } from './backupMarkdown';
 import {
   backupsToPrune,
@@ -39,7 +45,7 @@ import {
   deleteStoredImage,
 } from './imageStorage';
 
-const IMAGES_DIR = 'images/';
+const IMAGES_DIR = ARCHIVE_IMAGES_DIR;
 
 function basename(uri: string): string {
   const clean = uri.split('?')[0].split('#')[0];
@@ -90,7 +96,8 @@ async function stageArchive(stagingDir: string): Promise<void> {
     const cached = relForPath.get(absPath);
     if (cached) return cached;
     if (!(await fileExists(absPath))) return null;
-    let name = basename(absPath);
+    // Sanitized so the archive's own restore accepts it (isSafeArchiveImagePath).
+    let name = archiveImageName(basename(absPath));
     while (used.has(name)) name = `dup-${used.size}-${name}`;
     used.add(name);
     const rel = `${IMAGES_DIR}${name}`;
