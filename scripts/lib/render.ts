@@ -66,19 +66,27 @@ export function renderHtml({
     const jpeg = /\.jpe?g$/i.test(out);
     const png = jpeg ? path.join(tmp, 'shot.png') : out;
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    execFileSync(
-      chromium,
-      [
-        '--headless',
-        '--disable-gpu',
-        '--hide-scrollbars',
-        '--force-device-scale-factor=1',
-        `--screenshot=${png}`,
-        `--window-size=${width},${height}`,
-        `file://${page}`,
-      ],
-      { stdio: 'ignore' }
-    );
+    fs.rmSync(png, { force: true });
+    try {
+      execFileSync(
+        chromium,
+        [
+          '--headless',
+          '--disable-gpu',
+          '--hide-scrollbars',
+          '--force-device-scale-factor=1',
+          `--screenshot=${png}`,
+          `--window-size=${width},${height}`,
+          `file://${page}`,
+        ],
+        { stdio: 'ignore' }
+      );
+    } catch (e) {
+      // Newer Chrome for Testing builds (1255) write the screenshot, then exit
+      // with status 2 on "Teardown watchdog expired". Only a missing file is a
+      // failed render.
+      if (!fs.existsSync(png)) throw e;
+    }
     if (jpeg) {
       execFileSync(
         'sips',
