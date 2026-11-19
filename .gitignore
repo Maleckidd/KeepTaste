@@ -77,8 +77,9 @@ assets/store/promo/
 # persona-lab session output (screenshots, videos, transcripts)
 /persona-lab/runs/
 
-# e2e test runs (reports, traces, videos, replay cache, Metro log)
-/.e2e/
+# Playwright e2e output (report, traces, screenshots)
+/playwright-report/
+/test-results/
 
 # jest --coverage output
 /coverage/
