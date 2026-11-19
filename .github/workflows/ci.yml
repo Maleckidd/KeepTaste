@@ -39,7 +39,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Unit tests with coverage
-        run: npx jest --coverage --ci
+        run: npx jest --selectProjects unit --coverage --ci
 
       - name: Upload coverage report
         if: ${{ !cancelled() }}
@@ -49,6 +49,28 @@ jobs:
           path: coverage/
           retention-days: 14
           if-no-files-found: error
+
+  integration:
+    name: Integration tests (real SQLite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # db/ against sql.js: the real db/client.ts migration ladder, upgrading
+      # from every schema version that shipped, plus SQL-level domain rules
+      # and the backup round-trip. See __tests__/integration/.
+      - name: Integration tests
+        run: npx jest --selectProjects integration --ci
 
   e2e:
     name: E2E (Playwright, web export)
