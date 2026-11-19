@@ -10,7 +10,8 @@ module.exports = defineConfig([
     'web-build/*',
     'coverage/*',
     '.expo/*',
-    '.e2e/*',
+    'playwright-report/*',
+    'test-results/*',
     'android/*',
     'ios/*',
     'modules/*/android/build/*',
@@ -41,6 +42,14 @@ module.exports = defineConfig([
     rules: {
       'import/first': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
+    // Playwright fixtures hand the value on through a callback named `use`,
+    // which rules-of-hooks mistakes for React's use() hook.
+    files: ['e2e/**'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
     },
   },
 ]);
