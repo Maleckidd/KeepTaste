@@ -78,6 +78,18 @@ npx --yes tsx scripts/build-store-screenshots.ts               # all 36 frames
 npx --yes tsx scripts/build-store-screenshots.ts pl tablet10   # one of each
 ```
 
+## build-social-preview.ts
+
+Renders the **GitHub social preview** (1280×640), the card shown when a link to
+the repository is shared, in the same look as the feature graphic. It shows
+the English home-screen capture. Output: **`assets/github/social-preview.png`**
+(tracked). GitHub has no API for it: upload it by hand in Settings → General →
+Social preview.
+
+```bash
+npx --yes tsx scripts/build-social-preview.ts
+```
+
 ## build-feature-graphic.ts
 
 Renders the 1024×500 feature graphic — the banner Play shows above the listing
