@@ -340,7 +340,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - Title — with a small **"To try" badge** next to it when `to_try` is set, plus a **"Tried it ✓"** action that clears the flag, bumps `updated_at` (§4 exception) and confirms with a snackbar (§5.19)
 - Metadata: prep time, cook time, total time, servings — **items without a value are hidden** (no "—"); if all are missing, the whole metadata row disappears
 - **Ingredients** and **Instructions** as two stacked sections of a single scrollable view (no tabs, no switching) — each with an uppercase section header; an empty section is hidden entirely (consistent with the no-placeholder rule)
-- Section content rendered by `react-native-markdown-display`; ingredients are the one exception — they render as a **check-off list** (below), one `Markdown` per line so inline `**bold**` still works
+- Section content rendered by `react-native-markdown-display` through `components/recipe/RecipeMarkdown.tsx`, which renders a Markdown image as its alt text and never fetches it (recipe text can come from pastes, imports and other people's backups; a remote image would be a tracking pixel — SECURITY.md); ingredients are the one exception — they render as a **check-off list** (below), one `Markdown` per line so inline `**bold**` still works
 - Notes (if present) — highlighted box with a left border in the primary color
 
 **Ingredient check-off (cooking aid):**

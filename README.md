@@ -50,9 +50,8 @@ cloud-synced folder *you* control.
   link: the phone fetches that page directly from the recipe site.
 - **Private by design.** No account, no analytics, no tracking, and no
   KeepTaste server. Your library stays on the phone unless you export, share
-  or back it up yourself. (One known exception, a fix for which is
-  proposed: an image link written into a recipe's Markdown is loaded when
-  the recipe is shown. See [SECURITY.md](SECURITY.md#threat-model).)
+  or back it up yourself. Even an image link pasted into a recipe is shown
+  as text, never fetched.
 - **No lock-in, guaranteed.** One tap exports everything to Markdown you can
   read in any text editor — and import back later.
 - **Fast and focused.** Built for the two moments that matter: saving a recipe

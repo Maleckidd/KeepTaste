@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import Markdown from 'react-native-markdown-display';
+import RecipeMarkdown from '@/components/recipe/RecipeMarkdown';
 import { useKeepAwakeSafe } from '@/utils/keepAwake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getRecipeById, deleteRecipe, markRecipeTried } from '@/db/recipes';
@@ -403,7 +403,7 @@ export default function RecipeScreen() {
                   onToggle={toggleIngredient}
                 />
               ) : (
-                <Markdown style={markdownStyles}>{recipe.ingredients}</Markdown>
+                <RecipeMarkdown style={markdownStyles}>{recipe.ingredients}</RecipeMarkdown>
               )}
               {ingredientCount > 0 ? (
                 <Button
@@ -428,9 +428,9 @@ export default function RecipeScreen() {
               <Text style={styles.sectionTitle} accessibilityRole="header">
                 {t('recipe.instructions')}
               </Text>
-              <Markdown style={markdownStyles} rules={instructionRules}>
+              <RecipeMarkdown style={markdownStyles} rules={instructionRules}>
                 {recipe.instructions}
-              </Markdown>
+              </RecipeMarkdown>
             </View>
           ) : null}
 

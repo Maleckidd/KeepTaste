@@ -52,4 +52,23 @@ module.exports = defineConfig([
       'react-hooks/rules-of-hooks': 'off',
     },
   },
+  {
+    // Recipe Markdown goes through components/recipe/RecipeMarkdown.tsx, which
+    // renders images as alt text instead of fetching them (SECURITY.md).
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react-native-markdown-display',
+              importNames: ['default', 'Markdown'],
+              message:
+                'Render Markdown with components/recipe/RecipeMarkdown: it never fetches remote images.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
