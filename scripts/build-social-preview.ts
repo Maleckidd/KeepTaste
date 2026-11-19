@@ -1,7 +1,7 @@
 // Renders the GitHub social preview (1280x640) — the card shown when a link to
 // the repository is shared. Same palette, type and device frame as the Play
-// feature graphic (scripts/lib/brand.ts), but the copy speaks to the readers
-// of the repository: what the app is, and what the repository shows.
+// feature graphic (scripts/lib/brand.ts); the copy is the wordmark and a
+// one-line tagline.
 //
 // GitHub has no API for the social preview: upload the output by hand in
 // Settings → General → Social preview. GitHub keeps the important content
@@ -30,9 +30,6 @@ const HEIGHT = 640;
 const CAPTURE_SCREEN = '01-cookbooks';
 
 const TAGLINE = 'Offline-first recipe manager for Android';
-/** What the repository is a case study in. */
-const POINTS = ['Testing', 'Security', 'Spec-driven AI'];
-const STACK = 'Expo · React Native · TypeScript · SQLite';
 
 function html(capture: string): string {
   return `<!doctype html>
@@ -69,18 +66,6 @@ function html(capture: string): string {
     letter-spacing: -0.01em;
     color: ${Palette.body};
   }
-  .points {
-    margin-top: 22px;
-    font-size: 30px;
-    font-weight: 600;
-    color: ${Palette.ink};
-  }
-  .points b { color: ${Palette.primary}; font-weight: 400; padding: 0 12px; }
-  .stack {
-    margin-top: 18px;
-    font-size: 24px;
-    color: ${Palette.faint};
-  }
 
   .device {
     position: absolute;
@@ -106,8 +91,6 @@ function html(capture: string): string {
     <div class="wordmark">Keep<span>Taste</span></div>
     <div class="rule"></div>
     <div class="tagline">${escapeHtml(TAGLINE)}</div>
-    <div class="points">A case study in ${POINTS.map(escapeHtml).join('<b>·</b>')}</div>
-    <div class="stack">${escapeHtml(STACK)}</div>
   </div>
   <div class="device"><img src="${capture}"></div>
   <div class="edge bottom"></div>
