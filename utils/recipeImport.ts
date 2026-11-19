@@ -404,7 +404,9 @@ function isNoise(line: string): boolean {
   if (isPageTail(line)) return true;
   if (APP_CHROME.some((re) => re.test(n))) return true;
   // Hashtags, also behind a caption's "mniej"/"more" toggle; "# Ciasto" is a group heading.
-  if (/^(#\S+\s*)+(mniej|wi[ęe]cej|more|less)?$/.test(n)) return true;
+  // Words are split on whitespace only (`#a#b` is one word): a nested `(#\S+\s*)+`
+  // matches the same lines but backtracks exponentially on `#!#!#…` (ReDoS).
+  if (/^#\S+(\s+#\S+)*\s*(mniej|wi[ęe]cej|more|less)?$/.test(n)) return true;
   if (/\b(follow|obserwuj)\s+@\S|^save this\b|\blink (in|w) bio\b/.test(n)) return true;
   if (/^(\S\s)?[0-9]+([.,][0-9]+)?\s*kcal$/.test(n)) return true; // "186 kcal", its icon read as a stray character
   // A rating: "4.8 / 5 (…)". Not "1/2 szklanki mleka" — text follows the fraction.
