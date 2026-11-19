@@ -10,6 +10,7 @@ import {
   // Iteration 7 of persona-lab (SPEC.md §5.15): real-world paste and link fixes.
   parseRecipeHtml,
   parseRecipeMicrodata,
+  isRecipeNoise,
 } from '@/utils/recipeImport';
 import { cleanAiResponse } from '@/utils/aiTranscribe';
 import { readFileSync } from 'fs';
@@ -1573,5 +1574,36 @@ describe('parsePastedRecipe — an ad label never costs recipe lines', () => {
   it('still drops a product line and its call to action', () => {
     const r = parse('Zupa', 'Składniki', '1 kg dyni', 'REKLAMA', 'Nowy blender TurboMix 3000', 'Kup teraz -30%', 'Przygotowanie', 'Ugotuj dynię.');
     expect(r.ingredients).toBe('1 kg dyni');
+  });
+});
+
+// CodeQL js/redos (alert #1): the hashtag-line rule backtracked exponentially,
+// so one crafted line of pasted, OCR'd or imported text froze the JS thread.
+describe('isRecipeNoise — hashtag lines in linear time', () => {
+  it.each(['#obiad #szybko', '#obiad#szybko', '#obiad #szybko more', '#Obiad  #x  Więcej', '##', '#a#'])(
+    '%s is noise',
+    (line) => {
+      expect(isRecipeNoise(line)).toBe(true);
+    }
+  );
+
+  it.each(['# Ciasto', '#', '#obiad more x', '#a b'])('%s is not noise', (line) => {
+    expect(isRecipeNoise(line)).toBe(false);
+  });
+
+  it('answers a crafted hashtag line without catastrophic backtracking', () => {
+    // 25 repetitions took about a second with the old rule, doubling every one more.
+    const crafted = '#' + '!#'.repeat(25) + ' x';
+    const start = performance.now();
+    expect(isRecipeNoise(crafted)).toBe(false);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
+  it('parses a pasted recipe holding the crafted line', () => {
+    const crafted = '#' + '!#'.repeat(25) + ' x';
+    const start = performance.now();
+    const r = parsePastedRecipe(['Bułki', 'Składniki', 'mąka', 'Przygotowanie', 'Mieszaj.', crafted].join('\n'));
+    expect(r.ingredients).toBe('mąka');
+    expect(performance.now() - start).toBeLessThan(500);
   });
 });
