@@ -1,44 +1,54 @@
-# Dependabot: weekly, grouped, so updates arrive as a handful of PRs rather
-# than one per package. Expo SDK majors (expo, expo-*, react-native, react)
-# move together and need a native rebuild and on-device checks
-# (docs/upgrade-sdk-57.md), so their major bumps are ignored here and done
-# by hand as an SDK upgrade.
+# Dependabot for a finished Expo app: keep the dependencies patched and the
+# Actions pins current, without proposing upgrades that need a migration.
+#
+# - Expo SDK packages are not Dependabot's to move. expo, expo-*, @expo/*,
+#   react, react-dom, react-native and the native libraries Expo pins
+#   (gesture-handler, reanimated, safe-area-context, screens, web, worklets)
+#   must stay on the versions `npx expo install --check` expects for the SDK,
+#   and move together in an SDK upgrade (docs/upgrade-sdk-57.md).
+# - sql.js is pinned exactly: db/client.web.ts fetches the matching .wasm
+#   by version, and the E2E fixture fails if they drift.
+# - Major versions are migrations (Jest 30, TypeScript 7, ESLint 10, …) and
+#   are done by hand, if at all.
+#
+# Security advisories still reach the repository through `npm audit` in CI
+# (audit-ci, see SECURITY.md).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 3
     groups:
-      expo-sdk:
-        patterns: ['expo', 'expo-*', '@expo/*', 'react-native', 'react-native-*', '@react-native/*', 'react', 'react-dom']
       dev-tooling:
         dependency-type: development
       runtime:
         dependency-type: production
     ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
       - dependency-name: 'expo'
-        update-types: ['version-update:semver-major']
       - dependency-name: 'expo-*'
-        update-types: ['version-update:semver-major']
       - dependency-name: '@expo/*'
-        update-types: ['version-update:semver-major']
       - dependency-name: 'eslint-config-expo'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'react-native'
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: 'react'
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: 'react-dom'
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'react-native'
+      - dependency-name: '@react-native/*'
+      - dependency-name: 'react-native-gesture-handler'
+      - dependency-name: 'react-native-reanimated'
+      - dependency-name: 'react-native-safe-area-context'
+      - dependency-name: 'react-native-screens'
+      - dependency-name: 'react-native-web'
+      - dependency-name: 'react-native-worklets'
+      - dependency-name: '@types/react'
+      - dependency-name: 'sql.js'
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     groups:
       actions:
         patterns: ['*']
