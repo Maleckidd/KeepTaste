@@ -319,5 +319,4 @@ dishes.
 ## License
 
 The source code is [MIT](LICENSE). The KeepTaste name, logo and store art
-are not covered by that license; see the note at the end of
-[LICENSE](LICENSE).
+are not covered by that license; see [TRADEMARKS.md](TRADEMARKS.md).
