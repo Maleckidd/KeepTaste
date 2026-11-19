@@ -117,9 +117,11 @@ anywhere by the app.
 - **This is a rebuilt history.** Development happened in a private
   repository. For publication its history was rewritten with
   `git filter-repo`: third-party recipe-site text in the OCR test fixtures
-  was reworded, and a few internal files were dropped. Merge commits still
-  say "Merge pull request #1 … #14". **Those numbers refer to the private
-  repository's PRs, not to this one's.**
+  was reworded, and a few internal files were dropped. Up to 2026-11-13
+  (`a309360`, `60e2238`), merge commits and one squash commit still say
+  "#1 … #15". **Those numbers refer to the private repository's PRs, not to
+  this one's.** From 2026-11-19 (`b6a7059`) on, PR numbers are this
+  repository's, and they start again at #1.
 - **Most commits carry a `Co-Authored-By: Claude` trailer.** That is the
   point of this page, not something to hide.
 - **The agent prompts aged.** `.claude/agents/*.md` were written at the
