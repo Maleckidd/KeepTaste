@@ -106,6 +106,9 @@ export default function SwipeableRow({
       clearTimeout(close);
       clearTimeout(restore);
     };
+    // Only a `peek` flip starts the hint; re-running on a new callback
+    // identity (parents pass inline arrows) would restart it mid-slide.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [peek]);
 
   return (

@@ -5,7 +5,6 @@
 import {
   cookbooks,
   recipes,
-  shoppingLists,
   shoppingItems,
 } from '../db/schema';
 import type { BackupContent } from '../utils/backupArchive';

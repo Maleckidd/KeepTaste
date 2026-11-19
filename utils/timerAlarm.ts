@@ -49,6 +49,9 @@ let notificationsModule: NotificationsModule | null = null;
 /** Lazy require — call only behind isTimerAlarmAvailable. */
 function notifications(): NotificationsModule {
   if (!notificationsModule) {
+    // A static import would load expo-notifications in Expo Go / on web,
+    // where it is gated off; require only behind the availability check.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     notificationsModule = require('expo-notifications') as NotificationsModule;
   }
   return notificationsModule;

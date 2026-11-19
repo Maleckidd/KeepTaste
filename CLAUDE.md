@@ -14,6 +14,7 @@ npx expo start       # dev server (scan QR in Expo Go — non-backup work)
 npm run android      # Android emulator/device
 npm run web          # web build — agent/E2E test environment ONLY, not a product platform
 npx tsc --noEmit     # type check (strict mode)
+npm run lint         # ESLint (eslint-config-expo, flat config), zero warnings allowed
 npm test             # jest (ts-jest, logic-only tests in __tests__/)
 eas build --profile development   # custom dev client (required for backup flows)
 ```
@@ -26,7 +27,7 @@ The web build runs on an in-memory sql.js database (`db/client.web.ts`) that res
 
 **Android SDK versions are not pinned.** `expo-build-properties` was removed in the SDK 57 upgrade; `compileSdk`/`targetSdk` come from the SDK default (36 on SDK 57) via React Native's version catalog. Do not re-add a pin — an explicit one is what let the target go stale until Play threatened to block updates. See `docs/upgrade-sdk-57.md`.
 
-There is no lint script. Unit tests cover **pure logic only** (`db/` query helpers, `utils/`); UI/native-module behavior is verified by running the app (Expo Go, or the web build for browser-driven smoke tests), not by component tests.
+Lint config is `eslint.config.js`; the React Compiler diagnostics of `eslint-plugin-react-hooks` are off because the app does not use the compiler. Unit tests cover **pure logic only** (`db/` query helpers, `utils/`); UI/native-module behavior is verified by running the app (Expo Go, or the web build for browser-driven smoke tests), not by component tests.
 
 ## Subagent pipeline
 

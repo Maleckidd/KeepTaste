@@ -38,7 +38,7 @@ type DemoLocale = {
   /** Sample shopping list: name + [item, quantity, checked] rows. */
   shoppingList: {
     name: string;
-    items: Array<[string, string | null, 0 | 1]>;
+    items: [string, string | null, 0 | 1][];
   };
 };
 

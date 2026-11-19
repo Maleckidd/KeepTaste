@@ -130,6 +130,7 @@ export default function PasteListSheet({
     // initialProducts is deliberately not a dependency: the parent sets it in
     // the same batch as `visible`, so it is current when the sheet opens, and
     // a later change must not reset an open sheet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, progress]);
 
   useEffect(() => {
