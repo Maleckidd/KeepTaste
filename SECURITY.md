@@ -57,7 +57,7 @@ point at different code; a SHA cannot. That is how the
 `tj-actions/changed-files` compromise (March 2025, CVE-2025-30066) reached
 thousands of repositories: the attacker re-pointed the action's version tags
 at a commit that dumped CI secrets into the logs. Dependabot keeps the pins
-current (`.github/dependabot.yml`).
+current (`.github/dependabot.yml`; Expo-pinned packages and major versions are left to manual SDK upgrades).
 
 **Least-privilege tokens.** Every workflow sets `permissions: contents: read`
 at the top and widens it per job only where needed (CodeQL's
