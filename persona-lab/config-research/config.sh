@@ -46,7 +46,7 @@ state_ready() {
 }
 
 SYNTHESIS_SCOPE="app components db utils i18n constants package.json app.json"
-SCOPE_FORBIDDEN="SPEC.md CLAUDE.md UX_NOTES.md README.md SECURITY.md docs/TESTING.md docs/AI-WORKFLOW.md docs/case-studies/persona-lab.md"
+SCOPE_FORBIDDEN="SPEC.md CLAUDE.md docs/ux-audit-2026-06.md README.md SECURITY.md docs/TESTING.md docs/AI-WORKFLOW.md docs/case-studies/persona-lab.md"
 
 scope_scrub() {
   local dir="$1"

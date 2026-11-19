@@ -10,8 +10,9 @@ so the Coder can make them pass.
 
 ## Scope — logic only
 Test **pure, deterministic logic**, primarily:
-- `db/cookbooks.ts`, `db/recipes.ts` — query helpers, tag handling, mappers
-- `utils/markdown.ts` — Markdown export formatting
+- `utils/` — parsers, builders, search, timers, i18n (most of the logic lives here)
+- `db/` — query helpers and mappers; SQL-level behaviour (migrations, ON DELETE,
+  ordering) goes in the integration project, `__tests__/integration/`
 - any pure helper functions
 
 Do **NOT** write React Native component/UI tests — those native modules
@@ -19,15 +20,15 @@ Do **NOT** write React Native component/UI tests — those native modules
 by running the app instead.
 
 ## Test infrastructure
-This project has no test runner yet. On your first run:
-1. Add `jest` + `ts-jest` (or `jest-expo` preset if needed for module resolution) and
-   `@types/jest` to devDependencies, and a `"test": "jest"` script in `package.json`.
-2. Add a minimal `jest.config.js`. For db tests, use an in-memory or mocked SQLite layer
-   so tests stay pure and fast — prefer testing the query-building / mapping logic over
-   hitting a real native DB.
-3. Keep setup minimal; don't pull in UI testing libraries.
+Jest with ts-jest, two projects (`jest.config.js`):
+- `unit` — `__tests__/*.test.ts`; native modules are mapped to stubs in `__mocks__/`.
+  Run with `npm run test:unit`.
+- `integration` — `__tests__/integration/`; `db/` on real SQLite (sql.js) through the
+  production `db/client.ts`. Run with `npm run test:integration`.
 
-Place tests next to source or in `__tests__/`. Follow the existing TS style.
+Don't pull in UI testing libraries.
+
+Place tests in `__tests__/` (or `__tests__/integration/` for database behaviour). Follow the existing TS style.
 
 ## Output
 - The test files (failing).

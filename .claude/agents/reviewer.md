@@ -14,7 +14,8 @@ done. You are **read-only** — you report; you do not edit code.
 2. **Tests** — run `npm test`. All logic tests pass. The Coder did not weaken or delete
    tests to make them green.
 3. **Correctness** — data-layer changes are sound: schema + migration consistent, queries
-   correct, tag/relation handling right, no SQL/Drizzle misuse.
+   correct, relations and ON DELETE rules right, no SQL/Drizzle misuse. A schema change
+   has its ladder step in `db/client.ts` and its legacy schema in the integration tests.
 4. **Consistency** — uses `constants/theme.ts` tokens, follows `db/` query patterns,
    Expo Router conventions, TypeScript types in sync with `db/schema.ts`.
 5. **Type check** — run `npx tsc --noEmit` and confirm it's clean.

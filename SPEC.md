@@ -3,6 +3,25 @@
 > Living document. Update it with every significant design decision.
 > Version: 1.9 | Date: 2026-10
 
+## How to read this spec
+
+This is the single source of truth for what the app does. Code, commits and
+tests cite it by section (`§5.15`), and the AI agents plan from it
+([docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md)). It is long because it records
+decisions *and the reasons for them*; nobody needs to read it end to end.
+
+| If you want… | Read |
+|---|---|
+| What the product is, and what it deliberately is not | [§1 Product goal](#1-product-goal), [§7 Out of scope](#7-out-of-scope-deliberate-decisions) |
+| Platforms, stack, and why the web build is only a test harness | [§2 Platform and stack](#2-platform-and-stack) |
+| How the code is organised and how data flows | [§3 Architecture](#3-project-architecture), [§4 Database schema](#4-database-schema) |
+| A specific feature and its rules | §5, one subsection per feature: home and cookbooks (§5.1–5.3), recipe view and form (§5.4–5.5), Markdown backup and import (§5.6, §5.8), settings and language (§5.7, §5.11), shopping lists (§5.10, §5.12, §5.16, §5.18), sharing (§5.13–5.14), single-recipe import (§5.15), `.zip` backup (§5.17), to-try (§5.19), first-launch sample content (§5.20), cooking timers (§5.21) |
+| Design tokens, dark mode, the UI kit | [§6 Design system](#6-design-system) |
+| What was left open, and known risks | [§8 TODO](#8-todo--open-items), [§9 Known limitations](#9-known-limitations-and-risks) |
+
+The project is feature-complete: §8 is a record of ideas not taken, not a
+plan.
+
 ---
 
 ## 1. Product goal
@@ -1111,7 +1130,7 @@ Editing & deleting (June 2026 iteration):
 Persona testing, iteration 1 (October 2026):
 - **No unlabeled action icons.** Screen-specific actions are text — a text button or a labeled item in the "⋯" menu — never an icon-only button. Icon-only buttons are kept only for glyphs everyone reads: back, close, settings gear, "⋯", the FAB "+", and the add/confirm buttons of the shopping-list add row. The share icons in the cookbook and recipe headers were removed for this (§5.3, §5.4), and the home "New cookbook" action is a labeled tile in the grid (§5.1).
 
-Proposals that would require further logic changes are parked in `UX_NOTES.md`.
+Proposals that would require further logic changes are parked in [`docs/ux-audit-2026-06.md`](docs/ux-audit-2026-06.md).
 
 ---
 
@@ -1162,7 +1181,7 @@ Proposals that would require further logic changes are parked in `UX_NOTES.md`.
 - [ ] **Cooking timers** — §5.21 (stage 1 implemented November 2026; stage 2 implemented November 2026, pending the on-device check of delivery delay with the screen locked): stage 1 = pure `parseDurations` in `utils/durations.ts` (unit-tested: EN+PL units, compound, decimal, ranges → lower bound, no temperatures/quantities), inline timer chips in the instructions (custom `react-native-markdown-display` text rule), `TimerProvider` + `TimerBar` (endsAt-derived countdown, pause/resume/+1 min/stop, several at once), foreground alarm, `active_timers` persistence excluded from backup/restore; stage 2 = `expo-notifications` background alarm: pure reconciler `utils/timerNotifications.ts` (unit-tested), gated wrapper `utils/timerAlarm.ts`, `TimerNotifications` bridge (permission on first start, one-time notice, tap → recipe), in-app alert gate against double alarms, `timer_alarm_notice` device-only key, `versionCode` 14; open: measure the delivery delay on a device and decide on exact alarms; stage 3 v1 (November 2026, pending the on-device check) = live countdown notification `timer-live:<id>` on channel `timers-live` (pure `planTimerLiveNotifications`, native Chronometer custom view in `modules/exactalarm`), no control buttons
 
 ### Persona testing — iteration 1 fixes (October 2026)
-Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; acceptance = iteration 2 on the same personas (`run.sh --personas-file`). Ideas not taken now are parked in `UX_NOTES.md` ("Persona testing, iteration 1").
+Source: `persona-lab/history/01-2026-10-23.md`. One branch/PR per package; acceptance = iteration 2 on the same personas (`run.sh --personas-file`). Ideas not taken now are parked in [`docs/ux-audit-2026-06.md`](docs/ux-audit-2026-06.md) ("Persona testing, iteration 1").
 - [x] **Swipe peek hint replays on every save** — fixed separately in PR #6 (pin the hint to one recipe id, `onPeekEnd`)
 - [x] **A. First recipe** — FAB → new recipe, "New cookbook" text button in the home header (§5.1/§5.2); Cookbook picker in the form, which also moves recipes (§5.5); save snackbar with "Show" (§5.5); `updateRecipe` takes `cookbookId` (unit-tested)
 - [x] **B. Search** — title + ingredient search with diacritic folding and stem matching, title matches first, "in ingredients" hint, "×" clear button, focus on entry, explicit no-results text (§5.3); pure helpers in `utils/search.ts` (unit-tested)
