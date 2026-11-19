@@ -58,6 +58,7 @@ export type NewRecipe = {
   servings?: string;
   prep?: string;
   ingredients?: string;
+  instructions?: string;
 };
 
 /** Home → "Add recipe" → fill the form → Save → back on home. */
@@ -69,6 +70,9 @@ export async function createRecipe(page: Page, recipe: NewRecipe) {
   if (recipe.servings !== undefined) await page.getByTestId('recipe-servings').fill(recipe.servings);
   if (recipe.ingredients !== undefined) {
     await page.getByTestId('recipe-ingredients').fill(recipe.ingredients);
+  }
+  if (recipe.instructions !== undefined) {
+    await page.getByTestId('recipe-instructions').fill(recipe.instructions);
   }
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Recipe saved')).toBeVisible();
