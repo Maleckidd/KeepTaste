@@ -6,8 +6,11 @@ their needs and temperament would. The output is their problems and wishes,
 each backed by a screenshot, plus one synthesis that groups everything across
 personas and runs and maps it onto the code.
 
-The tool is a repository of its own, `persona-lab`. How it works, what it
-checks about itself and what it writes are in its README. This directory is
+The tool is a repository of its own,
+[Maleckidd/persona-lab](https://github.com/Maleckidd/persona-lab) (MIT). How
+it works, what it checks about itself and what it writes are in its README.
+An English summary of what the studies found and changed in KeepTaste is in
+[docs/case-studies/persona-lab.md](../docs/case-studies/persona-lab.md). This directory is
 what belongs to the app: its configs, the history of its studies and the
 output of its sessions.
 
@@ -20,7 +23,11 @@ bash persona-lab/run.sh persona-lab/config --count 1 --runs 1    # smoke run
 
 `run.sh` only finds the engine and hands over: `PERSONA_LAB_ENGINE` (the
 `engine/` directory of a clone) or, when that is not set, a clone called
-`persona-lab` next to this repository. The engine's version is not pinned
+`persona-lab` next to this repository:
+
+```bash
+git clone https://github.com/Maleckidd/persona-lab ../persona-lab
+``` The engine's version is not pinned
 here. Each session writes the engine commit it ran on into its `summary.json`
 and its history entry.
 

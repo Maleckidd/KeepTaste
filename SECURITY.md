@@ -14,6 +14,41 @@ steps or a crafted file that reproduces it, and the impact you see.
 This is a one-person project with no service-level commitment: expect an
 acknowledgement within a couple of weeks. Fixes ship as a Google Play update.
 
+## Threat model
+
+KeepTaste is a local-only Android app. There is no KeepTaste server, no
+account and no analytics. The assets are the user's recipe library, photos,
+shopping lists and settings, stored in the app's private sandbox (SQLite +
+the documents directory). The attacker considered here is someone who gets
+**content** in front of the app: a web page the user imports, text shared
+into it, a backup file someone hands them, or a link. Someone with root or
+physical access to an unlocked phone is out of scope. The database is not
+encrypted beyond what Android's per-app sandbox and device encryption
+provide.
+
+### Entry points
+
+| Entry point | What comes in | Controls | Residual risk |
+|---|---|---|---|
+| **Share target** (`text/*`, `expo-share-intent` in `app.json`) | Any text another app shares to KeepTaste | `utils/sharedUrl.ts` takes only the first `http(s)://` URL, or treats the text as a paste. The share opens the import sheet; nothing is saved until the user confirms the form. | A shared link is fetched immediately (see next row). |
+| **Import from a link** (`utils/recipeImportFetch.ts`) | The HTML of a page whose address the user pasted or shared | This is the app's only intentional network call: one `GET`, from the phone straight to that site, 15 s timeout. The HTML is parsed as data by pure parsers (`utils/recipeImport.ts`: JSON-LD, microdata, text). There is no WebView and no script execution. The result only pre-fills the form. | The response body is read without a size cap (memory pressure on a hostile page). Browser-like headers are sent so recipe sites answer. |
+| **`.zip` backup restore** (`utils/backupArchiveFs.ts`, `utils/backupArchive.ts`, `db/backup.ts`) | An archive from anywhere: email, a cloud folder, another phone | Unzip is guarded against path traversal by react-native-zip-archive (ZipSecurity). `backup.json` is validated before anything is wiped: schema version, required ids and names. **Image paths are restricted to a flat file name under `images/`**; anything else restores without a photo. Rows go in through Drizzle's parameterised queries. A Replace restore writes a safety backup of the current library first. | A crafted but valid archive can still fill the library with junk. That is a restore the user chose, and the safety backup undoes it. |
+| **`.md` import** (`utils/importMarkdown.ts`, `db/import.ts`) | Markdown text | Parsed as plain text into fields; never executed. | — |
+| **Markdown rendering** (`react-native-markdown-display`) | Recipe ingredients, instructions and notes | Rendered to native views, never HTML: the parser has `html: false` and `linkify: false`. Links open only when tapped. | **Markdown images are fetched.** The renderer loads `![](https://…)` images by default, so a recipe text holding an image URL (pasted, imported, or restored from someone else's backup) makes a request to that host whenever the recipe is shown. A fix that disables remote images is proposed. Quadratic-time parser advisories: see the allowlist below. |
+| **Deep links** (`keeptaste://` scheme, Expo Router) | A route such as `keeptaste://cookbook/all` | Navigation only. Every write needs taps in the UI. Deletes wait behind a 5-second Undo, and recipes and cookbooks also ask for confirmation first. | A crafted query string can stall the router (decode-uri-component advisory below). |
+| **AI transcription** (`utils/aiTranscribe.ts`) | An answer the user pastes back from an assistant of their choice | The app builds the prompt and cleans the pasted answer. It makes no AI or network call itself. | — |
+
+### Permissions
+
+`app.json` declares only **Camera** (recipe photos, OCR import) and
+**exact alarms** (cooking-timer alarms). The notification permission, which
+`expo-notifications` adds, is requested when the first timer starts. These
+are explicitly **blocked** so that no library can merge them in:
+`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ/WRITE_EXTERNAL_STORAGE`,
+`RECORD_AUDIO` and `SYSTEM_ALERT_WINDOW`. Photos come through the system
+photo picker and backups through the Storage Access Framework. Both are
+scoped to what the user picks and need no storage permission.
+
 ## Supply chain
 
 **GitHub Actions are pinned to full commit SHAs**, with the release tag in a

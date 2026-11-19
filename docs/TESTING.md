@@ -1,13 +1,159 @@
-# KeepTaste — Manual Test Plan (Mobile)
+# Testing
 
-> Companion to [SPEC.md](SPEC.md). Covers everything that **cannot** be verified by the
+How KeepTaste is verified, what each layer covers, and what it does not.
+Every claim here points at a file you can open. The manual device plan is
+[Appendix A](#appendix-a--manual-test-plan-mobile).
+
+## The layers
+
+```mermaid
+flowchart TB
+  M["Manual on device<br/>native modules, gestures, lifecycle<br/>Appendix A + CLAUDE.md dev-build rules"]
+  P["Persona studies<br/>simulated users on the emulator<br/>docs/case-studies/persona-lab.md"]
+  E["E2E — Playwright on the web export<br/>form → db → list → search, offline<br/>e2e/"]
+  I["Integration — db/ on real SQLite (sql.js)<br/>migration ladder, SQL rules, backup round-trip<br/>__tests__/integration/"]
+  U["Unit — pure logic in db/, utils/, i18n/<br/>parsers, builders, reducers, reconcilers<br/>__tests__/*.test.ts"]
+  S["Static — tsc --strict, ESLint (zero warnings)"]
+  M --- P --- E --- I --- U --- S
+```
+
+| Layer | Command | Runs in CI | Scope |
+|---|---|---|---|
+| Static | `npx tsc --noEmit`, `npm run lint` | yes, every PR | Strict TypeScript; ESLint with `eslint-config-expo`, zero warnings allowed |
+| Unit | `npm run test:unit` | yes, with coverage | Pure logic; native modules mapped to stubs in `__mocks__/` |
+| Integration | `npm run test:integration` | yes, own job | `db/` against real SQLite |
+| E2E | `npm run e2e:build && npm run e2e` | yes, own job | Cross-layer flows in the browser |
+| Persona studies | `bash persona-lab/run.sh persona-lab/config` | no (needs an emulator and an LLM) | Discoverability, comprehension, the user's belief vs the saved state |
+| Manual | Appendix A | no | Native behaviour on a real phone |
+
+Security checks (secret scan, dependency audit, CodeQL) run beside these.
+They are described in [SECURITY.md](../SECURITY.md).
+
+## What is tested, and why there
+
+### Unit: pure logic, which is most of the risk
+
+Most of what can go wrong in this app is data transformation: parsing a
+pasted recipe, a web page or an OCR'd photo; building and parsing the
+Markdown and `.zip` backups; diacritic-folding search; timer durations and
+notification planning; Polish plural rules. That logic is kept in pure
+modules (`utils/`, the pure parts of `db/`) with no native imports, so it
+runs in plain Node and is tested exhaustively and quickly.
+
+Some examples of where the effort went:
+
+- **Import parsers** (`recipeImport.test.ts`, `ocrText.test.ts`,
+  `ocrScreens.test.ts`). OCR is tested on real ML Kit output captured from
+  the emulator, stored as JSON in `__tests__/fixtures/ocr/` (third-party
+  text reworded), so a parser change is checked against what the device
+  actually produces.
+- **Round-trips** (`roundtrip.test.ts`, `importMarkdown.test.ts`,
+  `parseBackupMarkdown.test.ts`). Export, then import, must give back the
+  same library. That is the escape-hatch promise (SPEC.md §5.6).
+- **Backup safety** (`backupArchive.test.ts`, `backupSilentReplace.test.ts`,
+  `backupExcludesTimers.test.ts`). A corrupted or crafted archive is
+  rejected before anything is wiped. Image paths cannot leave `images/`.
+  Device-only settings never travel.
+- **Timers** (`durations.test.ts`, `timers.test.ts`,
+  `timerNotifications.test.ts`). The reconciler that decides which OS
+  notifications to schedule or cancel is pure, so mixes of running, paused
+  and expired timers are tested without a device.
+
+### Integration: the database itself
+
+The unit tests for `db/` mock `db/client`, so they check *which* Drizzle
+calls are made, never what SQLite does with them. The integration project
+closes that gap. It maps `expo-sqlite` to a small adapter over **sql.js**
+(real SQLite in WebAssembly,
+`__tests__/integration/support/expoSqliteOnSqlJs.ts`). Everything above
+the native binding is production code: `db/client.ts` with its import-time
+migrations, drizzle's `expo-sqlite` driver, the `db/` helpers.
+
+- **The migration ladder** (`migrations.test.ts`). A fresh install never
+  runs the ladder's ALTERs: the baseline DDL already has every column, so a
+  missing ladder step passes every test on a clean database (CLAUDE.md warns
+  about exactly this). So every schema a release shipped is rebuilt from git
+  history (`support/legacySchemas.ts`), filled with data and migrated. Each
+  table must then match `db/schema.ts` column for column. Removing a ladder
+  step on purpose turns 12 of these tests red while the fresh-install tests
+  stay green; that run is linked from the PR that added the suite.
+- **Rules that live in SQL** (`dataLayer.test.ts`). Deleting a cookbook sets
+  its recipes' `cookbook_id` to NULL; deleting a list cascades to its items;
+  recipes sort by `updated_at`, newest first.
+- **Backup round-trip** (`backupRoundTrip.test.ts`). Export → `backup.json` →
+  restore into an empty database gives back the same library: timestamps
+  kept, ids remapped, device-only settings left behind.
+
+### E2E: the flows across layers
+
+Playwright drives the static web export (`playwright.config.ts`, `e2e/`). It
+covers the seeded first launch, creating a recipe, the title-only
+validation, numeric fields that must never save `NaN` (SPEC.md §5.5), and
+diacritic search over titles and ingredients (§5.3).
+
+Two properties make these tests trustworthy rather than flaky:
+
+- **A fresh database per page load.** The web build runs on an in-memory
+  sql.js database (`db/client.web.ts`), so tests cannot leak state into each
+  other.
+- **Hermetic and offline.** The `app` fixture serves sql.js's WebAssembly
+  from `node_modules` and *blocks and records* every request to any other
+  host; a test fails if there was one, or if the page threw.
+
+The web build is a test harness, not a product (SPEC.md §2). It has no file
+system, sharing, camera or notifications, so E2E cannot reach those.
+
+### Coverage
+
+`jest --coverage` counts **every** file in `db/`, `utils/` and `i18n/`, not
+only the files some test imports, so an untested file shows as 0%. The
+threshold in `jest.config.js` is a floor just under the measured level: CI
+fails if coverage drops. Thin native wrappers (`utils/timerAlarm.ts`,
+`haptics.ts`, `backupArchiveFs.ts`, `recipeOcr.ts`, …) stay in the
+denominator on purpose. They are low because they are verified on a
+device, and hiding them would make the number lie.
+
+## Why there are no component tests
+
+There are no React Native Testing Library tests, by decision:
+
+- **The risky logic is not in components.** It was pulled out into pure
+  modules precisely so it can be unit-tested (see above). What is left in
+  `app/` and `components/` is layout, gestures, animation and wiring to
+  native modules.
+- **That layer does not survive a mock.** Swipe rows, bottom sheets, the
+  keyboard on edge-to-edge Android, haptics and the share sheet behave
+  differently under a JS renderer with mocked natives. A green component
+  test would say little about the real screen, and it is expensive to keep
+  in step with UI changes.
+- **UI is verified by running it.** Flows are covered by E2E in the browser,
+  by personas on the emulator, and by the manual plan on a phone. The rule
+  is in [CLAUDE.md](../CLAUDE.md): unit tests cover pure logic; UI is
+  checked by running the app.
+
+## Known gaps
+
+- Native flows need a dev build and a phone: the `.zip` export/restore,
+  SAF auto-backup, OCR, background timer alarms and the share target. They
+  are not automated. The manual plan below was written for 1.0 (June 2026)
+  and has no cases for the `.zip` backup, OCR, timers or the to-try list.
+- No Android E2E yet. Maestro on a release build is planned; the groundwork
+  (adb smoke steps, a Maestro outline) is in [e2e-emulator.md](e2e-emulator.md).
+- Mutation testing is not set up, so the parsers' assertions have not been
+  measured for strength. Stryker on `utils/` is planned.
+
+---
+
+## Appendix A — Manual test plan (mobile)
+
+> Companion to [SPEC.md](../SPEC.md). Covers everything that **cannot** be verified by the
 > automated layers (unit tests for pure logic, browser smoke tests on the web build):
 > native modules, Alert dialogs, gestures, permissions, file system, share sheet.
 > Version: 1.0 | Date: 2026-06
 
 ---
 
-## 1. Scope and test strategy
+### 1. Scope and test strategy
 
 The project uses a layered verification strategy; this document is the top layer:
 
@@ -15,23 +161,23 @@ The project uses a layered verification strategy; this document is the top layer
 |---|---|---|
 | Unit tests | `npm test` (jest) | Pure logic: `db/` query helpers, `utils/` (parsing, search, dirty-checks, image-path decisions, export format) |
 | Type check | `npx tsc --noEmit` | Strict TypeScript across the codebase |
-| Web smoke | Playwright on `npm run web` | Browser-driven flows: form → save → list, navigation, rendering |
+| E2E | Playwright on the web export (`npm run e2e`) | Browser-driven flows: form → save → list, search |
 | **Manual (this plan)** | Expo Go / dev build on device | Alerts, image picker, camera, permissions, file persistence, share sheet, gestures, app lifecycle |
 
 **Why manual:** `Alert.alert` is a no-op on web, the in-memory web DB resets on
 reload, and `expo-file-system` / `expo-image-picker` / `expo-sharing` have no web
 implementation. Every test case below exercises at least one of those gaps.
 
-### Out of scope of this plan
+#### Out of scope of this plan
 - Web-only behavior (the web build is a test environment, not a product platform — SPEC §2).
 - Features not implemented yet: animations, tags (SPEC §7/§8). Dark mode (SPEC §6), Markdown import (§5.8), and single-recipe import (§5.15) are implemented and covered below (DM, MI, and RI cases).
 - Performance/load testing — the app is local-only and single-user; not a current risk.
 
 ---
 
-## 2. Test environment
+### 2. Test environment
 
-### Device matrix
+#### Device matrix
 
 | # | Device class | OS | Priority | Notes |
 |---|---|---|---|---|
@@ -40,13 +186,13 @@ implementation. Every test case below exercises at least one of those gaps.
 | E3 | Physical Android, small screen / older OS | Android 10–12 | P2 | Layout + permission-dialog differences |
 | E4 | iPhone (Expo Go) | iOS 17+ | P2 | Planned platform; run the smoke suite only |
 
-### Preconditions for every session
+#### Preconditions for every session
 1. `npm test` green and `npx tsc --noEmit` clean on the commit under test (entry criteria).
 2. App installed fresh **or** state reset via Settings → Delete all data (each case states which).
 3. Language is bilingual (EN/PL, §5.11). Unless a case says otherwise, set the in-app Language to **English** (Settings → Language → English) so expected strings match; the I18N cases below cover the Polish and device-locale paths explicitly.
 4. For permission cases: app permissions reset (`Settings → Apps → Expo Go → Permissions` or `adb shell pm reset-permissions`).
 
-### Standard test data
+#### Standard test data
 - **Cookbook A**: name `Desserts`, with cover photo.
 - **Cookbook B**: name `Zupy i żurki` (Polish diacritics), no cover.
 - **Recipe R1**: title `Strawberry Tart`, prep 15, cook 45, servings 4, photo, ingredients/instructions with Markdown (`# heading`, `**bold**`, `- bullets`), notes filled.
@@ -55,7 +201,7 @@ implementation. Every test case below exercises at least one of those gaps.
 
 ---
 
-## 3. Conventions
+### 3. Conventions
 
 - **ID scheme**: `<AREA>-<number>` — CB cookbooks, RC recipe create/edit, RV recipe view, LS lists & sorting, SR search, IM image persistence, EX export, DC discard dialogs, ST settings, PM permissions, LC app lifecycle.
 - **Priority**: P0 = smoke (run on every build), P1 = full pass before release, P2 = extended/edge.
@@ -64,9 +210,9 @@ implementation. Every test case below exercises at least one of those gaps.
 
 ---
 
-## 4. Test cases
+### 4. Test cases
 
-### CB — Cookbooks (SPEC §5.1, §5.2)
+#### CB — Cookbooks (SPEC §5.1, §5.2)
 
 **CB-01 · P0 · Create a cookbook (name only)**
 Pre: fresh state.
@@ -115,7 +261,7 @@ Pre: CB-02 done.
 1. Edit the cookbook → tap cover → **Remove photo** → Save.
 - Expected: tile falls back to the palette color + icon. (File cleanup verified in IM-05.)
 
-### RC — Recipe create & edit (SPEC §5.5)
+#### RC — Recipe create & edit (SPEC §5.5)
 
 **RC-01 · P0 · Create a recipe with title only**
 1. Home → header "+" → fill only title `Żurek staropolski`. Save.
@@ -150,7 +296,7 @@ Pre: ≥2 recipes, the recipe under test NOT the most recent.
 1. Edit a recipe with a photo: replace it; save; verify. 2. Edit again: **Remove photo**; save.
 - Expected: replacement shows the new photo; removal shows the gray placeholder. (Files: IM-03/IM-04.)
 
-### RV — Recipe view (SPEC §5.4)
+#### RV — Recipe view (SPEC §5.4)
 
 **RV-01 · P0 · Unified content view (no tabs)**
 Pre: R1 (both sections filled) and R2 (both empty) exist.
@@ -176,7 +322,7 @@ Pre: R1 (both sections filled) and R2 (both empty) exist.
 1. Open a recipe → trash icon → confirmation Alert (destructive) → confirm.
 - Expected: navigates back; recipe gone from every list. Cancel path leaves it intact.
 
-### LS — Lists, grid, sorting (SPEC §5.1, §5.3)
+#### LS — Lists, grid, sorting (SPEC §5.1, §5.3)
 
 **LS-01 · P0 · "All recipes" aggregates everything**
 Pre: recipes in 2 cookbooks + ≥1 recipe without a cookbook.
@@ -200,7 +346,7 @@ Pre: fresh state (no cookbooks).
 2. Open All recipes.
 - Expected: **no** export icon in the All recipes view (SPEC §5.6).
 
-### SR — Search (SPEC §5.1)
+#### SR — Search (SPEC §5.1)
 
 **SR-01 · P0 · Live title search**
 1. All recipes view → type `tart` (lowercase) in search.
@@ -214,7 +360,7 @@ Pre: fresh state (no cookbooks).
 1. Search `xyzzy`.
 - Expected: muted "no results" text; no crash; clearing the query restores the full list.
 
-### IM — Image persistence (SPEC §5.5, §8, §9) — **data-loss critical**
+#### IM — Image persistence (SPEC §5.5, §8, §9) — **data-loss critical**
 
 **IM-01 · P0 · Picked photo is copied to documentDirectory**
 1. Create a recipe with a gallery photo. Save.
@@ -241,7 +387,7 @@ Same as IM-01 but for a cookbook cover.
 1. Edit a recipe with a photo, change only the title, save. Repeat 3×.
 - Expected: still exactly one image file for that recipe (no duplicates per save).
 
-### EX — Markdown export (SPEC §5.6)
+#### EX — Markdown export (SPEC §5.6)
 
 **EX-01 · P0 · Export a cookbook**
 Pre: cookbook with R1 (full) and R2 (title only).
@@ -263,7 +409,7 @@ Inspect the exported file:
 1. Trigger export, dismiss the share sheet without choosing a target.
 - Expected: app returns to the cookbook view; no crash; export can be re-triggered.
 
-### MI — Markdown import (SPEC §5.8)
+#### MI — Markdown import (SPEC §5.8)
 
 **MI-01 · P0 · Export → import round-trip**
 Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (title only).
@@ -291,7 +437,7 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 1. After MI-01, open imported R1.
 - Expected: gray placeholder instead of a photo (export does not carry images — known format property, not a bug); everything else intact.
 
-### RI — Single-recipe import (SPEC §5.15)
+#### RI — Single-recipe import (SPEC §5.15)
 
 > Distinct from MI (whole-library Markdown backup). The pure parsers are unit-tested
 > (`__tests__/recipeImport.test.ts`); these cases cover the native sheet, `fetch`, and keyboard.
@@ -326,7 +472,7 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 1. Open the Import sheet and tap the URL field (and the paste field).
 - Expected: the sheet lifts above the on-screen keyboard — the input and the Import button stay visible and tappable, not hidden behind the keyboard.
 
-### SL — Shopping lists (SPEC §5.10)
+#### SL — Shopping lists (SPEC §5.10)
 
 **SL-01 · P0 · Create a shopping list**
 1. Shopping tab → tap "+" → the "New shopping list" modal opens with the name field focused.
@@ -376,7 +522,7 @@ Pre: cookbook with R1 (full: times, servings, Markdown sections, notes) and R2 (
 1. Long-press a product row → Alert → "Delete".
 - Expected: the product is removed; the parent list's `updated_at` is touched.
 
-### DC — Discard-changes dialogs (SPEC §5.2, §5.5)
+#### DC — Discard-changes dialogs (SPEC §5.2, §5.5)
 
 **DC-01 · P0 · Dirty recipe form warns on Cancel**
 1. New recipe → type anything in any field → tap Cancel.
@@ -393,7 +539,7 @@ Same as DC-01 for the cookbook modal (name typed or cover picked).
 1. Edit a recipe, change the title, then change it back exactly → Cancel.
 - Expected: closes without a dialog (form equals initial state). *Known limitation:* the OS back gesture / hardware back bypasses the dialog on both forms (parity gap, tracked for a future pass) — verify it at least does not crash.
 
-### ST — Settings (SPEC §5.7)
+#### ST — Settings (SPEC §5.7)
 
 **ST-01 · P0 · Settings content**
 1. Home → gear icon.
@@ -408,7 +554,7 @@ Pre: ≥2 cookbooks, ≥3 recipes, with photos.
 1. Cancel at the first Alert; re-enter and cancel at the second.
 - Expected: nothing deleted in either path.
 
-### PM — Permissions (SPEC §2)
+#### PM — Permissions (SPEC §2)
 
 **PM-01 · P1 · Photo library permission denied**
 Pre: permissions reset.
@@ -423,14 +569,14 @@ Same for Camera.
 1. After PM-01, grant the permission from system settings, retry.
 - Expected: picker opens normally.
 
-### DM — Dark mode (SPEC §6)
+#### DM — Dark mode (SPEC §6)
 
 **DM-01 · P1 · System theme switching**
 1. With the app open on Home, switch the system theme to dark (quick settings tile), then walk through: cookbook view, recipe view, both forms, settings.
 2. Switch back to light mid-session.
 - Expected: every screen switches instantly without reload; no stale light/dark surfaces; text readable on all backgrounds (spot-check contrast per SPEC §6 WCAG AA goal); cookbook tiles and photos unchanged (dark overlay works in both modes); status bar style follows the theme.
 
-### I18N — Language selection (SPEC §5.11)
+#### I18N — Language selection (SPEC §5.11)
 
 **I18N-01 · P1 · Polish-locale device defaults to Polish UI**
 1. Fresh install (clear Expo Go data) on a device whose system language is Polish (`pl-PL`). Launch the app without touching Settings.
@@ -448,7 +594,7 @@ Same for Camera.
 1. With UI language set to Polski, export a cookbook to Markdown, inspect the file, then re-import it (Settings → Importuj z Markdown).
 - Expected: the exported `.md` headings/labels are English (the data format never localizes); the import succeeds and round-trips identically — recipe count and content match — even though every surrounding UI string and Alert shown during import is Polish.
 
-### LC — App lifecycle & data durability (SPEC §4, §9)
+#### LC — App lifecycle & data durability (SPEC §4, §9)
 
 **LC-01 · P0 · Data survives app restart**
 1. Create data, force-stop the app, relaunch.
@@ -468,14 +614,14 @@ Same for Camera.
 
 ---
 
-## 5. Smoke suite (run on every build)
+### 5. Smoke suite (run on every build)
 
 The P0 set, in execution order:
 `LC-01 → CB-01 → CB-04 → CB-06 → RC-01 → RC-02 → RC-03 → RV-01 → RV-05 → LS-01 → SR-01 → SR-02 → IM-01 → IM-02 → EX-01 → MI-01 → DC-01 → ST-01 → ST-02`
 
 ~20 minutes on one physical Android device. The full plan (P0+P1) is the release gate for the primary platform; P2 and the iOS pass are scheduled per release scope.
 
-## 6. Exit criteria
+### 6. Exit criteria
 
 - 100% of P0 passed on E1.
 - No open defects in IM (data-loss class) or LC-01.
