@@ -9,13 +9,6 @@
 
 > **Your recipes. Your device. No cloud required.**
 
-> **Project status:** feature-complete and live on Google Play. This is a
-> personal project published as a portfolio case study in **quality,
-> security and controlled AI-assisted development**: see
-> [how it is tested](docs/TESTING.md), [its threat model](SECURITY.md) and
-> [how it was built with AI](docs/AI-WORKFLOW.md). It is not actively
-> developed, and contributions are not accepted ([CONTRIBUTING.md](CONTRIBUTING.md)).
-
 ---
 
 ## Available on Google Play
