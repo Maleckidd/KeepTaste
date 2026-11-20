@@ -10,11 +10,12 @@ Every claim here points at a file you can open. The manual device plan is
 flowchart TB
   M["Manual on device<br/>native modules, gestures, lifecycle<br/>Appendix A + CLAUDE.md dev-build rules"]
   P["Persona studies<br/>simulated users on the emulator<br/>docs/case-studies/persona-lab.md"]
+  A["Android E2E — Maestro on the emulator<br/>.zip restore/export, recipe, shopping list<br/>.maestro/"]
   E["E2E — Playwright on the web export<br/>form → db → list → search, offline<br/>e2e/"]
   I["Integration — db/ on real SQLite (sql.js)<br/>migration ladder, SQL rules, backup round-trip<br/>__tests__/integration/"]
   U["Unit — pure logic in db/, utils/, i18n/<br/>parsers, builders, reducers, reconcilers<br/>__tests__/*.test.ts"]
   S["Static — tsc --strict, ESLint (zero warnings)"]
-  M --- P --- E --- I --- U --- S
+  M --- P --- A --- E --- I --- U --- S
 ```
 
 | Layer | Command | Runs in CI | Scope |
@@ -23,6 +24,8 @@ flowchart TB
 | Unit | `npm run test:unit` | yes, with coverage | Pure logic; native modules mapped to stubs in `__mocks__/` |
 | Integration | `npm run test:integration` | yes, own job | `db/` against real SQLite |
 | E2E | `npm run e2e:build && npm run e2e` | yes, own job | Cross-layer flows in the browser |
+| Android E2E | `maestro test .maestro/` | no, local emulator only ([ADR 0011](adr/0011-maestro-android-e2e.md)) | Native flows on a dev/release build: `.zip` restore and export, recipe create, shopping list |
+| Mutation | `npm run test:mutation` | weekly and on demand, never on PRs ([ADR 0010](adr/0010-mutation-testing-stryker.md)) | How strong the unit tests of the `utils/` parsers are ([mutation-testing.md](mutation-testing.md)) |
 | Persona studies | `bash persona-lab/run.sh persona-lab/config` | no (needs an emulator and an LLM) | Discoverability, comprehension, the user's belief vs the saved state |
 | Manual | Appendix A | no | Native behaviour on a real phone |
 
@@ -134,14 +137,19 @@ There are no React Native Testing Library tests, by decision:
 
 ## Known gaps
 
-- Native flows need a dev build and a phone: the `.zip` export/restore,
-  SAF auto-backup, OCR, background timer alarms and the share target. They
-  are not automated. The manual plan below was written for 1.0 (June 2026)
-  and has no cases for the `.zip` backup, OCR, timers or the to-try list.
-- No Android E2E yet. Maestro on a release build is planned; the groundwork
-  (adb smoke steps, a Maestro outline) is in [e2e-emulator.md](e2e-emulator.md).
-- Mutation testing is not set up, so the parsers' assertions have not been
-  measured for strength. Stryker on `utils/` is planned.
+- Some native flows are still not automated: SAF auto-backup, OCR,
+  background timer alarms and the share target need a dev build and a
+  phone. The manual plan below was written for 1.0 (June 2026) and has no
+  cases for the `.zip` backup, OCR, timers or the to-try list.
+- Android E2E (Maestro, [e2e-emulator.md](e2e-emulator.md)) covers the
+  `.zip` restore and export, but it runs only locally, by hand. It is not
+  in CI ([ADR 0011](adr/0011-maestro-android-e2e.md)), so it protects a
+  release only if someone runs it first.
+- Mutation testing is measured but does not block anything. The overall
+  score is 68.66%. `recipeImport.ts` (59%) and `ocrText.ts` (72%) are the
+  lowest: most of their survivors sit in phrase lists and heuristic
+  thresholds, left alive on purpose
+  ([mutation-testing.md](mutation-testing.md)).
 
 ---
 

@@ -37,8 +37,8 @@ it, and the old one's status points to the new one.
 | [0007](0007-android-sdk-not-pinned.md) | The Android compile/target SDK is not pinned | Accepted | 2026-08-02 |
 | [0008](0008-expo-file-system-legacy.md) | Stay on `expo-file-system/legacy` for now | Accepted | 2026-08-02 |
 | [0009](0009-actions-pinned-to-sha.md) | GitHub Actions pinned to full commit SHAs | Accepted | 2026-11-19 |
-| [0010](0010-mutation-testing-stryker.md) | Mutation testing with Stryker on the pure parsers, non-blocking | Accepted, implementation in progress | 2026-11-19 |
-| [0011](0011-maestro-android-e2e.md) | Maestro for Android E2E, run locally, no CI for now | Accepted, implementation in progress | 2026-11-19 |
+| [0010](0010-mutation-testing-stryker.md) | Mutation testing with Stryker on the pure parsers, non-blocking | Accepted | 2026-11-19 |
+| [0011](0011-maestro-android-e2e.md) | Maestro for Android E2E, run locally, no CI for now | Accepted | 2026-11-19 |
 
 ## Adding one
 

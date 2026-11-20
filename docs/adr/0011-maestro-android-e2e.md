@@ -1,7 +1,8 @@
 # 0011. Maestro for Android E2E, run locally, no CI for now
 
-- **Status:** Accepted. Implementation is in progress; this ADR records
-  the decision, not a finished suite.
+- **Status:** Accepted. Implemented on 2026-11-20: four flows in
+  [`.maestro/`](../../.maestro/README.md), run as described in
+  [docs/e2e-emulator.md](../e2e-emulator.md).
 - **Date:** 2026-11-19
 
 ## Context

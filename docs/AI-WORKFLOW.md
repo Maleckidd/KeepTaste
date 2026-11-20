@@ -136,7 +136,8 @@ anywhere by the app.
   an `npm run e2e:android` script that never existed. The publication audit
   caught the dangling references; nothing automated did. It was replaced by
   deterministic Playwright tests on the web export as the CI gate, with the
-  same flows ported. An Android runner (Maestro) is planned separately.
+  same flows ported. The Android side was added later as a separate,
+  local-only Maestro suite (`.maestro/`, [ADR 0011](adr/0011-maestro-android-e2e.md)).
 
 ## Reuse
 
