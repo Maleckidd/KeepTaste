@@ -6,7 +6,7 @@ import {
   UNCATEGORIZED_HEADING,
   type BackupSection,
 } from '../utils/backupMarkdown';
-import { recipeToMarkdown } from '../utils/markdown';
+import { cookbookBodyToMarkdown, formatTime, recipeToMarkdown } from '../utils/markdown';
 
 function recipe(over: Partial<any> = {}): any {
   return {
@@ -135,5 +135,131 @@ describe('recipeToMarkdown — to-try Status line (§5.19)', () => {
   it('emits no Status line when toTry is absent (undefined → falsy)', () => {
     const md = recipeToMarkdown(recipe());
     expect(md).not.toContain('Status');
+  });
+});
+
+// Gaps found by mutation testing (docs/mutation-testing.md): the exact §5.6
+// layout, separators included, not only which markers appear somewhere.
+describe('formatTime', () => {
+  it.each([
+    [45, '45 min'],
+    [59, '59 min'],
+    [60, '1 hr'],
+    [90, '1 hr 30 min'],
+    [120, '2 hr'],
+    [135, '2 hr 15 min'],
+  ])('%p minutes → %p', (minutes, expected) => {
+    expect(formatTime(minutes)).toBe(expected);
+  });
+
+  it.each([null, undefined, 0])('%p → "—"', (minutes) => {
+    expect(formatTime(minutes)).toBe('—');
+  });
+});
+
+describe('recipeToMarkdown — exact layout', () => {
+  it('renders a full recipe block', () => {
+    expect(recipeToMarkdown(recipe())).toBe(
+      [
+        '## Pierogi Ruskie',
+        '',
+        '**Prep:** 30 min | **Cook:** 20 min | **Servings:** 4',
+        '',
+        '',
+        '### Ingredients',
+        '',
+        'flour',
+        'potato',
+        'cheese',
+        '',
+        '',
+        '### Instructions',
+        '',
+        'Mix. Boil.',
+        '',
+        '',
+        '### Notes',
+        '',
+        'Serve with sour cream.',
+        '',
+        '',
+        '---',
+        '',
+      ].join('\n')
+    );
+  });
+
+  it('joins only the metadata that exists, with no empty " | " slots', () => {
+    const md = recipeToMarkdown(recipe({ prepTime: null, servings: null }));
+    expect(md.split('\n')[2]).toBe('**Cook:** 20 min');
+  });
+
+  it('puts the Status line under the meta line, with no blank line between', () => {
+    const md = recipeToMarkdown(recipe({ toTry: 1 }));
+    expect(md.split('\n').slice(2, 5)).toEqual([
+      '**Prep:** 30 min | **Cook:** 20 min | **Servings:** 4',
+      '**Status:** to try',
+      '',
+    ]);
+  });
+
+  it('renders a title-only recipe with no section text at all', () => {
+    const md = recipeToMarkdown(
+      recipe({
+        prepTime: null,
+        cookTime: null,
+        servings: null,
+        ingredients: '',
+        instructions: '',
+        notes: '',
+      })
+    );
+    expect(md).toBe('## Pierogi Ruskie\n\n\n\n\n\n---\n');
+  });
+
+  it('renders a Status-only meta block for a to-try recipe with no metadata', () => {
+    const md = recipeToMarkdown(
+      recipe({ prepTime: null, cookTime: null, servings: null, toTry: 1 })
+    );
+    expect(md.startsWith('## Pierogi Ruskie\n\n**Status:** to try\n\n\n### Ingredients')).toBe(
+      true
+    );
+  });
+});
+
+describe('cookbookBodyToMarkdown / buildBackupMarkdown — exact layout', () => {
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-05T12:00:00Z'));
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const body = (titles: string[]) =>
+    cookbookBodyToMarkdown(titles.map((title) => recipe({ title })));
+
+  it('opens with the Exported / Recipes preamble and a separator', () => {
+    expect(body([]).split('\n')).toEqual([
+      '*Exported: 05/03/2026*',
+      '*Recipes: 0*',
+      '',
+      '---',
+      '',
+    ]);
+  });
+
+  it('follows the preamble with each recipe block', () => {
+    const r1 = recipe({ title: 'A' });
+    expect(cookbookBodyToMarkdown([r1])).toBe(
+      `*Exported: 05/03/2026*\n*Recipes: 1*\n\n---\n\n${recipeToMarkdown(r1)}`
+    );
+  });
+
+  it('joins sections as "# Name", a blank line, then the body', () => {
+    const md = buildBackupMarkdown([
+      { cookbookName: 'One', recipes: [] },
+      { cookbookName: 'Two', recipes: [] },
+    ]);
+    expect(md).toBe(`# One\n\n${body([])}\n# Two\n\n${body([])}`);
   });
 });

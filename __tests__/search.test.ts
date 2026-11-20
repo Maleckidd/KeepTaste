@@ -352,3 +352,13 @@ describe('matchRecipes — identity and composition', () => {
     expect(toTry).toEqual([B, C]);
   });
 });
+
+// Gaps found by mutation testing (docs/mutation-testing.md).
+describe('matchRecipes — hint line with several missing terms', () => {
+  it('takes the first line that holds ANY missing term, not one holding all of them', () => {
+    const rec = r('Zupa', '1 marchew\n2 ziemniaki');
+    const [m] = matchRecipes([rec], 'marchew ziemniaki');
+    expect(m.matchedIn).toBe('ingredients');
+    expect(m.ingredientHint).toBe('1 marchew');
+  });
+});

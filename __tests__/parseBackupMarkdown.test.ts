@@ -80,3 +80,51 @@ describe('parseBackupMarkdown', () => {
     expect(result.error.length).toBeGreaterThan(0);
   });
 });
+
+// Gaps found by mutation testing (docs/mutation-testing.md).
+describe('parseBackupMarkdown — hand-edited files', () => {
+  it('reports whitespace-only content as an empty file', () => {
+    expect(parseBackupMarkdown('  \n \n')).toEqual({
+      ok: false,
+      error: 'The file is empty.',
+    });
+  });
+
+  it('normalizes CRLF line endings', () => {
+    const lf = [section('One', ['A']), section('Two', ['B'])].join('\n');
+    expect(parseBackupMarkdown(lf.replace(/\n/g, '\r\n'))).toEqual(parseBackupMarkdown(lf));
+  });
+
+  it('trims trailing spaces from a section name', () => {
+    const result = parseBackupMarkdown('# Desserts  \n\n## Sernik\n---\n');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.sections[0].cookbookName).toBe('Desserts');
+  });
+
+  it('closes a recipe on a "---" line with trailing spaces, so the next "# " starts a section', () => {
+    const result = parseBackupMarkdown('# One\n\n## A\n---  \n# Two\n\n## B\n---\n');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.sections.map((s) => s.cookbookName)).toEqual(['One', 'Two']);
+    expect(result.sections[0].recipes.map((r) => r.title)).toEqual(['A']);
+  });
+
+  it('does not attach text after a recipe\'s closing "---" to that recipe', () => {
+    const result = parseBackupMarkdown('# One\n\n## A\n### Notes\n\nn\n---\nstray text\n');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.sections[0].recipes[0].notes).toBe('n');
+  });
+
+  it('does not start a section on a line with " # " in the middle', () => {
+    const result = parseBackupMarkdown('# One\n\n## A\n---\nnote # aside\n');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.sections.map((s) => s.cookbookName)).toEqual(['One']);
+  });
+});
+
+describe('parseBackupMarkdown — recipe end marker inside a section', () => {
+  it('closes a recipe on a "---" line with trailing spaces, ignoring text after it', () => {
+    const result = parseBackupMarkdown('# One\n\n## A\n### Notes\n\nn\n---  \nstray text\n');
+    if (!result.ok) throw new Error(result.error);
+    expect(result.sections[0].recipes[0].notes).toBe('n');
+  });
+});

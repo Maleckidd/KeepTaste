@@ -191,3 +191,112 @@ describe('cleanAiResponse + parsePastedRecipe round-trip', () => {
     expect(parsed.instructions).not.toContain('2 jajka');
   });
 });
+
+// Gaps found by mutation testing (docs/mutation-testing.md).
+describe('cleanAiResponse — fences', () => {
+  it('unwraps indented fences and ignores blank lines around them', () => {
+    expect(cleanAiResponse('  \n  ```\nTytuł\n  ```\n  \n')).toBe('Tytuł');
+  });
+
+  it('does not unwrap when the first line has text after the fence tag', () => {
+    const input = '```js and more\nbody\n```';
+    expect(cleanAiResponse(input)).toBe(input);
+  });
+
+  it('does not unwrap when the first line has text before the fence', () => {
+    const input = 'note```\nbody\n```';
+    expect(cleanAiResponse(input)).toBe(input);
+  });
+
+  it('does not unwrap without a closing fence on the last line', () => {
+    const input = '```\nbody\nend';
+    expect(cleanAiResponse(input)).toBe(input);
+  });
+
+  it('falls back to the trimmed input when cleaning would leave nothing', () => {
+    expect(cleanAiResponse('  ```\n```  \n')).toBe('```\n```');
+  });
+});
+
+describe('cleanAiResponse — preamble', () => {
+  it('matches the preamble prefix after trimming and lowercasing', () => {
+    expect(cleanAiResponse('  HERE IS the recipe:\nTitle')).toBe('Title');
+  });
+
+  it('strips a preamble that follows blank lines', () => {
+    expect(cleanAiResponse('\nHere is the recipe:\nTitle')).toBe('Title');
+  });
+
+  it('strips the preamble when blank lines separate it from the content', () => {
+    expect(cleanAiResponse('Here is the recipe:\n\nTitle')).toBe('Title');
+  });
+});
+
+describe('cleanAiResponse — trailing separators', () => {
+  it.each(['***', '___', '===', '  ---  '])('strips a trailing %p line', (sep) => {
+    expect(cleanAiResponse(`Title\n${sep}`)).toBe('Title');
+  });
+
+  it('strips several trailing separator lines', () => {
+    expect(cleanAiResponse('Title\n---\n\n***')).toBe('Title');
+  });
+
+  it('keeps a line that only starts or ends with a separator', () => {
+    expect(cleanAiResponse('Title\n--- end')).toBe('Title\n--- end');
+    expect(cleanAiResponse('Title\nServe ---')).toBe('Title\nServe ---');
+  });
+
+  it('keeps a separator-only input rather than emptying it', () => {
+    expect(cleanAiResponse('\n---')).toBe('---');
+  });
+});
+
+describe('cleanAiResponse — per-line markdown', () => {
+  it('strips heading markers of every level, keeping indentation', () => {
+    expect(cleanAiResponse('Title\n## Składniki\n  # Krok\n#   Uwagi')).toBe(
+      'Title\nSkładniki\n  Krok\nUwagi'
+    );
+  });
+
+  it('leaves a "#" in the middle of a line alone', () => {
+    expect(cleanAiResponse('Title\nMix # well')).toBe('Title\nMix # well');
+  });
+
+  it('strips blockquote markers, keeping indentation', () => {
+    expect(cleanAiResponse('Title\n  > quoted\n>   wide')).toBe(
+      'Title\n  quoted\nwide'
+    );
+  });
+
+  it('leaves a ">" in the middle of a line alone', () => {
+    expect(cleanAiResponse('Title\nheat > 180')).toBe('Title\nheat > 180');
+  });
+
+  it('unwraps bold around a whole (padded) line of several words', () => {
+    expect(cleanAiResponse('Title\n  **Dwa słowa**  \nx')).toBe(
+      'Title\n  Dwa słowa  \nx'
+    );
+  });
+
+  it('leaves bold that does not wrap the whole line', () => {
+    expect(cleanAiResponse('Title\n**Uwaga** sól\nDodaj **sól**')).toBe(
+      'Title\n**Uwaga** sól\nDodaj **sól**'
+    );
+  });
+
+  it('unwraps underscore emphasis around a whole line', () => {
+    expect(cleanAiResponse('Title\n__Dwa słowa__')).toBe('Title\nDwa słowa');
+  });
+
+  it('leaves underscore emphasis that does not wrap the whole line', () => {
+    expect(cleanAiResponse('Title\n__a__ b\nc __d__')).toBe(
+      'Title\n__a__ b\nc __d__'
+    );
+  });
+});
+
+describe('cleanAiResponse — fence line padding', () => {
+  it('unwraps a fence whose opening line has trailing spaces', () => {
+    expect(cleanAiResponse('```  \nTytuł\n```')).toBe('Tytuł');
+  });
+});

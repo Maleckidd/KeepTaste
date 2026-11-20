@@ -276,3 +276,63 @@ describe('splitDurationSegments', () => {
     expect(splitDurationSegments('')).toEqual([]);
   });
 });
+
+// Gaps found by mutation testing (docs/mutation-testing.md).
+describe('parseDurations — boundaries and edge cases', () => {
+  it('reads the digit 9 as a number', () => {
+    expectWhole('9 min', 540);
+  });
+
+  it('matches the range and compound joiners case-insensitively', () => {
+    expectWhole('20 TO 25 min', 1200);
+    expectWhole('1 hour AND 30 minutes', 5400);
+  });
+
+  it('accepts a range whose upper bound is exactly 24 h', () => {
+    expectWhole('20-24 h', 72000);
+  });
+
+  it('does not chain a compound part with the same or a larger unit', () => {
+    expect(parseDurations('5 min 10 min').map((m) => m.text)).toEqual([
+      '5 min',
+      '10 min',
+    ]);
+    expect(parseDurations('5 min 2 h').map((m) => m.text)).toEqual([
+      '5 min',
+      '2 h',
+    ]);
+  });
+
+  it('takes bare minutes 59 after an hour, but not 60', () => {
+    expectWhole('1h59', 3600 + 59 * 60);
+    expect(parseDurations('1h60')).toEqual([
+      { start: 0, end: 2, text: '1h', seconds: 3600 },
+    ]);
+  });
+
+  it('only takes bare minutes directly after the hour unit', () => {
+    expect(parseDurations('Bake 2 h, then rest 15.')).toEqual([
+      { start: 5, end: 8, text: '2 h', seconds: 7200 },
+    ]);
+  });
+
+  it.each(['Rest .5 h', 'Rest ,5 h'])(
+    '%p → no match (a decimal without its leading digit is not "5 h")',
+    (text) => {
+      expect(parseDurations(text)).toEqual([]);
+    }
+  );
+
+  it('finds a number-less phrase mid-sentence after a non-letter', () => {
+    expect(parseDurations('Rest (half an hour).')).toEqual([
+      { start: 6, end: 18, text: 'half an hour', seconds: 1800 },
+    ]);
+  });
+
+  it.each(['xhalf an hour', '2half an hour'])(
+    '%p → no match (a phrase glued to a word or number)',
+    (text) => {
+      expect(parseDurations(text)).toEqual([]);
+    }
+  );
+});

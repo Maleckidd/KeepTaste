@@ -1607,3 +1607,207 @@ describe('isRecipeNoise — hashtag lines in linear time', () => {
     expect(performance.now() - start).toBeLessThan(500);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Gaps found by mutation testing (docs/mutation-testing.md): the structured
+// HTML paths (JSON-LD, microdata, entity decoding).
+// ---------------------------------------------------------------------------
+describe('parseIsoDuration — anchoring and multi-digit parts', () => {
+  it('reads multi-digit hours and day counts', () => {
+    expect(parseIsoDuration('PT12H')).toBe(720);
+    expect(parseIsoDuration('P10DT30M')).toBe(30);
+  });
+
+  it.each(['xPT30M', 'PT30Mx'])('%p (text around the duration) -> null', (value) => {
+    expect(parseIsoDuration(value)).toBeNull();
+  });
+});
+
+describe('parseRecipeJsonLd — block shapes', () => {
+  it('finds a Recipe in a top-level array, skipping null and non-object entries', () => {
+    const html = `<script type="application/ld+json">${JSON.stringify([
+      null,
+      'x',
+      { '@type': 'Recipe', name: 'Z tablicy' },
+    ])}</script>`;
+    expect(parseRecipeJsonLd(html)!.title).toBe('Z tablicy');
+  });
+
+  it('finds the block with other attributes before and after type', () => {
+    const html = `<script id="ld" type="application/ld+json" data-x="1">${JSON.stringify({
+      '@type': 'Recipe',
+      name: 'Z atrybutami',
+    })}</script>`;
+    expect(parseRecipeJsonLd(html)!.title).toBe('Z atrybutami');
+  });
+
+  it('keeps only string ingredients and skips null steps', () => {
+    const r = parseRecipeJsonLd(
+      ldScript({
+        '@type': 'Recipe',
+        recipeIngredient: ['mąka', 5, null, 'jajko'],
+        recipeInstructions: [null, 'Wymieszaj.'],
+      })
+    )!;
+    expect(r.ingredients).toBe('mąka\njajko');
+    expect(r.instructions).toBe('Wymieszaj.');
+  });
+
+  it('leaves instructions unset when the Recipe has none', () => {
+    const r = parseRecipeJsonLd(ldScript({ '@type': 'Recipe', name: 'Bez kroków' }))!;
+    expect(r).not.toHaveProperty('instructions');
+  });
+});
+
+describe('parseRecipeMicrodata — markup details', () => {
+  const recipe = (inner: string, attrs = 'itemscope itemtype="https://schema.org/Recipe"') =>
+    `<div ${attrs}>${inner}<span itemprop="recipeIngredient">mąka</span></div>`;
+
+  it('reads attribute names case-insensitively and itemscope as the last attribute', () => {
+    const r = parseRecipeMicrodata(
+      `<div ITEMTYPE="https://schema.org/Recipe" itemscope><span ITEMPROP="name">Placki</span><span itemprop="recipeIngredient">mąka</span></div>`
+    )!;
+    expect(r.title).toBe('Placki');
+  });
+
+  it('accepts a Recipe listed with a second item type, but not a look-alike type', () => {
+    expect(
+      parseRecipeMicrodata(
+        recipe('<span itemprop="name">Placki</span>', 'itemscope itemtype="https://schema.org/Recipe https://schema.org/HowTo"')
+      )!.title
+    ).toBe('Placki');
+    expect(
+      parseRecipeMicrodata(recipe('', 'itemscope itemtype="https://schema.org/RecipeX"'))
+    ).toBeNull();
+  });
+
+  it('skips an unrelated item without an itemtype before the Recipe', () => {
+    const html = `<div itemscope><span itemprop="name">Inne</span></div>${recipe('<span itemprop="name">Placki</span>')}`;
+    expect(parseRecipeMicrodata(html)!.title).toBe('Placki');
+  });
+
+  it('keeps a single-quoted attribute value that contains ">"', () => {
+    const r = parseRecipeMicrodata(recipe(`<meta itemprop='name' content='Zupa > krem'>`))!;
+    expect(r.title).toBe('Zupa > krem');
+  });
+
+  it('ignores a stray closing tag that matches nothing open', () => {
+    const r = parseRecipeMicrodata(recipe('<span itemprop="name">Pierogi</b> ruskie</span>'))!;
+    expect(r.title).toBe('Pierogi ruskie');
+  });
+
+  it('a Recipe without a name has no title', () => {
+    expect(parseRecipeMicrodata(recipe(''))!.title).toBeUndefined();
+  });
+
+  it('drops comments and scripts from property text', () => {
+    const r = parseRecipeMicrodata(
+      recipe('<span itemprop="name">Pie<!-- x -->rogi<script>\n var a = 1;\n</script></span>')
+    )!;
+    expect(r.title).toBe('Pierogi');
+  });
+
+  it('decodes named and numeric entities', () => {
+    const named =
+      '&amp; &lt; &gt; &quot; &apos; a&nbsp;b &deg; &frac12; &frac14; &frac34; &ndash; &mdash; &hellip; &oacute; &Oacute;';
+    const r = parseRecipeMicrodata(
+      recipe(
+        `<span itemprop="name">${named}</span><span itemprop="recipeIngredient">&#176; &#x2013; &#1; &#x10ffff; &#0; &#x110000; &bogus;</span>`
+      )
+    )!;
+    expect(r.title).toBe('& < > " \' a b ° ½ ¼ ¾ – — … ó Ó');
+    expect(r.ingredients!.split('\n')[0]).toBe(
+      '° – \u0001 \u{10ffff} &#0; &#x110000; &bogus;'
+    );
+  });
+
+  it('breaks text into lines at block tags and <br />, collapsing whitespace', () => {
+    const r = parseRecipeMicrodata(
+      recipe(
+        '<div itemprop="recipeInstructions"><h2>Ciasto</h2>Wymieszaj   \t mąkę.<br />Odstaw.<li>Piecz.<li>Studź.</div>'
+      )
+    )!;
+    expect(r.instructions).toBe('Ciasto\nWymieszaj mąkę.\nOdstaw.\nPiecz.\nStudź.');
+  });
+});
+
+describe('parseRecipeMicrodata — name-only fallback', () => {
+  it('reads only the Recipe element, not the page text around it', () => {
+    const r = parseRecipeMicrodata(`<div itemscope itemtype="https://schema.org/Recipe">
+        <span itemprop="name">Sernik</span>
+        <h3>Składniki</h3><ul><li>twaróg</li></ul>
+        <h3>Przygotowanie</h3><p>Upiecz.</p>
+      </div>
+      <p>Podawaj z bitą śmietaną.</p>`)!;
+    expect(r.instructions).toBe('Upiecz.');
+    expect(r.notes).toBeFalsy();
+  });
+
+  it('prefers marked-up times over times found in the text', () => {
+    const r = parseRecipeMicrodata(`<div itemscope itemtype="https://schema.org/Recipe">
+        <span itemprop="name">Sernik</span>
+        <meta itemprop="prepTime" content="PT15M"><meta itemprop="cookTime" content="PT50M">
+        <p>Czas przygotowania: 30 minut</p><p>Czas pieczenia: 60 minut</p>
+        <h3>Składniki</h3><ul><li>twaróg</li></ul>
+        <h3>Przygotowanie</h3><p>Upiecz.</p>
+      </div>`)!;
+    expect(r.prepTime).toBe(15);
+    expect(r.cookTime).toBe(50);
+  });
+});
+
+describe('parsePastedRecipe — gaps found by mutation testing', () => {
+  const paste = (...lines: string[]) => parsePastedRecipe(lines.join('\n'));
+
+  it('merges a quantity line onto the ingredient name above it, across blank lines', () => {
+    const r = paste('Sushi', 'Składniki', 'ryż do sushi  ', '', '250 g', 'Przygotowanie', 'Ugotuj ryż.');
+    expect(r.ingredients).toBe('ryż do sushi – 250 g');
+  });
+
+  it('does not merge a quantity onto a bullet, a line with a number, or nothing', () => {
+    expect(paste('Sushi', 'Składniki', '- nori', '2 g', 'Przygotowanie', 'Zwiń.').ingredients).toBe(
+      '- nori\n2 g'
+    );
+    expect(paste('Sushi', 'Składniki', '2 jajka', '250 g', 'Przygotowanie', 'Zwiń.').ingredients).toBe(
+      '2 jajka\n250 g'
+    );
+    expect(paste('Sushi', 'Składniki', '250 g', 'ryż', 'Przygotowanie', 'Zwiń.').ingredients).toBe(
+      '250 g\nryż'
+    );
+  });
+
+  it('reads a 1-minute time but not a 0-minute one', () => {
+    const r = paste('Placki', 'Czas przygotowania: 0 minut', 'Czas gotowania: 1 minuta', 'Składniki', 'mąka', 'Przygotowanie', 'Usmaż.');
+    expect(r.prepTime).toBeNull();
+    expect(r.cookTime).toBe(1);
+  });
+
+  describe('a text without any header', () => {
+    it('takes an ingredient list that runs to the end of the text', () => {
+      const r = paste('Placki', '200 g mąki', '2 jajka', '1 szklanka mleka');
+      expect(r.ingredients).toBe('200 g mąki\n2 jajka\n1 szklanka mleka');
+      expect(r.instructions).toBe('');
+    });
+
+    it('keeps a long amount line in the list and ends it at a short step', () => {
+      const r = paste('Placki', '200 g mąki', '2 łyżki cukru pudru do posypania', '1 szklanka mleka', 'Wymieszaj.', 'Usmaż na patelni.');
+      expect(r.ingredients).toBe('200 g mąki\n2 łyżki cukru pudru do posypania\n1 szklanka mleka');
+      expect(r.instructions).toBe('Wymieszaj.\nUsmaż na patelni.');
+    });
+
+    it('needs three amount lines: plain items alone do not make a list', () => {
+      const r = paste('Placki', '200 g mąki', 'sól', 'pieprz', 'koperek', 'Wymieszaj wszystko dokładnie w misce.');
+      expect(r.ingredients).toBe('');
+    });
+  });
+});
+
+describe('extractTitleServings — spacing', () => {
+  it('drops the space in front of punctuation after the bracket', () => {
+    expect(extractTitleServings('Shakshuka (serves 2) !')).toEqual({ title: 'Shakshuka!', servings: 2 });
+  });
+
+  it('reads a padded bracket and collapses the spaces around it', () => {
+    expect(extractTitleServings('Zupa  ( 4 porcje )  krem')).toEqual({ title: 'Zupa krem', servings: 4 });
+  });
+});

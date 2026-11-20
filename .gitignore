@@ -83,3 +83,9 @@ assets/store/promo/
 
 # jest --coverage output
 /coverage/
+
+# Stryker mutation testing: the sandbox copy (removed after a clean run, left
+# behind if a run is killed) and the HTML/JSON report — see
+# docs/mutation-testing.md
+/.stryker-tmp/
+/reports/

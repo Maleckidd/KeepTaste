@@ -384,3 +384,83 @@ describe('parseCookbookMarkdown', () => {
     });
   });
 });
+
+// Gaps found by mutation testing (docs/mutation-testing.md): hand-edited
+// files (spacing, stray text), which the exporter itself never writes.
+describe('parseTimeToMinutes — spacing and anchoring', () => {
+  it.each([
+    ['12 hr', 720],
+    ['1hr', 60],
+    ['1 hr 5min', 65],
+    ['1 hr  30 min', 90],
+    ['45min', 45],
+  ])('parses %p -> %p', (input, expected) => {
+    expect(parseTimeToMinutes(input)).toBe(expected);
+  });
+
+  it.each(['about 1 hr', '1 hr or so', 'about 45 min', '45 min or so'])(
+    'returns null for %p (text around the time)',
+    (input) => {
+      expect(parseTimeToMinutes(input)).toBeNull();
+    }
+  );
+});
+
+describe('parseCookbookMarkdown — hand-edited files', () => {
+  const book = (...body: string[]) => ['# Book', '', ...body].join('\n');
+  const only = (content: string) => {
+    const result = parseCookbookMarkdown(content);
+    if (!result.ok) throw new Error(result.error);
+    return result;
+  };
+
+  it('trims trailing spaces from the cookbook name and the recipe title', () => {
+    const result = only('# Book  \n\n## Soup  \n---\n');
+    expect(result.cookbookName).toBe('Book');
+    expect(result.recipes[0].title).toBe('Soup');
+  });
+
+  it('reads meta tokens written without a space after the label', () => {
+    const [r] = only(
+      book('## Soup', '', '**Prep:**10 min | **Cook:**1 hr | **Servings:**12', '**Status:**to try ', '---')
+    ).recipes;
+    expect(r).toMatchObject({ prepTime: 10, cookTime: 60, servings: 12, toTry: true });
+  });
+
+  it('ignores meta labels that do not start their token', () => {
+    const [r] = only(
+      book('## Soup', '', 'about **Prep:** 10 min | x **Cook:** 5 min | x **Servings:** 4', 'x **Status:** to try', '---')
+    ).recipes;
+    expect(r).toMatchObject({ prepTime: null, cookTime: null, servings: null, toTry: false });
+  });
+
+  it('drops whitespace-only lines around a section body', () => {
+    const [r] = only(book('## Soup', '', '### Notes', '', '   ', 'Salt.', '  ', '---')).recipes;
+    expect(r.notes).toBe('Salt.');
+  });
+
+  it('keeps sections apart when they come in an unusual order', () => {
+    const [r] = only(
+      book('## Soup', '', '### Notes', '', 'n', '', '### Ingredients', '', 'i', '---')
+    ).recipes;
+    expect(r.notes).toBe('n');
+    expect(r.ingredients).toBe('i');
+  });
+
+  it('closes a recipe on a "---" line with trailing spaces, ignoring text after it', () => {
+    const result = only(book('## Soup', '', '### Notes', '', 'n', '---  ', 'stray text'));
+    expect(result.recipes).toHaveLength(1);
+    expect(result.recipes[0].notes).toBe('n');
+  });
+
+  it('takes the heading only from a line that starts with "# "', () => {
+    expect(only('Intro # not this\n# Book\n').cookbookName).toBe('Book');
+  });
+
+  it('reports whitespace-only content as an empty file', () => {
+    expect(parseCookbookMarkdown('  \n \n')).toEqual({
+      ok: false,
+      error: 'The file is empty.',
+    });
+  });
+});
