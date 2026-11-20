@@ -479,6 +479,7 @@ export default function RecipeForm({
         <Button
           label={t('common.save')}
           onPress={handleSave}
+          testID="recipe-save"
           loading={isLoading}
         />
       </View>

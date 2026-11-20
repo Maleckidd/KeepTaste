@@ -24,6 +24,8 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Stable E2E selector (Maestro `id:`); never user-facing. */
+  testID?: string;
 };
 
 export default function Button({
@@ -34,6 +36,7 @@ export default function Button({
   disabled = false,
   loading = false,
   style,
+  testID,
 }: Props) {
   const c = useTheme();
   const isBlocked = disabled || loading;
@@ -50,6 +53,7 @@ export default function Button({
     <Pressable
       onPress={onPress}
       disabled={isBlocked}
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isBlocked, busy: loading }}

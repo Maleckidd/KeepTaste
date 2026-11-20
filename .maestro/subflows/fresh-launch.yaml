@@ -1,0 +1,22 @@
+# Fresh install state: wipe the app's data and launch it.
+#
+# A cleared app is NOT an empty library: the first launch seeds sample content
+# (SPEC.md §5.20, db/seed.ts) — one "Breakfasts" cookbook holding "Pancakes".
+# Waiting for that tile proves migrations + seed have finished. Its name shows
+# before its cover photo has decoded and faded in, and a tap during that busy
+# moment can be dropped, so the subflow also waits for the screen to stop
+# changing (a condition, not a fixed sleep).
+appId: ${APP_ID}
+env:
+  # The side-by-side E2E build (.maestro/README.md); override with -e APP_ID=...
+  APP_ID: ${APP_ID || "com.damianmalecki.keeptaste.e2e"}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: home-settings
+    timeout: 60000
+- assertVisible: "Breakfasts"
+- waitForAnimationToEnd:
+    timeout: 10000

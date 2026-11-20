@@ -1,0 +1,67 @@
+# Flow 3 — shopping list: create a list, add two products, tick one off.
+appId: ${APP_ID}
+env:
+  # The side-by-side E2E build (.maestro/README.md); override with -e APP_ID=...
+  APP_ID: ${APP_ID || "com.damianmalecki.keeptaste.e2e"}
+name: Shopping list
+tags:
+  - shopping
+---
+- runFlow: subflows/fresh-launch.yaml
+
+- tapOn:
+    id: tab-shopping
+# A fresh install has no shopping lists (the seed only adds a cookbook).
+- tapOn:
+    id: shopping-empty-new-list
+- tapOn:
+    id: shopping-new-name
+- inputText: "Maestro Groceries"
+- tapOn:
+    id: shopping-new-create
+
+# Creating a list opens it; it starts empty.
+- tapOn:
+    id: shopping-empty-add
+- tapOn:
+    id: shopping-item-name
+- inputText: "Milk"
+- tapOn:
+    id: shopping-item-qty
+- inputText: "2 l"
+- tapOn:
+    id: shopping-item-confirm
+# Confirm clears the fields and keeps the row open for the next product.
+- extendedWaitUntil:
+    visible: "Milk"
+    timeout: 5000
+- tapOn:
+    id: shopping-item-name
+- inputText: "Bread"
+- tapOn:
+    id: shopping-item-confirm
+- extendedWaitUntil:
+    visible: "Bread"
+    timeout: 5000
+- tapOn: "Close"
+
+- assertVisible:
+    text: "Milk, 2 l"
+    checked: false
+- tapOn: "Milk"
+
+# Ticked: the item moves to the "In cart" section and reports checked.
+- extendedWaitUntil:
+    visible: "In cart"
+    timeout: 5000
+- assertVisible:
+    text: "Milk, 2 l"
+    checked: true
+- assertVisible:
+    text: "Bread"
+    checked: false
+
+# The list overview reflects the tick.
+- back
+- assertVisible: "Maestro Groceries"
+- assertVisible: "1/2 in cart"

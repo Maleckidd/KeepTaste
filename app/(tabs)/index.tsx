@@ -248,6 +248,7 @@ export default function HomeScreen() {
           color={c.primary}
           raised
           onPress={() => router.push('/settings')}
+          testID="home-settings"
         />
       </View>
 
@@ -260,6 +261,7 @@ export default function HomeScreen() {
         onPress={handleOpenAllRecipes}
         accessibilityRole="button"
         accessibilityLabel={t('home.allRecipes')}
+        testID="home-all-recipes"
       >
         <Ionicons name="search-outline" size={18} color={c.textSecondary} />
         <Text style={styles.allRecipesText}>{t('home.allRecipes')}</Text>
@@ -304,6 +306,7 @@ export default function HomeScreen() {
           accessibilityLabel={t('a11y.addRecipe')}
           onPress={handleAddRecipe}
           withBottomInset={false}
+          testID="home-add-recipe"
         />
       ) : null}
 

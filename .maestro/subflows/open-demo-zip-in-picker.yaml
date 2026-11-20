@@ -1,0 +1,18 @@
+# Pick keeptaste-demo.zip in the system file picker (DocumentsUI).
+#
+# The picker is not our UI and its layout differs between Android versions and
+# picker states, so this is kept to the minimum: if the file is not already on
+# screen (the picker opened on "Recent" or on another folder), open the roots
+# drawer and go to Downloads. Nothing about the picker itself is asserted.
+appId: ${APP_ID}
+env:
+  # The side-by-side E2E build (.maestro/README.md); override with -e APP_ID=...
+  APP_ID: ${APP_ID || "com.damianmalecki.keeptaste.e2e"}
+---
+- runFlow:
+    when:
+      notVisible: "keeptaste-demo.zip"
+    commands:
+      - tapOn: "Show roots"
+      - tapOn: "Downloads"
+- tapOn: "keeptaste-demo.zip"

@@ -21,6 +21,8 @@ type Props = {
    * "In cart" pill). It shares the FAB's lift above the snackbar/timer bar.
    */
   leading?: React.ReactNode;
+  /** Stable E2E selector (Maestro `id:`); never user-facing. */
+  testID?: string;
 };
 
 // Floating action button — the screen's primary action, pinned bottom-right
@@ -33,6 +35,7 @@ export default function Fab({
   icon = 'add',
   withBottomInset = true,
   leading,
+  testID,
 }: Props) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
@@ -80,6 +83,7 @@ export default function Fab({
       {leading}
       <Pressable
         onPress={onPress}
+        testID={testID}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         style={({ pressed }) => [

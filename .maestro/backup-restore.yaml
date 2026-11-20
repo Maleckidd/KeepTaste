@@ -1,0 +1,84 @@
+# Flow 1 — restore a full .zip backup into a fresh install (disaster recovery).
+#
+# Prerequisite (see .maestro/README.md): the demo archive is built and pushed to
+# the emulator's Downloads folder:
+#   npx --yes tsx scripts/build-demo-backup.ts
+#   adb push assets/store/keeptaste-demo.zip /sdcard/Download/
+#
+# Asserted: the restore succeeds and the library holds the archive's content —
+# its 4 cookbooks, a recipe inside one of them, its shopping list — and the
+# first-launch seed was replaced, not merged ("Pancakes" is gone).
+# Not asserted: anything inside the system file picker.
+appId: ${APP_ID}
+env:
+  # The side-by-side E2E build (.maestro/README.md); override with -e APP_ID=...
+  APP_ID: ${APP_ID || "com.damianmalecki.keeptaste.e2e"}
+name: Backup restore (.zip)
+tags:
+  - backup
+---
+- runFlow: subflows/fresh-launch.yaml
+
+- tapOn:
+    id: home-settings
+- scrollUntilVisible:
+    element:
+      id: settings-restore
+- tapOn:
+    id: settings-restore
+
+- runFlow: subflows/open-demo-zip-in-picker.yaml
+
+# A library holding only the untouched seed restores silently 1:1 (replace);
+# unzipping + copying photos can take a while on a cold emulator.
+- extendedWaitUntil:
+    visible: "Backup restored"
+    timeout: 60000
+- tapOn: "OK"
+
+# A successful restore leaves Settings on its own (router.back()), so we are
+# back on home: the archive's cookbooks (assets/store/demo-import.md).
+- extendedWaitUntil:
+    visible:
+      id: home-settings
+    timeout: 10000
+- assertVisible: "Italian Kitchen"
+- assertVisible: "Desserts"
+- assertVisible: "Weekday Dinners"
+- assertVisible: "Breakfasts"
+
+- tapOn: "Italian Kitchen"
+- assertVisible: "Spaghetti Carbonara"
+- assertVisible: "Wild Mushroom Risotto"
+- back
+
+# Replace, not merge: the seed's only recipe is gone from "All recipes".
+# Recipes sort newest first; the seed was created at launch, so it would sit at
+# the top. The archive's "Ricotta Pancakes" is its oldest recipe (14 cards
+# down), so it is found through the search field instead of a long scroll.
+- tapOn:
+    id: home-all-recipes
+- assertVisible: "Spaghetti Carbonara"
+- assertNotVisible: "Pancakes"
+- tapOn:
+    id: recipes-search
+- inputText: "Ricotta"
+- assertVisible: "Ricotta Pancakes"
+- assertNotVisible: "Spaghetti Carbonara"
+# Back to home. With the search keyboard up the first Back only closes it.
+- back
+- runFlow:
+    when:
+      notVisible:
+        id: home-settings
+    commands:
+      - back
+- extendedWaitUntil:
+    visible:
+      id: home-settings
+    timeout: 5000
+
+- tapOn:
+    id: tab-shopping
+- assertVisible: "Weekend Shopping"
+- assertVisible: "3/10 in cart"
