@@ -24,10 +24,13 @@ APP_LANGUAGES="pl en"
 # Start states. The generator picks one per persona from STATE_DESC_*; the
 # persona is told STATE_PERSONA_* — its situation in user terms, nothing about
 # what is on the screens.
+# STATE_DESC_demo lists what the demo library holds (assets/store/demo-import*.md,
+# built by scripts/build-demo-backup.ts); keep it in step with them. Without
+# the list the generator invented recipes "you already have" that were not there.
 STATES="fresh demo"
 STATE_DESC_fresh="first launch right after installing from the store; the person has none of their own recipes in it yet"
 STATE_PERSONA_fresh="You have just installed the app from the store and are opening it for the first time. None of your own recipes are in it yet."
-STATE_DESC_demo="the person has been using the app for a few weeks: several cookbooks with a dozen or so recipes with photos, and a shopping list"
+STATE_DESC_demo="the person has been using the app for a few weeks. The library holds these four cookbooks and 14 recipes and nothing else: Italian Kitchen (spaghetti carbonara, wild mushroom risotto, classic tiramisu, thin-crust margherita pizza); Desserts (classic apple pie, chocolate pudding, panna cotta with raspberry coulis); Weekday Dinners (tomato soup with rice, baked salmon with roasted vegetables, chicken in creamy mushroom sauce, red lentil dal); Breakfasts (banana oatmeal with nuts, fried eggs on sourdough with avocado, ricotta pancakes). The four cookbooks have cover photos, and of the recipes only the three breakfasts have one. There is one shopping list, with ten items. In Polish the library is the same, under Polish names. A need about a recipe the person already has must be about one of these; any other recipe is not in the app."
 STATE_PERSONA_demo="You have been using this app for a few weeks. Your cookbooks and recipes are already in it, and you have a shopping list going."
 
 # reset_app <state> <lang> — puts the app into a known state and leaves it
