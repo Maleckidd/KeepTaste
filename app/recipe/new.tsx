@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { StyleSheet, ActivityIndicator, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router as globalRouter, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import RecipeForm from '@/components/recipe/RecipeForm';
 import {
   type RecipeFormData,
@@ -13,10 +13,7 @@ import { createRecipe } from '@/db/recipes';
 import { createCookbook, getCookbooks } from '@/db/cookbooks';
 import type { Cookbook } from '@/db/schema';
 import { filterPendingDeletes } from '@/utils/pendingDelete';
-import {
-  useSnackbar,
-  NAVIGATION_SNACKBAR_MS,
-} from '@/components/ui/SnackbarProvider';
+import { useSnackbar } from '@/components/ui/SnackbarProvider';
 import { useTheme, ThemePalette } from '@/constants/theme';
 import { useT } from '@/i18n/LanguageProvider';
 import { parsePositiveInt } from '@/utils/numeric';
@@ -91,19 +88,18 @@ export default function NewRecipeScreen() {
         toTry: data.toTry ? 1 : 0,
       });
 
-      router.back();
-      // Tell the user where the recipe went (§5.5 "Save confirmation"). This
-      // screen is unmounted by the time "Show" is tapped, so navigate through
-      // the imperative router.
+      // Open the new recipe instead of closing silently (§5.5 "Save
+      // confirmation", persona finding F-010): the form is replaced by the
+      // recipe's view, so Back returns to where the form was opened. The
+      // snackbar then says where the recipe went; it has no action, because
+      // the result is already on screen.
+      router.replace(`/recipe/${newId}`);
       const notice = recipeSaveNotice('create', null, data.cookbookId, cookbooks ?? []);
       showSnackbar({
         message:
           notice?.kind === 'savedIn'
             ? t('recipeForm.savedIn', { name: notice.cookbookName })
             : t('recipeForm.saved'),
-        actionLabel: t('common.show'),
-        onAction: () => globalRouter.push(`/recipe/${newId}`),
-        durationMs: NAVIGATION_SNACKBAR_MS,
       });
     } finally {
       setIsLoading(false);

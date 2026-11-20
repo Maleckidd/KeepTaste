@@ -119,7 +119,7 @@ with a screenshot, the view hierarchy and its log.
 | --- | --- | --- | --- |
 | `backup-restore.yaml` | fresh install → Settings → Restore backup → pick `keeptaste-demo.zip` | "Backup restored"; home shows all 4 cookbooks; Italian Kitchen lists its recipes; "All recipes" has no seed "Pancakes" (replace, not merge) and its search finds the archive's oldest recipe, "Ricotta Pancakes"; Shopping shows "Weekend Shopping", "3/10 in cart" | the file picker's own UI; photos rendering |
 | `backup-export.yaml` | fresh install → Settings → Export all data → Share / send | the share sheet receives `keeptaste-backup.zip`; Back returns to Settings | archive contents (covered by `__tests__/backupArchive.test.ts`, `__tests__/integration/backupRoundTrip.test.ts`); any share target |
-| `create-recipe.yaml` | fresh install → + → title and 2 ingredient lines → Save | the recipe is in "All recipes" above the seed; its view shows title, "Ingredients" and both lines | snackbar text; other fields |
+| `create-recipe.yaml` | fresh install → + → title and 2 ingredient lines → Save | Save opens the recipe view (title, "Ingredients", both lines); after Back it is in "All recipes" above the seed | snackbar text; other fields |
 | `shopping-list.yaml` | fresh install → Shopping → new list → add "Milk / 2 l" and "Bread" → tick Milk | Milk is `checked`, "In cart" appears, Bread stays unchecked; the overview shows `1/2 in cart` | swipe actions; check-off animation |
 
 Each flow starts with `subflows/fresh-launch.yaml`: `launchApp` with

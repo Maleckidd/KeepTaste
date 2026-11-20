@@ -48,7 +48,7 @@ const SnackbarTopContext = createContext<number | null>(null);
 const DEFAULT_DURATION = 5000;
 
 /**
- * For snackbars whose action navigates ("Show", "View list") — 5 s is too
+ * For snackbars whose action navigates ("View list") — 5 s is too
  * short to reach the action one-handed (SPEC.md §6 "Snackbar durations").
  */
 export const NAVIGATION_SNACKBAR_MS = 8000;

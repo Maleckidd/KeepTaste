@@ -24,7 +24,6 @@ export const dictionary = {
   },
   'common.keepEditing': { en: 'Keep editing', pl: 'Kontynuuj edycję' },
   'common.discard': { en: 'Discard', pl: 'Odrzuć' },
-  'common.show': { en: 'Show', pl: 'Pokaż' },
   'common.gallery': { en: 'Gallery', pl: 'Galeria' },
   'common.camera': { en: 'Camera', pl: 'Aparat' },
   'common.removePhoto': { en: 'Remove photo', pl: 'Usuń zdjęcie' },

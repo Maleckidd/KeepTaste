@@ -4,7 +4,7 @@
     {
       "id": "S1",
       "screen": "nowy przepis — chwila po naciśnięciu Zapisz",
-      "defect": "po zapisaniu nowego przepisu nie pojawia się żadne potwierdzenie (usunięty komunikat „Przepis zapisany” / „Zapisano w …” z przyciskiem Pokaż)",
+      "defect": "po zapisaniu nowego przepisu nie pojawia się żadne potwierdzenie — formularz po prostu zamyka się z powrotem do listy (usunięte otwarcie widoku nowego przepisu i komunikat „Przepis zapisany” / „Zapisano w …”)",
       "symptom": "formularz znika bez słowa; użytkownik nie wie, czy przepis się zapisał ani gdzie trafił, szuka go albo zapisuje drugi raz"
     },
     {

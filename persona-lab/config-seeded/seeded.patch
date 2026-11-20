@@ -13,17 +13,28 @@ index eb20b3c..3773076 100644
            accessibilityLabel={t('a11y.addRecipe')}
            onPress={handleAddRecipe}
 diff --git a/app/recipe/new.tsx b/app/recipe/new.tsx
-index 178bbb9..17046c4 100644
+index 451ca01..02b3283 100644
 --- a/app/recipe/new.tsx
 +++ b/app/recipe/new.tsx
-@@ -96,7 +96,9 @@ export default function NewRecipeScreen() {
-       // screen is unmounted by the time "Show" is tapped, so navigate through
-       // the imperative router.
+@@ -88,14 +88,14 @@
+         toTry: data.toTry ? 1 : 0,
+       });
+ 
+-      // Open the new recipe instead of closing silently (§5.5 "Save
+-      // confirmation", persona finding F-010): the form is replaced by the
+-      // recipe's view, so Back returns to where the form was opened. The
+-      // snackbar then says where the recipe went; it has no action, because
+-      // the result is already on screen.
+-      router.replace(`/recipe/${newId}`);
++      // SEEDED DEFECT S1 (persona-lab calibration): after saving, the form just
++      // closes back to the list - no confirmation, the recipe is not opened.
++      // The guard keeps the code below compiling and the imports used.
++      const seededOpenRecipe = false as boolean;
++      if (seededOpenRecipe) router.replace(`/recipe/${newId}`);
++      else router.back();
        const notice = recipeSaveNotice('create', null, data.cookbookId, cookbooks ?? []);
 -      showSnackbar({
-+      // SEEDED DEFECT S1 (persona-lab calibration): no confirmation after saving.
-+      const seededShowConfirmation = false as boolean;
-+      if (seededShowConfirmation) showSnackbar({
++      if (seededOpenRecipe) showSnackbar({
          message:
            notice?.kind === 'savedIn'
              ? t('recipeForm.savedIn', { name: notice.cookbookName })
