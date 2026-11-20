@@ -11,6 +11,7 @@
     "lint": "expo lint . --max-warnings 0",
     "test:unit": "jest --selectProjects unit",
     "test:integration": "jest --selectProjects integration",
+    "test:mutation": "stryker run",
     "e2e:build": "expo export -p web --output-dir dist",
     "e2e": "playwright test"
   },
@@ -63,6 +64,9 @@
   "devDependencies": {
     "@babel/core": "^7.29.13",
     "@playwright/test": "1.65.1",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/jest-runner": "10.1.1",
+    "@stryker-mutator/typescript-checker": "10.1.1",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.0",
     "@types/sql.js": "^1.4.11",
@@ -82,6 +86,11 @@
         "// listUnknownPackages": "modules/safwriter and modules/exactalarm are our own local modules — they will never be in the directory.",
         "listUnknownPackages": false
       }
+    }
+  },
+  "overrides": {
+    "typed-rest-client": {
+      "qs": "6.17.1"
     }
   }
 }
