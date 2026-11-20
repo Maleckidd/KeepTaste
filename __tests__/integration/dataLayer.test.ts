@@ -140,6 +140,107 @@ describe('recipe ordering by updated_at, newest first', () => {
   });
 });
 
+describe('to-try marking (SPEC.md §5.19)', () => {
+  it('marks a normal recipe without touching updated_at or created_at', async () => {
+    await openTestDb();
+    const { recipes } = loadDb();
+    at('2026-11-01T09:00:00.000Z');
+    const id = await recipes.createRecipe({ title: 'Soup' });
+
+    at('2026-11-02T09:00:00.000Z');
+    await recipes.markRecipeToTry(id);
+
+    expect(await recipes.getRecipeById(id)).toMatchObject({
+      toTry: 1,
+      createdAt: '2026-11-01T09:00:00.000Z',
+      updatedAt: '2026-11-01T09:00:00.000Z',
+    });
+  });
+
+  it('does not reorder the list', async () => {
+    await openTestDb();
+    const { recipes } = loadDb();
+    at('2026-11-01T09:00:00.000Z');
+    const a = await recipes.createRecipe({ title: 'A' });
+    at('2026-11-02T09:00:00.000Z');
+    await recipes.createRecipe({ title: 'B' });
+
+    at('2026-11-03T09:00:00.000Z');
+    await recipes.markRecipeToTry(a);
+
+    const all = await recipes.getAllRecipes();
+    expect(all.map((r) => [r.title, r.toTry])).toEqual([
+      ['B', 0],
+      ['A', 1],
+    ]);
+  });
+
+  it('is idempotent on an already to-try recipe', async () => {
+    await openTestDb();
+    const { recipes } = loadDb();
+    at('2026-11-01T09:00:00.000Z');
+    const id = await recipes.createRecipe({ title: 'Idea', toTry: 1 });
+
+    at('2026-11-02T09:00:00.000Z');
+    await expect(recipes.markRecipeToTry(id)).resolves.toBeUndefined();
+
+    expect(await recipes.getRecipeById(id)).toMatchObject({
+      toTry: 1,
+      updatedAt: '2026-11-01T09:00:00.000Z',
+    });
+  });
+
+  it('changes only the target row', async () => {
+    await openTestDb();
+    const { recipes } = loadDb();
+    at('2026-11-01T09:00:00.000Z');
+    const a = await recipes.createRecipe({ title: 'A' });
+    const b = await recipes.createRecipe({ title: 'B' });
+
+    at('2026-11-02T09:00:00.000Z');
+    await recipes.markRecipeToTry(a);
+
+    expect(await recipes.getRecipeById(a)).toMatchObject({ toTry: 1 });
+    expect(await recipes.getRecipeById(b)).toMatchObject({
+      toTry: 0,
+      updatedAt: '2026-11-01T09:00:00.000Z',
+    });
+  });
+
+  it('resolves for an unknown id and changes no rows', async () => {
+    await openTestDb();
+    const { recipes } = loadDb();
+    at('2026-11-01T09:00:00.000Z');
+    const id = await recipes.createRecipe({ title: 'Soup' });
+
+    await expect(recipes.markRecipeToTry(id + 999)).resolves.toBeUndefined();
+
+    expect(await recipes.getAllRecipes()).toHaveLength(1);
+    expect(await recipes.getRecipeById(id)).toMatchObject({ toTry: 0 });
+  });
+
+  it('round trip: mark keeps the order, then Tried it bumps to the top', async () => {
+    await openTestDb();
+    const { recipes } = loadDb();
+    at('2026-11-01T09:00:00.000Z');
+    const a = await recipes.createRecipe({ title: 'A' });
+    at('2026-11-02T09:00:00.000Z');
+    await recipes.createRecipe({ title: 'B' });
+
+    at('2026-11-03T09:00:00.000Z');
+    await recipes.markRecipeToTry(a);
+    at('2026-11-04T09:00:00.000Z');
+    await recipes.markRecipeTried(a);
+
+    expect(await recipes.getRecipeById(a)).toMatchObject({
+      toTry: 0,
+      updatedAt: '2026-11-04T09:00:00.000Z',
+    });
+    const all = await recipes.getAllRecipes();
+    expect(all.map((r) => r.title)).toEqual(['A', 'B']);
+  });
+});
+
 describe('deleting all data', () => {
   it('empties every user table and returns the image paths to clean up', async () => {
     const database = await openTestDb();

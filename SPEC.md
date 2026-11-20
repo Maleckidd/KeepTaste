@@ -240,7 +240,7 @@ CREATE INDEX idx_recipes_cookbook_id ON recipes(cookbook_id);
 ### Key behaviors
 
 - **Deleting a cookbook** → `cookbook_id` on its recipes is set to `NULL` (ON DELETE SET NULL). Recipes do not disappear; they go to the "no cookbook" pool visible in the "All recipes" view.
-- **`updated_at`** — updated **only when saving a recipe edit**. Merely opening or viewing a recipe does not change `updated_at` (and therefore the sort order). **One deliberate exception:** the "Tried it" action in the recipe view (§5.19) clears `to_try` **and bumps `updated_at`**, so a freshly tried recipe surfaces at the top of its cookbook.
+- **`updated_at`** — updated **only when saving a recipe edit**. Merely opening or viewing a recipe does not change `updated_at` (and therefore the sort order). **One deliberate exception:** clearing the to-try flag from the recipe view — the "Tried it ✓" button or the "⋯" menu's "Unmark to try" (§5.19) — clears `to_try` **and bumps `updated_at`**, so a freshly tried recipe surfaces at the top of its cookbook. Marking a recipe to try from the menu does **not** bump it.
 - **`notes` field** — empty string and `NULL` are treated identically (no note) in all views and in export.
 - **Dates** — stored as ISO 8601 strings (TEXT), not UNIX timestamps. More readable when debugging and exporting.
 
@@ -366,6 +366,7 @@ Migrations are hand-written as `CREATE TABLE IF NOT EXISTS` in `db/ddl.ts` (shar
 - **Text zoom (A− / A+)** — two header buttons (left of the "⋯" menu) scale the recipe **content** read while cooking: ingredients, instructions, step numbers, in-content `#` headings and the Notes box. Title and metadata are unaffected. The scale runs 1×–1.8× in 0.2 steps; each button disables at its bound. The zoom is **ephemeral by design** — it lives in component state (no persistence, no `app_settings` key), so leaving the recipe resets it to 1× on the next open. Ionicons has no clean "A+/A−" glyph, so these are text buttons, not `IconButton`. This is a polish of the existing reading view, **not** the step-by-step cooking mode that stays out of scope (§7).
 - "⋯" menu (ActionSheet, same pattern as the cookbook and shopping-list headers):
   - **Share** → shares the recipe as plain text (§5.13). No separate share icon in the header (§6, "No unlabeled action icons")
+  - **Mark to try** / **Unmark to try** (one state-dependent entry, §5.19) → "Mark to try" sets the flag without touching `updated_at`; "Unmark to try" is the same action as "Tried it ✓" (clears the flag, bumps `updated_at`, §4). Both confirm with a plain snackbar
   - **Edit** → opens `/recipe/edit?id=X`
   - **Delete** → confirmation Alert ("Delete \"{title}\"?"); on confirm goes back and the delete commits after a 5s **Undo** snackbar (§6)
 
@@ -383,11 +384,11 @@ One shared `RecipeForm.tsx` component used by `/recipe/new` and `/recipe/edit`.
 |---|---|---|---|
 | Title | TextInput | YES | Trimmed before saving |
 | Cookbook | Picker row | NO | Which cookbook the recipe belongs to, or "No cookbook" (see below) |
+| To try | Switch | NO | Marks the recipe as saved-to-try (§5.19); default off, edit preserves the stored value. Directly under the Cookbook row (see below) |
 | Prep | TextInput numeric | NO | Minutes as a positive integer |
 | Cook | TextInput numeric | NO | Minutes as a positive integer |
 | Servings | TextInput numeric | NO | Positive integer |
 | Photo | ImagePicker | NO | Gallery or camera, 4:3 aspect |
-| To try | Switch | NO | Marks the recipe as saved-to-try (§5.19); default off, edit preserves the stored value |
 | Ingredients | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Instructions | TextInput multiline | NO | Raw text, supports Markdown; carries a "See formatting tips" link |
 | Notes | TextInput multiline | NO | Exported together with the recipe (it's a cookbook, not a diary) |
@@ -900,8 +901,9 @@ Restoring an archive made on a different schema version is a corruption vector, 
 **Data:** `recipes.to_try INTEGER NOT NULL DEFAULT 0` (§4), added as an `ALTER TABLE ... ADD COLUMN` step in the `user_version` migration ladder (§5.17.4). Default `0` (= tried / normal): existing libraries are unaffected; marking is always an explicit user action.
 
 **Marking and unmarking:**
-- **Recipe form (§5.5):** a "To try" switch, default off for new recipes; edit preserves the stored value. Import flows (§5.8 backup, §5.15 link/paste) never set it except when a backup's `**Status:** to try` line says so.
-- **Recipe view (§5.4):** when the flag is set, a small "To try" badge appears next to the title and a **"Tried it ✓"** action is shown. Tapping it clears the flag, **bumps `updated_at`** (the one deliberate exception to the edit-only rule, §4 — the freshly tried recipe "graduates" to the top of its cookbook) and confirms with a snackbar. No Undo path — re-marking takes one switch flip in the edit form.
+- **Recipe form (§5.5):** a "To try" switch, default off for new recipes; edit preserves the stored value. It sits **directly under the Cookbook row** — both answer "where does this recipe belong" — and must be visible without scrolling in create and edit. It used to sit below Notes, at the very bottom of the form, where a usability-study persona never scrolled and reported the feature as missing (persona-lab finding F-025). Import flows (§5.8 backup, §5.15 link/paste) never set it except when a backup's `**Status:** to try` line says so.
+- **Recipe view (§5.4):** when the flag is set, a small "To try" badge appears next to the title and a **"Tried it ✓"** action is shown. Tapping it clears the flag, **bumps `updated_at`** (the one deliberate exception to the edit-only rule, §4 — the freshly tried recipe "graduates" to the top of its cookbook) and confirms with a snackbar.
+- **Recipe view "⋯" menu (§5.4):** one state-dependent entry between Share and Edit, icon `flask-outline`. **"Mark to try"** when the flag is off sets it **without** bumping `updated_at` (marking is not an edit — the recipe already moves visibly into the bottom "To try" section). **"Unmark to try"** when it is on is the same action as "Tried it ✓": clears the flag and bumps `updated_at`, so the recipe lands at the top of the normal list rather than somewhere in the middle. Both confirm with a plain snackbar. No Undo snackbar — the opposite action is one tap in the same menu. Added with the form-switch move (F-025): the menu is where the persona looked first.
 - **Recipe cards (§5.3):** a small muted icon badge (Ionicons `flask-outline`, `textMuted`) next to the title — visible at a glance, quiet enough not to shout. No text on cards.
 
 **List behavior (§5.3):** in every recipe list (specific cookbook and "All recipes") to-try recipes are **partitioned to the bottom** under an uppercase "To try" section header; within both partitions the ordering stays `updated_at` descending. The header renders only when the partition is non-empty. A visible section, not a silent sort tweak — otherwise a recently edited to-try recipe "missing" from the top of the list would look like a bug. The partitioning is a pure helper (unit-tested), applied after the existing sort.
@@ -916,7 +918,7 @@ Restoring an archive made on a different schema version is a corruption vector, 
 - `.zip` archive (§5.17.1): `backup.json` recipes gain `to_try`; **`schemaVersion` bump** (§5.17.4). Older archives restore with `to_try = 0`.
 - **Shares omit the status** (recipe text §5.13, cookbook PDF §5.14) — it is personal workflow state, not recipe content.
 
-**i18n:** new EN+PL strings in `dictionary.ts` (badge/section label, chip label with count, form switch label, "Tried it" button, confirmation snackbar).
+**i18n:** new EN+PL strings in `dictionary.ts` (badge/section label, chip label with count, form switch label, "Tried it" button, confirmation snackbar, the menu's "Mark to try" / "Unmark to try" and their snackbars).
 
 **Out of scope for this feature:** a dedicated "To try" virtual cookbook tile (the chip covers aggregation; revisit only if it proves too hidden), reminders/nudges, a "tried on" date, auto-marking imported recipes.
 

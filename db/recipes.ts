@@ -100,14 +100,25 @@ export async function updateRecipe(
 
 /**
  * Clears the to-try flag and bumps updated_at to now (SPEC.md §5.19 / §4 — the
- * one deliberate exception to the edit-only updated_at rule, so the freshly
- * tried recipe graduates to the top of its cookbook). No Undo path.
+ * deliberate exception to the edit-only updated_at rule, so the recipe
+ * graduates to the top of its cookbook). Backs both "Tried it" and the view
+ * menu's "Unmark to try".
  */
 export async function markRecipeTried(id: number): Promise<void> {
   await db
     .update(recipes)
     .set({ toTry: 0, updatedAt: new Date().toISOString() })
     .where(eq(recipes.id, id));
+  noteUserEdit();
+  scheduleAutoBackup();
+}
+
+/**
+ * Sets the to-try flag WITHOUT touching updated_at (SPEC.md §5.19 / §4), so
+ * marking a recipe from the view menu does not reorder it. Idempotent.
+ */
+export async function markRecipeToTry(id: number): Promise<void> {
+  await db.update(recipes).set({ toTry: 1 }).where(eq(recipes.id, id));
   noteUserEdit();
   scheduleAutoBackup();
 }

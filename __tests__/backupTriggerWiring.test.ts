@@ -50,6 +50,7 @@ import {
   updateRecipe,
   deleteRecipe,
   markRecipeTried,
+  markRecipeToTry,
 } from '../db/recipes';
 import {
   createCookbook,
@@ -94,6 +95,16 @@ describe('recipe mutations schedule a backup', () => {
 
   it('deleteRecipe', async () => {
     await deleteRecipe(1);
+    expect(mockSchedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('markRecipeTried', async () => {
+    await markRecipeTried(1);
+    expect(mockSchedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('markRecipeToTry', async () => {
+    await markRecipeToTry(1);
     expect(mockSchedule).toHaveBeenCalledTimes(1);
   });
 });
@@ -170,6 +181,11 @@ describe('mutations mark the library user-edited (§5.20)', () => {
 
   it('markRecipeTried', async () => {
     await markRecipeTried(1);
+    expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('markRecipeToTry', async () => {
+    await markRecipeToTry(1);
     expect(mockNoteUserEdit).toHaveBeenCalledTimes(1);
   });
 
