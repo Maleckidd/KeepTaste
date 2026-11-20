@@ -61,7 +61,10 @@ export type NewRecipe = {
   instructions?: string;
 };
 
-/** Home → "Add recipe" → fill the form → Save → back on home. */
+/**
+ * Home → "Add recipe" → fill the form → Save → the new recipe's view (§5.5,
+ * F-010) → Go back → home. Callers continue from home.
+ */
 export async function createRecipe(page: Page, recipe: NewRecipe) {
   await page.getByRole('button', { name: 'Add recipe' }).click();
   await expect(page.getByRole('heading', { name: 'New recipe' })).toBeVisible();
@@ -75,7 +78,10 @@ export async function createRecipe(page: Page, recipe: NewRecipe) {
     await page.getByTestId('recipe-instructions').fill(recipe.instructions);
   }
   await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('heading', { name: recipe.title })).toBeVisible();
   await expect(page.getByText('Recipe saved')).toBeVisible();
+  await page.getByRole('button', { name: 'Go back' }).click();
+  await expect(page.getByRole('heading', { name: 'KeepTaste' })).toBeVisible();
 }
 
 /** Home → "All recipes". */

@@ -19,6 +19,44 @@ test('a saved recipe shows up with its metadata', async ({ app }) => {
   await expect(app.getByText('500 ml zakwasu')).toBeVisible();
 });
 
+// SPEC.md §5.5 "Save confirmation" (F-010): saving opens the new recipe.
+test('saving a new recipe opens its view with a plain snackbar', async ({ app }) => {
+  await app.getByRole('button', { name: 'Add recipe' }).click();
+  await app.getByTestId('recipe-title').fill('Żurek');
+  await app.getByRole('button', { name: 'Save' }).click();
+  await expect(app.getByRole('heading', { name: 'Żurek' })).toBeVisible();
+  await expect(app.getByText('Recipe saved')).toBeVisible();
+  await expect(app.getByRole('button', { name: 'Show' })).toBeHidden();
+
+  await app.getByRole('button', { name: 'Go back' }).click();
+  await expect(app.getByRole('heading', { name: 'KeepTaste' })).toBeVisible();
+  await openAllRecipes(app);
+  await expect(app.getByRole('button', { name: /^Żurek/ })).toBeVisible();
+});
+
+test('saving from a cookbook opens the recipe and Back returns to the cookbook', async ({ app }) => {
+  await app.getByRole('button', { name: 'Breakfasts' }).click();
+  await expect(app.getByRole('heading', { name: 'Breakfasts' })).toBeVisible();
+  await app.getByRole('button', { name: 'Add recipe' }).click();
+  await app.getByTestId('recipe-title').fill('Owsianka');
+  await app.getByRole('button', { name: 'Save' }).click();
+  await expect(app.getByRole('heading', { name: 'Owsianka' })).toBeVisible();
+  await expect(app.getByText('Saved in "Breakfasts"')).toBeVisible();
+  await expect(app.getByRole('button', { name: 'Show' })).toBeHidden();
+
+  await app.getByRole('button', { name: 'Go back' }).click();
+  await expect(app.getByRole('heading', { name: 'Breakfasts' })).toBeVisible();
+  await expect(app.getByRole('button', { name: /^Owsianka/ })).toBeVisible();
+});
+
+test('closing the new-recipe form returns home without a snackbar', async ({ app }) => {
+  await app.getByRole('button', { name: 'Add recipe' }).click();
+  await expect(app.getByRole('heading', { name: 'New recipe' })).toBeVisible();
+  await app.getByRole('button', { name: 'Close' }).click();
+  await expect(app.getByRole('heading', { name: 'KeepTaste' })).toBeVisible();
+  await expect(app.getByText('Recipe saved')).toBeHidden();
+});
+
 test('the title is the only required field', async ({ app }) => {
   await app.getByRole('button', { name: 'Add recipe' }).click();
   await app.getByRole('button', { name: 'Save' }).click();

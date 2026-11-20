@@ -8,7 +8,7 @@ troubleshooting: [docs/e2e-emulator.md](../docs/e2e-emulator.md).
 | --- | --- |
 | `backup-restore.yaml` | A `.zip` backup restores into a fresh install: 4 cookbooks, recipes, the shopping list; the first-launch seed is replaced, not merged. |
 | `backup-export.yaml` | "Export all data → Share / send" hands `keeptaste-backup.zip` to the system share sheet. |
-| `create-recipe.yaml` | A recipe with a title and two ingredient lines is saved, listed under "All recipes" and shown in the recipe view. |
+| `create-recipe.yaml` | A recipe with a title and two ingredient lines is saved, opens straight in the recipe view and is then listed under "All recipes". |
 | `shopping-list.yaml` | A new list gets two products; ticking one moves it to "In cart" (checked) and the overview shows `1/2 in cart`. |
 
 `subflows/` holds shared steps (`fresh-launch`, the file-picker step). Maestro
