@@ -6,10 +6,8 @@ Po `fixed` silnik sam ustawia `verified` (nie wróciło, choć ścieżka była s
 | ID | Status | Priorytet | Rodzaj | Znalezisko | Sesje | Pierwszy raz | Ostatnio | Gdzie | Notatka |
 |---|---|---|---|---|---|---|---|---|---|
 | F-009 | open | P1 | problem | Aplikacja przestaje odpowiadać (ANR) po zapisaniu przepisu | 2 | 20261112-160835 | 20261114-200122 | `app/cookbook/new.tsx:19` |  |
-| F-010 | open | P1 | problem | Nowo zapisany przepis Bez książki jest niewidoczny po zapisie | 3 | 20261112-160835 | 20261114-200122 | `app/recipe/new.tsx:94`, `app/recipe/new.tsx:98`, `components/ui/SnackbarProvider.tsx:54`, `app/(tabs)/index.tsx:255` |  |
 | F-011 | open | P1 | problem | Przypisanie do książki: pole w formularzu niezauważone, przeniesienie tylko przez ··· → Edytuj | 3 | 20261112-160835 | 20261114-200122 | `app/recipe/[id].tsx:262`, `components/recipe/RecipeForm.tsx:349`, `app/cookbook/[id].tsx:447`, `app/cookbook/[id].tsx:512` |  |
 | F-024 | open | P1 | problem | Chipy minutnika przy pierwszym renderze: czas znika, kreska przecina inne słowa | 1 | 20261114-200122 | 20261114-200122 | `components/timers/timerMarkdownRules.tsx:32`, `components/timers/TimerChip.tsx:90` |  |
-| F-025 | open | P1 | problem | Przełącznik Do wypróbowania schowany na dnie formularza, brak w menu przepisu | 1 | 20261114-200122 | 20261114-200122 | `components/recipe/RecipeForm.tsx:457`, `app/recipe/[id].tsx:266`, `app/cookbook/[id].tsx:412` |  |
 | F-001 | open | P2 | problem | Pole Składniki zasłonięte przy wpisywaniu nowego przepisu (duża czcionka) | 4 | 20261112-114007 | 20261114-200122 | `components/recipe/RecipeForm.tsx:281`, `components/recipe/RecipeForm.tsx:477` |  |
 | F-002 | open | P2 | problem | Wyszukiwanie po kilku składnikach nic nie zwraca i nie podpowiada, co dalej | 2 | 20261112-114007 | 20261112-185244 | `utils/search.ts:91`, `app/cookbook/[id].tsx:444` |  |
 | F-003 | open | P2 | problem | Udostępnianie przepisu schowane w menu ··· | 1 | 20261112-114007 | 20261112-114007 | `app/recipe/[id].tsx:254`, `app/recipe/[id].tsx:268` |  |
@@ -40,3 +38,5 @@ Po `fixed` silnik sam ustawia `verified` (nie wróciło, choć ścieżka była s
 | F-033 | open | — | wish | Łatwiejszy odbiorca / Kopiuj listę | 1 | 20261114-200122 | 20261114-200122 |  |  |
 | F-034 | open | — | wish | PDF łatwy do znalezienia z wnętrza książki | 1 | 20261114-200122 | 20261114-200122 | `app/cookbook/[id].tsx:512` |  |
 | F-035 | open | — | wish | Zachować wpisany tekst przy zamknięciu aplikacji | 1 | 20261114-200122 | 20261114-200122 |  |  |
+| F-010 | fixed | P1 | problem | Nowo zapisany przepis Bez książki jest niewidoczny po zapisie | 3 | 20261112-160835 | 20261114-200122 | `app/recipe/new.tsx:94`, `app/recipe/new.tsx:98`, `components/ui/SnackbarProvider.tsx:54`, `app/(tabs)/index.tsx:255` | d4fd23c (#29): a new recipe opens its own view after saving; the snackbar is no longer the only way to it |
+| F-025 | fixed | P1 | problem | Przełącznik Do wypróbowania schowany na dnie formularza, brak w menu przepisu | 1 | 20261114-200122 | 20261114-200122 | `components/recipe/RecipeForm.tsx:457`, `app/recipe/[id].tsx:266`, `app/cookbook/[id].tsx:412` | c86c460 (#28): the To try switch sits under Cookbook in the form; Mark/Unmark to try in the recipe menu |
