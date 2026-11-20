@@ -101,6 +101,7 @@ screens load from SQLite on focus and reload after mutations.
 | Read | For |
 |---|---|
 | [SPEC.md](SPEC.md) | The living product spec: every feature, rule and out-of-scope decision |
+| [docs/adr/](docs/adr/README.md) | Architecture decisions: why it is built this way, and what was rejected |
 | [docs/TESTING.md](docs/TESTING.md) | Test strategy: unit, SQLite integration, E2E, personas, manual plan |
 | [SECURITY.md](SECURITY.md) | Threat model, supply-chain controls, the justified audit allowlist |
 | [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md) | Spec → agents → reviewer gate → tests, and what the history shows |
