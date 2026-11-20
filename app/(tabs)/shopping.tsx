@@ -86,6 +86,7 @@ export default function ShoppingScreen() {
           text={t('shopping.emptyText')}
           actionLabel={t('shopping.emptyAction')}
           onAction={() => router.push('/shopping/new')}
+          actionTestID="shopping-empty-new-list"
         />
       ) : (
         <FlatList
@@ -149,6 +150,7 @@ export default function ShoppingScreen() {
         // Tab bar already sits below — no extra bottom inset needed
         <Fab
           accessibilityLabel={t('a11y.addList')}
+          testID="shopping-add-list"
           onPress={() => router.push('/shopping/new')}
           withBottomInset={false}
         />

@@ -64,6 +64,7 @@ export default function NewShoppingListScreen() {
           <Input
             large
             placeholder={t('shoppingNew.placeholder')}
+            testID="shopping-new-name"
             value={name}
             onChangeText={(v) => {
               if (nameError) setNameError(false);
@@ -83,6 +84,7 @@ export default function NewShoppingListScreen() {
           <Button
             label={t('shoppingNew.create')}
             onPress={handleCreate}
+            testID="shopping-new-create"
             loading={isLoading}
             style={styles.submit}
           />

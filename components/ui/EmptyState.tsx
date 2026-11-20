@@ -10,6 +10,8 @@ type Props = {
   text: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Stable E2E selector for the action button (Maestro `id:`). */
+  actionTestID?: string;
 };
 
 export default function EmptyState({
@@ -18,6 +20,7 @@ export default function EmptyState({
   text,
   actionLabel,
   onAction,
+  actionTestID,
 }: Props) {
   const c = useTheme();
   return (
@@ -28,7 +31,12 @@ export default function EmptyState({
       ) : null}
       <Text style={[styles.text, { color: c.textMuted }]}>{text}</Text>
       {actionLabel && onAction ? (
-        <Button label={actionLabel} onPress={onAction} style={styles.action} />
+        <Button
+          label={actionLabel}
+          onPress={onAction}
+          style={styles.action}
+          testID={actionTestID}
+        />
       ) : null}
     </View>
   );

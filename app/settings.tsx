@@ -587,6 +587,7 @@ export default function SettingsScreen() {
           icon="download-outline"
           label={t('settings.import')}
           onPress={handleImport}
+          testID="settings-restore"
           style={styles.actionButton}
         />
         <Text style={styles.importHint}>{t('settings.importHint')}</Text>

@@ -13,6 +13,8 @@ type Props = {
   /** Raised circular variant (header action buttons on tab screens). */
   raised?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Stable E2E selector (Maestro `id:`); never user-facing. */
+  testID?: string;
 };
 
 export default function IconButton({
@@ -23,11 +25,13 @@ export default function IconButton({
   size = 22,
   raised = false,
   style,
+  testID,
 }: Props) {
   const c = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={4}

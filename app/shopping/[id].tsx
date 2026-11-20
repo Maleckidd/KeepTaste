@@ -533,6 +533,7 @@ export default function ShoppingListScreen() {
           text={t('shoppingList.emptyText')}
           actionLabel={t('shoppingList.addProduct')}
           onAction={openAdd}
+          actionTestID="shopping-empty-add"
         />
       ) : (
         <FlatList
@@ -600,12 +601,14 @@ export default function ShoppingListScreen() {
               }
               value={name}
               onChangeText={handleNameChange}
+              testID="shopping-item-name"
               returnKeyType="done"
               onSubmitEditing={handleConfirm}
             />
             <Input
               style={styles.addQtyInput}
               placeholder={t('shoppingList.qtyPlaceholder')}
+              testID="shopping-item-qty"
               value={quantity}
               onChangeText={setQuantity}
               returnKeyType="done"
@@ -617,6 +620,7 @@ export default function ShoppingListScreen() {
               color={c.onPrimary}
               accessibilityLabel={t('a11y.confirmProduct')}
               onPress={handleConfirm}
+              testID="shopping-item-confirm"
               style={styles.confirmButton}
             />
             <IconButton
@@ -647,6 +651,7 @@ export default function ShoppingListScreen() {
         <Fab
           accessibilityLabel={t('a11y.addProduct')}
           onPress={openAdd}
+          testID="shopping-add-product"
           leading={
             <InCartPill
               label={t('shoppingList.inCartHeader')}

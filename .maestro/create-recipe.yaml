@@ -1,0 +1,43 @@
+# Flow 2 — create a recipe (title + ingredients), then find it in the list and
+# open its view.
+appId: ${APP_ID}
+env:
+  # The side-by-side E2E build (.maestro/README.md); override with -e APP_ID=...
+  APP_ID: ${APP_ID || "com.damianmalecki.keeptaste.e2e"}
+name: Create recipe
+tags:
+  - recipes
+---
+- runFlow: subflows/fresh-launch.yaml
+
+- tapOn:
+    id: home-add-recipe
+- tapOn:
+    id: recipe-title
+- inputText: "Maestro Lemon Soup"
+- tapOn:
+    id: recipe-ingredients
+- inputText: "2 lemons"
+- pressKey: Enter
+- inputText: "1 l vegetable stock"
+# No hideKeyboard: on Android it sends a system Back, and Back closes the form
+# without saving (known bug). Save is pinned above the keyboard anyway.
+- tapOn:
+    id: recipe-save
+
+# Back on home after the save; the new recipe has no cookbook, so it is listed
+# under "All recipes" (newest first, above the seeded "Pancakes").
+- extendedWaitUntil:
+    visible:
+      id: home-all-recipes
+    timeout: 10000
+- tapOn:
+    id: home-all-recipes
+- assertVisible: "Maestro Lemon Soup"
+- assertVisible: "Pancakes"
+
+- tapOn: "Maestro Lemon Soup"
+- assertVisible: "Maestro Lemon Soup"
+- assertVisible: "Ingredients"
+- assertVisible: "2 lemons"
+- assertVisible: "1 l vegetable stock"

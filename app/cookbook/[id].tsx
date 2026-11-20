@@ -394,6 +394,7 @@ export default function CookbookScreen() {
             returnKeyType="search"
             autoFocus
             accessibilityLabel={t('cookbook.searchPlaceholder')}
+            testID="recipes-search"
           />
           {searchQuery ? (
             <IconButton

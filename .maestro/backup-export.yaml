@@ -1,0 +1,33 @@
+# Flow 1b — export a full .zip backup through the system share sheet.
+#
+# Asserted: "Export all data" → "Share / send" builds the archive and hands one
+# file named keeptaste-backup.zip to the Android share sheet, and dismissing the
+# sheet returns to Settings.
+# Not asserted: the archive's contents or any delivery target (Drive, Gmail…) —
+# the share sheet is system UI; the contents round-trip is covered by the unit
+# and integration tests of utils/backupArchive.ts and db/backup.ts, and the
+# restore side by backup-restore.yaml.
+appId: ${APP_ID}
+env:
+  # The side-by-side E2E build (.maestro/README.md); override with -e APP_ID=...
+  APP_ID: ${APP_ID || "com.damianmalecki.keeptaste.e2e"}
+name: Backup export (share sheet)
+tags:
+  - backup
+---
+- runFlow: subflows/fresh-launch.yaml
+
+- tapOn:
+    id: home-settings
+- tapOn: "Export all data"
+- tapOn: "Share / send"
+
+# Zipping the library (photos included) takes a moment before the sheet opens.
+- extendedWaitUntil:
+    visible: "keeptaste-backup.zip"
+    timeout: 30000
+- back
+- extendedWaitUntil:
+    visible:
+      id: settings-restore
+    timeout: 10000

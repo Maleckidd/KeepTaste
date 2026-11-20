@@ -32,6 +32,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: t('tabs.recipes'),
+          tabBarButtonTestID: 'tab-recipes',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'book' : 'book-outline'} size={size} color={color} />
           ),
@@ -41,6 +42,7 @@ export default function TabsLayout() {
         name="shopping"
         options={{
           title: t('tabs.shopping'),
+          tabBarButtonTestID: 'tab-shopping',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'cart' : 'cart-outline'} size={size} color={color} />
           ),
