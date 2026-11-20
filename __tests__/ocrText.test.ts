@@ -1539,3 +1539,155 @@ describe('normalizeOcrText — what makes a text a chat', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Gaps found by mutation testing (docs/mutation-testing.md).
+// ---------------------------------------------------------------------------
+describe('ocrBlocksToText — ordering details', () => {
+  it('keeps input order for blocks with the same top (stable y-sort)', () => {
+    const blocks: OcrBlock[] = [
+      { text: 'a', frame: { top: 10 } },
+      { text: 'b', frame: { top: 10 } },
+      { text: 'c', frame: { top: 10 } },
+    ];
+    expect(ocrBlocksToText(blocks)).toBe('a\nb\nc');
+  });
+
+  it('sorts a block whose frame has no numeric top after the framed ones', () => {
+    const blocks = [
+      { text: 'bez top', frame: {} },
+      { text: 'z top', frame: { top: 5 } },
+    ] as unknown as OcrBlock[];
+    expect(ocrBlocksToText(blocks)).toBe('z top\nbez top');
+  });
+});
+
+describe('ocrBlocksToText — status bar detection', () => {
+  it('finds the top row wherever the screenshot starts, battery a little lower', () => {
+    expect(
+      flow([
+        ['21:37', 100, 48, 117, 27],
+        ['5G 82%', 104, 850, 1040, 27],
+        ['Sernik', 300, 40, 300],
+      ])
+    ).toBe('Sernik');
+  });
+
+  it('keeps a top block that holds a clock and other text', () => {
+    const frame = { top: 0, left: 40, width: 300, height: 27 };
+    const blocks: OcrBlock[] = [
+      { text: '21:37\nSernik', lines: [{ text: '21:37', frame }, { text: 'Sernik', frame: { ...frame, top: 40 } }], frame },
+    ];
+    expect(ocrBlocksToText(blocks)).toContain('Sernik');
+  });
+});
+
+describe('dropClippedEdgeLines — details', () => {
+  const size = { width: 700, height: 300 };
+  // Three ordinary lines away from the edges: median line height 20.
+  const body = () => [lineBlock('a', 100, 20), lineBlock('b', 140, 20), lineBlock('c', 180, 20)];
+  const texts = (blocks: OcrBlock[]) => blocks.map((b) => b.text);
+
+  it('returns an untouched block as the same object', () => {
+    const blocks = body();
+    const out = dropClippedEdgeLines(blocks, size);
+    out.forEach((b, i) => expect(b).toBe(blocks[i]));
+  });
+
+  it('drops a block whose only line is clipped', () => {
+    expect(texts(dropClippedEdgeLines([lineBlock('Dah', 0, 10), ...body()], size))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('rebuilds a partly clipped block from its kept lines, frame included', () => {
+    const lines = [
+      { text: 'ucięta', frame: { top: 0, left: 40, width: 300, height: 10 } },
+      { text: 'B', frame: { top: 30, left: 50, width: 100, height: 20 } },
+      { text: 'C', frame: { top: 55, left: 40, width: 200, height: 20 } },
+    ];
+    const block: OcrBlock = { text: 'x', lines, frame: { top: 0, left: 0, width: 500, height: 80 } };
+    expect(dropClippedEdgeLines([block, ...body()], size)[0]).toEqual({
+      text: 'B\nC',
+      lines: lines.slice(1),
+      frame: { top: 30, left: 40, width: 200, height: 45 },
+    });
+  });
+
+  it('keeps the block frame when a kept line has no full frame', () => {
+    const blockFrame = { top: 0, left: 0, width: 500, height: 80 };
+    const block: OcrBlock = {
+      text: 'x',
+      lines: [
+        { text: 'ucięta', frame: { top: 0, left: 40, width: 300, height: 10 } },
+        { text: 'bez ramki' },
+        { text: 'B', frame: { top: 30, left: 50, width: 100, height: 20 } },
+      ],
+      frame: blockFrame,
+    };
+    const [out] = dropClippedEdgeLines([block, ...body()], size);
+    expect(out.text).toBe('bez ramki\nB');
+    expect(out.frame).toBe(blockFrame);
+  });
+
+  it('reads the median of the sorted heights', () => {
+    // Heights 21, 10, 32, 30, 28 → median 28, so the 21-high edge line (over
+    // 70% of 28) is kept; an unsorted middle (32) would clip it.
+    const blocks = [
+      lineBlock('krawędź', 0, 21),
+      lineBlock('d', 100, 10),
+      lineBlock('e', 140, 32),
+      lineBlock('f', 180, 30),
+      lineBlock('g', 220, 28),
+    ];
+    expect(texts(dropClippedEdgeLines(blocks, size))).toContain('krawędź');
+  });
+
+  it('leaves zero heights out of the median', () => {
+    const zero = (text: string, top: number) => lineBlock(text, top, 0);
+    const blocks = [zero('z1', 60), zero('z2', 70), zero('z3', 80), zero('z4', 90), lineBlock('Dah', 0, 10), ...body()];
+    expect(texts(dropClippedEdgeLines(blocks, size))).not.toContain('Dah');
+  });
+
+  it('judges with exactly three line heights, counting a block without lines', () => {
+    const noLines: OcrBlock = { text: 'c', frame: { top: 180, left: 40, width: 600, height: 20 }, lines: [] };
+    const blocks = [lineBlock('Dah', 0, 10), lineBlock('a', 100, 20), noLines];
+    expect(texts(dropClippedEdgeLines(blocks, size))).toEqual(['a', 'c']);
+  });
+
+  it('never treats a line without a frame as clipped', () => {
+    const blocks: OcrBlock[] = [{ text: 'bez ramki', lines: [{ text: 'bez ramki' }] }, ...body()];
+    expect(texts(dropClippedEdgeLines(blocks, size))).toContain('bez ramki');
+  });
+
+  it.each([
+    ['top edge at exactly half a median line', 10, 13, false],
+    ['just inside the top margin', 11, 13, true],
+    ['exactly 70% of the median high', 10, 14, true],
+    ['bottom edge at exactly half a median line', 277, 13, false],
+    ['bottom just inside the margin', 276, 13, true],
+  ])('a squat line with its %s: kept = %p', (_label, top, height, kept) => {
+    const out = texts(dropClippedEdgeLines([lineBlock('edge', top as number, height as number), ...body()], size));
+    expect(out.includes('edge')).toBe(kept);
+  });
+});
+
+describe('dropClippedEdgeLines — partial line frames', () => {
+  it.each([
+    ['left', { top: 60, width: 100, height: 20 }],
+    ['width', { top: 60, left: 50, height: 20 }],
+    ['height', { top: 60, left: 50, width: 100 }],
+  ])('keeps the block frame when a kept line frame lacks %s', (_missing, frame) => {
+    const blockFrame = { top: 0, left: 0, width: 500, height: 80 };
+    const block: OcrBlock = {
+      text: 'x',
+      lines: [
+        { text: 'ucięta', frame: { top: 0, left: 40, width: 300, height: 10 } },
+        { text: 'B', frame: frame as OcrBlock['frame'] },
+      ],
+      frame: blockFrame,
+    };
+    const body = [lineBlock('a', 100, 20), lineBlock('b', 140, 20), lineBlock('c', 180, 20)];
+    const [out] = dropClippedEdgeLines([block, ...body], { width: 700, height: 300 });
+    expect(out.text).toBe('B');
+    expect(out.frame).toBe(blockFrame);
+  });
+});

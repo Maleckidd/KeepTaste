@@ -125,3 +125,12 @@ describe('toImportIntent', () => {
     expect(toImportIntent(undefined)).toBeNull();
   });
 });
+
+// Gaps found by mutation testing (docs/mutation-testing.md).
+describe('extractSharedUrl — trailing punctuation runs', () => {
+  it('strips a whole run of trailing punctuation, not just the last character', () => {
+    expect(extractSharedUrl('(see <https://example.com/r>).')).toBe(
+      'https://example.com/r'
+    );
+  });
+});
