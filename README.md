@@ -102,7 +102,7 @@ screens load from SQLite on focus and reload after mutations.
 |---|---|
 | [SPEC.md](SPEC.md) | The living product spec: every feature, rule and out-of-scope decision |
 | [docs/adr/](docs/adr/README.md) | Architecture decisions: why it is built this way, and what was rejected |
-| [docs/TESTING.md](docs/TESTING.md) | Test strategy: unit, SQLite integration, E2E, personas, manual plan |
+| [docs/TESTING.md](docs/TESTING.md) | Test strategy: unit, SQLite integration, E2E (web and Android), mutation, personas, manual plan |
 | [SECURITY.md](SECURITY.md) | Threat model, supply-chain controls, the justified audit allowlist |
 | [docs/AI-WORKFLOW.md](docs/AI-WORKFLOW.md) | Spec → agents → reviewer gate → tests, and what the history shows |
 | [docs/case-studies/persona-lab.md](docs/case-studies/persona-lab.md) | Usability testing with simulated users ([engine](https://github.com/Maleckidd/persona-lab)) |
@@ -254,6 +254,8 @@ npx tsc --noEmit                   # strict type check
 npm run test:unit                  # pure logic (db helpers, utils, i18n)
 npm run test:integration           # db/ on real SQLite: migrations, SQL rules, backup round-trip
 npm run e2e:build && npm run e2e   # Playwright on the web export, offline
+npm run test:mutation              # Stryker on the utils/ parsers (25–40 min)
+maestro test .maestro/             # Android E2E on a local emulator, see .maestro/README.md
 ```
 
 Native behaviour (file system, share sheet, camera, notifications) is

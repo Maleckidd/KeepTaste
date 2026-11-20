@@ -1,7 +1,9 @@
 # 0010. Mutation testing with Stryker on the pure parsers, non-blocking
 
-- **Status:** Accepted. Implementation is in progress; this ADR records
-  the decision, not a finished setup.
+- **Status:** Accepted. Implemented on 2026-11-20
+  ([`stryker.config.mjs`](../../stryker.config.mjs),
+  [`mutation.yml`](../../.github/workflows/mutation.yml),
+  [docs/mutation-testing.md](../mutation-testing.md)).
 - **Date:** 2026-11-19
 
 ## Context
@@ -63,3 +65,12 @@ not been measured ([docs/TESTING.md](../TESTING.md#known-gaps)).
 - The thresholds, once set from the baseline, are added here as a dated
   note. Making mutation testing a required check would change the
   decision, so it needs a new ADR that supersedes this one.
+
+## Notes
+
+- **2026-11-20, baseline and thresholds.** The first full run scored
+  62.74%. After the tests were strengthened (tests only, no parser code
+  changed) it scored 68.66%. The thresholds were set from that
+  measurement: `high: 80`, `low: 70`, `break: 65`, a few points under the
+  current score. Per-file scores and the groups of survivors left alive
+  on purpose are in [docs/mutation-testing.md](../mutation-testing.md).
