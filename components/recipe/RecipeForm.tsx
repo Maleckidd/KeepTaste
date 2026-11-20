@@ -365,6 +365,26 @@ export default function RecipeForm({
           <Ionicons name="chevron-down" size={18} color={c.textSecondary} />
         </Pressable>
 
+        {/* To try (§5.19) — beside the Cookbook picker, visible without scrolling */}
+        <Pressable
+          testID="recipe-to-try-switch"
+          style={styles.toTryRow}
+          onPress={() => setToTry(!form.toTry)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: form.toTry }}
+          accessibilityLabel={t('recipeForm.toTryLabel')}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toTryLabel}>{t('recipeForm.toTryLabel')}</Text>
+          </View>
+          <Switch
+            value={form.toTry}
+            onValueChange={setToTry}
+            trackColor={{ false: c.border, true: c.primary }}
+            thumbColor={c.surface}
+          />
+        </Pressable>
+
         {/* Times */}
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
@@ -453,25 +473,6 @@ export default function RecipeForm({
             multiline
           />
         </Field>
-
-        {/* To try (§5.19) */}
-        <Pressable
-          style={styles.toTryRow}
-          onPress={() => setToTry(!form.toTry)}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: form.toTry }}
-          accessibilityLabel={t('recipeForm.toTryLabel')}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toTryLabel}>{t('recipeForm.toTryLabel')}</Text>
-          </View>
-          <Switch
-            value={form.toTry}
-            onValueChange={setToTry}
-            trackColor={{ false: c.border, true: c.primary }}
-            thumbColor={c.surface}
-          />
-        </Pressable>
       </ScrollView>
 
       {/* Save stays pinned in the thumb zone, above the keyboard */}

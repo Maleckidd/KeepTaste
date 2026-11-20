@@ -47,6 +47,11 @@ describe('i18n/dictionary — completeness', () => {
     ['timer.liveEndsAt', 'Ends at {time}'],
     ['timer.liveChannelName', 'Running timers'],
     ['timer.liveChannelDescription', 'Countdown of running cooking timers'],
+    // To-try toggle in the recipe "⋯" menu (SPEC.md §5.19).
+    ['recipe.menuMarkToTry', 'Mark to try'],
+    ['recipe.menuUnmarkToTry', 'Unmark to try'],
+    ['recipe.markedToTry', 'Marked to try'],
+    ['recipe.unmarkedToTry', 'Removed from To try'],
   ] as const)('contains pinned key %p with en %p', (key, en) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].en).toBe(en);
@@ -60,6 +65,10 @@ describe('i18n/dictionary — completeness', () => {
     ['timer.liveEndsAt', 'Koniec o {time}'],
     ['timer.liveChannelName', 'Odliczanie minutników'],
     ['timer.liveChannelDescription', 'Odliczanie trwających minutników'],
+    ['recipe.menuMarkToTry', 'Oznacz „do wypróbowania”'],
+    ['recipe.menuUnmarkToTry', 'Odznacz „do wypróbowania”'],
+    ['recipe.markedToTry', 'Oznaczono do wypróbowania'],
+    ['recipe.unmarkedToTry', 'Usunięto z „do wypróbowania”'],
   ] as const)('contains pinned key %p with pl %p', (key, pl) => {
     expect(dictionary[key as TranslationKey]).toBeDefined();
     expect(dictionary[key as TranslationKey].pl).toBe(pl);

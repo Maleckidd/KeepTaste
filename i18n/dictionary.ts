@@ -184,6 +184,22 @@ export const dictionary = {
     en: 'Marked as tried',
     pl: 'Oznaczono jako wypróbowane',
   },
+  'recipe.menuMarkToTry': {
+    en: 'Mark to try',
+    pl: 'Oznacz „do wypróbowania”',
+  },
+  'recipe.menuUnmarkToTry': {
+    en: 'Unmark to try',
+    pl: 'Odznacz „do wypróbowania”',
+  },
+  'recipe.markedToTry': {
+    en: 'Marked to try',
+    pl: 'Oznaczono do wypróbowania',
+  },
+  'recipe.unmarkedToTry': {
+    en: 'Removed from To try',
+    pl: 'Usunięto z „do wypróbowania”',
+  },
 
   // --- Add ingredients to a shopping list (app/recipe/add-to-list.tsx, §5.12) ---
   'addToList.title': {

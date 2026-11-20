@@ -15,7 +15,7 @@ import { Image } from 'expo-image';
 import RecipeMarkdown from '@/components/recipe/RecipeMarkdown';
 import { useKeepAwakeSafe } from '@/utils/keepAwake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getRecipeById, deleteRecipe, markRecipeTried } from '@/db/recipes';
+import { getRecipeById, deleteRecipe, markRecipeTried, markRecipeToTry } from '@/db/recipes';
 import { deleteStoredImage } from '@/utils/imageStorage';
 import { pendingDeleteKey } from '@/utils/pendingDelete';
 import { useUndoDelete, useSnackbar } from '@/components/ui/SnackbarProvider';
@@ -204,6 +204,22 @@ export default function RecipeScreen() {
     await loadData();
   };
 
+  // §5.19 menu toggles: marking leaves updated_at alone, unmarking reuses
+  // markRecipeTried (bumps it). Plain snackbar, no animateLayout (same frame).
+  const handleMarkToTry = async () => {
+    if (!recipe) return;
+    await markRecipeToTry(recipe.id);
+    showSnackbar({ message: t('recipe.markedToTry') });
+    await loadData();
+  };
+
+  const handleUnmarkToTry = async () => {
+    if (!recipe) return;
+    await markRecipeTried(recipe.id);
+    showSnackbar({ message: t('recipe.unmarkedToTry') });
+    await loadData();
+  };
+
   const handleShare = async () => {
     if (!recipe) return;
     try {
@@ -268,6 +284,13 @@ export default function RecipeScreen() {
             label: t('recipe.menuShare'),
             icon: 'share-outline',
             onPress: handleShare,
+          },
+          {
+            label: t(
+              recipe.toTry ? 'recipe.menuUnmarkToTry' : 'recipe.menuMarkToTry'
+            ),
+            icon: 'flask-outline',
+            onPress: recipe.toTry ? handleUnmarkToTry : handleMarkToTry,
           },
           {
             label: t('common.edit'),
