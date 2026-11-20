@@ -387,7 +387,7 @@
       "kind": "problem",
       "title": "Nowo zapisany przepis Bez książki jest niewidoczny po zapisie",
       "priority": "P1",
-      "status": "open",
+      "status": "fixed",
       "where": [
         "app/recipe/new.tsx:94",
         "app/recipe/new.tsx:98",
@@ -396,7 +396,7 @@
       ],
       "first_seen": "20261112-160835",
       "last_seen": "20261114-200122",
-      "note": "",
+      "note": "d4fd23c (#29): a new recipe opens its own view after saving; the snackbar is no longer the only way to it",
       "sightings": [
         {
           "session": "20261112-160835",
@@ -434,7 +434,9 @@
           ],
           "status_before": "open"
         }
-      ]
+      ],
+      "status_changed": "2026-11-20",
+      "status_changed_at": "20261120-185055"
     },
     {
       "id": "F-011",
@@ -942,7 +944,7 @@
       "kind": "problem",
       "title": "Przełącznik Do wypróbowania schowany na dnie formularza, brak w menu przepisu",
       "priority": "P1",
-      "status": "open",
+      "status": "fixed",
       "where": [
         "components/recipe/RecipeForm.tsx:457",
         "app/recipe/[id].tsx:266",
@@ -950,7 +952,7 @@
       ],
       "first_seen": "20261114-200122",
       "last_seen": "20261114-200122",
-      "note": "",
+      "note": "c86c460 (#28): the To try switch sits under Cookbook in the form; Mark/Unmark to try in the recipe menu",
       "sightings": [
         {
           "session": "20261114-200122",
@@ -963,7 +965,9 @@
           ],
           "status_before": "open"
         }
-      ]
+      ],
+      "status_changed": "2026-11-20",
+      "status_changed_at": "20261120-185055"
     },
     {
       "id": "F-026",
