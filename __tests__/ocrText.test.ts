@@ -1,6 +1,5 @@
-// TDD red phase for the "From photo (OCR)" import feature (SPEC.md §5.15, mode
-// T3 "Text assembly"). The module @/utils/ocrText does not exist yet; these
-// tests should fail because of the missing implementation, not setup errors.
+// Tests for the "From photo (OCR)" import feature (SPEC.md §5.15, mode
+// T3 "Text assembly").
 import {
   dropClippedEdgeLines,
   ocrBlocksToText,

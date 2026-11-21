@@ -1,6 +1,6 @@
-// TDD red phase for the i18n (Polish + English) feature — pure logic helpers.
+// Tests for the i18n (Polish + English) feature — pure logic helpers.
 //
-// Target modules (do NOT exist yet):
+// Modules under test:
 //   - i18n/dictionary.ts  (dictionary, TranslationKey, Language)
 //   - utils/i18n.ts       (parsePreference, resolveLanguage, interpolate,
 //                          createTranslator, pluralPl, LanguagePreference)

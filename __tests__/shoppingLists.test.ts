@@ -1,7 +1,7 @@
-// TDD red phase for the Shopping lists feature — db helpers.
+// Tests for the Shopping lists feature — db helpers.
 //
-// Target module (does NOT exist yet): db/shoppingLists.ts
-// Target schema tables (do NOT exist yet): shoppingLists, shoppingItems in db/schema.ts
+// Module under test: db/shoppingLists.ts
+// Schema tables: shoppingLists, shoppingItems in db/schema.ts
 //
 // We mock db/client so importing db/shoppingLists is pure. The mock models the
 // Drizzle call shapes the implementation is expected to use, consistent with the

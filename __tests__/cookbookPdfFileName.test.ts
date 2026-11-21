@@ -1,8 +1,8 @@
-// TDD red phase for package F (SPEC.md §5.14): the shared cookbook PDF gets a
+// Tests for package F (SPEC.md §5.14): the shared cookbook PDF gets a
 // readable file name `{cookbook name} {YYYY-MM-DD}.pdf` instead of expo-print's
 // random UUID. Pure helper — no native imports, no file system.
 //
-// Target module (does NOT exist yet): utils/cookbookPdfFileName.ts
+// Module under test: utils/cookbookPdfFileName.ts
 //   cookbookPdfFileName(name: string, date: Date, fallback: string): string
 //
 // Dates are always built with the local constructor (month is 0-based) — the

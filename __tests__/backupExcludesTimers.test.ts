@@ -1,9 +1,9 @@
-// TDD red phase for cooking timers, stage 1 (SPEC.md §5.21) — running timers
+// Tests for cooking timers, stage 1 (SPEC.md §5.21) — running timers
 // are device state, persisted in app_settings.active_timers, and must stay out
 // of backups: excluded from export, skipped on restore. backup_* keys keep
 // today's behaviour (exported, skipped on restore).
 //
-// Target module (does NOT exist yet): db/settingKeys.ts — dependency-free:
+// Module under test: db/settingKeys.ts — dependency-free:
 //   ACTIVE_TIMERS_KEY, isExcludedFromBackup(key), isSkippedOnRestore(key)
 // and db/backup.ts getFullBackupData filtering with isExcludedFromBackup.
 //

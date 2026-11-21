@@ -1,4 +1,4 @@
-// TDD red phase for shouldSilentReplace (seed sample content on first launch).
+// Tests for shouldSilentReplace (seed sample content on first launch).
 // Pure truth-table decision for whether a restore may skip the Replace/Add
 // prompt (§5.17.1). It lives in db/backup.ts, which imports db/client; that
 // native connection is mocked (the established pattern, see

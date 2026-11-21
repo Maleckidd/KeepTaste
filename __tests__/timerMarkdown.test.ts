@@ -1,7 +1,7 @@
-// TDD red phase for cooking timers, stage 1 (SPEC.md §5.21) — step numbers and
+// Tests for cooking timers, stage 1 (SPEC.md §5.21) — step numbers and
 // chip keys derived from the react-native-markdown-display AST.
 //
-// Target module (does NOT exist yet): utils/timerMarkdown.ts
+// Module under test: utils/timerMarkdown.ts
 //   stepNumberFromAncestors(ancestors): number | null
 //   chipSourceKey(node, ancestors, matchStart): string
 // `ancestors` is the `parent` array a markdown-display render rule receives:

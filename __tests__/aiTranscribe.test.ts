@@ -1,6 +1,4 @@
-// TDD red phase for the "Transcribe with AI" import mode (SPEC §5.15 T4).
-// The module utils/aiTranscribe.ts does NOT exist yet; these tests should fail
-// because of the missing implementation, not setup errors.
+// Tests for the "Transcribe with AI" import mode (SPEC §5.15 T4).
 import { buildAiTranscribePrompt, cleanAiResponse } from '@/utils/aiTranscribe';
 import { parsePastedRecipe } from '@/utils/recipeImport';
 
