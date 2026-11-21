@@ -137,8 +137,8 @@ exporter never writes.
 ## CI
 
 [`.github/workflows/mutation.yml`](../.github/workflows/mutation.yml) runs the
-full suite weekly (Monday 04:17 UTC) and on demand (`workflow_dispatch`), and
-uploads the HTML report as the `mutation-report` artifact. It is **not** a
+full suite on demand only (`workflow_dispatch`, Actions → Mutation testing →
+Run workflow), and uploads the HTML report as the `mutation-report` artifact. It is **not** a
 required check: a run takes too long for every PR, and it doesn't run on PRs at
 all.
 
