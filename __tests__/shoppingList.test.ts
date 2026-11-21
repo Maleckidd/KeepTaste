@@ -1,6 +1,6 @@
-// TDD red phase for the Shopping lists feature — pure logic helpers.
+// Tests for the Shopping lists feature — pure logic helpers.
 //
-// Target module (does NOT exist yet): utils/shoppingList.ts
+// Module under test: utils/shoppingList.ts
 // These helpers are pure: no native imports, no DB access.
 
 import {

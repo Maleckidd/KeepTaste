@@ -1,7 +1,7 @@
-// TDD red phase for cooking timers, stage 2 (SPEC.md §5.21) — background
+// Tests for cooking timers, stage 2 (SPEC.md §5.21) — background
 // alarms via local OS notifications.
 //
-// Target module (does NOT exist yet): utils/timerNotifications.ts — pure,
+// Module under test: utils/timerNotifications.ts — pure,
 // imports only utils/i18n (Translator) and utils/timers (timerLabel, Timer).
 // No expo-notifications / react-native import, so no jest mapper is needed.
 //   TIMER_CHANNEL_ID, TIMER_NOTIFICATION_PREFIX, FIRE_TIME_TOLERANCE_MS,
@@ -35,7 +35,7 @@ import {
   nextExactAlarmStep,
   shouldRearmOnExactChange,
   parseNoticeCount,
-  // Stage 3 — live countdown notification (v1). TDD red: not implemented yet.
+  // Stage 3 — live countdown notification (v1).
   TIMER_LIVE_PREFIX,
   timerLiveNotificationId,
   timerIdFromLiveNotificationId,
@@ -877,7 +877,7 @@ describe('armedAfterSync', () => {
   });
 });
 
-// TDD red phase — exact timer alarms (stage 2 addendum). Without exact-alarm
+// Exact timer alarms (stage 2 addendum). Without exact-alarm
 // access Android fires an inexact alarm up to 3/4 of the duration late, so the
 // app asks for "Alarms & reminders" via a snackbar: at most once per session,
 // at most EXACT_ALARM_NOTICE_MAX sessions in total, only while notifications

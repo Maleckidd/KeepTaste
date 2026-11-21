@@ -1,4 +1,4 @@
-// TDD red phase for the pure backup-archive serializer (SPEC.md §5.17.1).
+// Tests for the pure backup-archive serializer (SPEC.md §5.17.1).
 // utils/backupArchive.ts must stay pure (no native imports) so it runs in
 // plain ts-jest. These tests exercise the JSON build/parse round-trip and the
 // schema-version guard.

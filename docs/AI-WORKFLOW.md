@@ -64,7 +64,7 @@ flowchart LR
 - **tester**: writes the failing tests first, for pure logic only (no
   component tests; see [TESTING.md](TESTING.md#why-there-are-no-component-tests)).
   It must show the tests fail *for the right reason*: missing behaviour, not
-  broken setup. 17 test files still open with their "TDD red phase" header.
+  broken setup.
 - **coder**: implements until the tests pass. It is not allowed to weaken
   or delete tests to get there.
 - **reviewer**: read-only gate. It checks every plan step was done, runs

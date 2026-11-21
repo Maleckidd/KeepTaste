@@ -1,4 +1,4 @@
-// TDD red phase for deleteAllData (Settings → "delete all data").
+// Tests for deleteAllData (Settings → "delete all data").
 //
 // We mock db/client so importing db/recipes is pure. The mock models the two
 // query shapes the implementation is expected to use, consistent with the rest

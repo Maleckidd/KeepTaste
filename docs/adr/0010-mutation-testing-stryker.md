@@ -74,3 +74,8 @@ not been measured ([docs/TESTING.md](../TESTING.md#known-gaps)).
   measurement: `high: 80`, `low: 70`, `break: 65`, a few points under the
   current score. Per-file scores and the groups of survivors left alive
   on purpose are in [docs/mutation-testing.md](../mutation-testing.md).
+- **2026-11-21, schedule removed.** The weekly cron is gone; the workflow
+  runs only when started by hand (`workflow_dispatch`). The rest of the
+  decision stands. The owner has no use for a recurring run, so a run
+  happens when someone wants the report, and nothing is left to go red
+  unnoticed.

@@ -1,6 +1,4 @@
-// TDD red phase for the Android share-target URL helper (SPEC §5.15).
-// The module utils/sharedUrl.ts does NOT exist yet; these tests should fail
-// because of the missing implementation, not setup errors.
+// Tests for the Android share-target URL helper (SPEC §5.15).
 import { extractSharedUrl, toImportIntent } from '@/utils/sharedUrl';
 
 describe('extractSharedUrl', () => {

@@ -1,8 +1,7 @@
-// TDD red phase for the pure to-try partition helper (SPEC.md §5.19).
-// utils/toTry.ts does not exist yet — this suite fails to resolve until the
-// Coder adds it. The helper is fed a list already sorted updated_at-desc and
-// must partition (not re-sort) it into a leading "normal" bucket and a trailing
-// "to try" bucket, preserving the input order within each.
+// Tests for the pure to-try partition helper (SPEC.md §5.19, utils/toTry.ts).
+// The helper is fed a list already sorted updated_at-desc and must partition
+// (not re-sort) it into a leading "normal" bucket and a trailing "to try"
+// bucket, preserving the input order within each.
 import { partitionToTry, countToTry } from '../utils/toTry';
 
 type Row = { id: number; toTry: number };

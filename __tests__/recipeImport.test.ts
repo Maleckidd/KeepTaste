@@ -1,6 +1,4 @@
-// TDD red phase for single-recipe import (SPEC.md §5.15).
-// The module utils/recipeImport.ts does not exist yet; these tests should
-// fail because of the missing implementation, not setup errors.
+// Tests for single-recipe import (SPEC.md §5.15).
 import {
   parseIsoDuration,
   parseRecipeJsonLd,

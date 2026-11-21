@@ -1,6 +1,7 @@
 // Pure HTML builder for the cookbook-to-PDF export (SPEC.md §5.14). Localized
-// via the passed translator; user content is HTML-escaped; missing metadata is
-// omitted (no "—" placeholders). Styling values mirror constants/theme.ts.
+// via the passed translator; user content is HTML-escaped (including quotes, so
+// it stays safe in an attribute too); missing metadata is omitted (no "—"
+// placeholders). Styling values mirror constants/theme.ts.
 import type { Cookbook, Recipe } from '../db/schema';
 import type { Translator } from './i18n';
 import { formatTime } from './markdown';
@@ -9,7 +10,9 @@ function escapeHtml(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** Escapes then turns newlines into <br> for inline multi-line content. */

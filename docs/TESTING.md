@@ -25,7 +25,7 @@ flowchart TB
 | Integration | `npm run test:integration` | yes, own job | `db/` against real SQLite |
 | E2E | `npm run e2e:build && npm run e2e` | yes, own job | Cross-layer flows in the browser |
 | Android E2E | `maestro test .maestro/` | no, local emulator only ([ADR 0011](adr/0011-maestro-android-e2e.md)) | Native flows on a dev/release build: `.zip` restore and export, recipe create, shopping list |
-| Mutation | `npm run test:mutation` | weekly and on demand, never on PRs ([ADR 0010](adr/0010-mutation-testing-stryker.md)) | How strong the unit tests of the `utils/` parsers are ([mutation-testing.md](mutation-testing.md)) |
+| Mutation | `npm run test:mutation` | on demand only, never on PRs ([ADR 0010](adr/0010-mutation-testing-stryker.md)) | How strong the unit tests of the `utils/` parsers are ([mutation-testing.md](mutation-testing.md)) |
 | Persona studies | `bash persona-lab/run.sh persona-lab/config` | no (needs an emulator and an LLM) | Discoverability, comprehension, the user's belief vs the saved state |
 | Manual | Appendix A | no | Native behaviour on a real phone |
 

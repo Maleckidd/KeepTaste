@@ -1,7 +1,7 @@
-// TDD red phase for cooking timers, stage 1 (SPEC.md §5.21) — duration
+// Tests for cooking timers, stage 1 (SPEC.md §5.21) — duration
 // detection in recipe Instructions.
 //
-// Target module (does NOT exist yet): utils/durations.ts
+// Module under test: utils/durations.ts
 //   parseDurations(text): DurationMatch[]        — sorted by start, non-overlapping
 //   splitDurationSegments(text): DurationSegment[]
 // Pure: no react-native / expo imports. Must run on Hermes (no lookbehind,

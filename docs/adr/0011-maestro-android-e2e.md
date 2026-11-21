@@ -56,8 +56,8 @@ the runner, on every run. That is heavy and slow next to the rest of the
 pipeline, and an emulator boot adds failures that have nothing to do with
 the app. The
 suite is small and local runs are enough to see whether it is worth the
-cost. CI can be added later, for example as a scheduled job like
-mutation testing ([0010](0010-mutation-testing-stryker.md)), and that
+cost. CI can be added later, for example as a separate, non-required workflow
+like mutation testing ([0010](0010-mutation-testing-stryker.md)), and that
 would be a new ADR.
 
 ## Consequences

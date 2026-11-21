@@ -1,6 +1,6 @@
-// TDD red phase for cooking timers, stage 1 (SPEC.md §5.21) — timer model.
+// Tests for cooking timers, stage 1 (SPEC.md §5.21) — timer model.
 //
-// Target module (does NOT exist yet): utils/timers.ts
+// Module under test: utils/timers.ts
 //   timersReducer, remainingSeconds, expireDue, orderTimers, barSummary,
 //   findTimerForChip, serializeTimers, parseStoredTimers, formatCountdown,
 //   formatDurationWords, timerLabel, shouldShowTimerBar
@@ -554,7 +554,7 @@ describe('isModalFormRoute', () => {
   );
 });
 
-// TDD red phase — ringing alarm (stage 2 addendum). TimerProvider keeps a
+// Ringing alarm (stage 2 addendum). TimerProvider keeps a
 // "ringing" id set for the repeating in-app vibration; after every timers
 // change it keeps only the ids whose timer still exists in state 'done'
 // (Dismiss / Stop / +1 min drop it) and stops the vibration when it empties.

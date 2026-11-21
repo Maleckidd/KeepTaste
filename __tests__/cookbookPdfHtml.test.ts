@@ -81,4 +81,17 @@ describe('buildCookbookHtml', () => {
     // The raw injected tag must not appear unescaped in the body.
     expect(html).not.toContain('<b>flour</b>');
   });
+
+  it('HTML-escapes double and single quotes from recipe content', () => {
+    const html = buildCookbookHtml(
+      { ...cookbook, name: `Gran's "best"` },
+      [recipe({ title: `Mom's "secret" pie`, notes: `a" onload="x` })],
+      en,
+    );
+    expect(html).toContain('Gran&#39;s &quot;best&quot;');
+    expect(html).toContain('Mom&#39;s &quot;secret&quot; pie');
+    expect(html).toContain('a&quot; onload=&quot;x');
+    expect(html).not.toContain('"secret"');
+    expect(html).not.toContain('onload="x');
+  });
 });
